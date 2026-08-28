@@ -76,6 +76,31 @@ Anti-example (rejected — unsourced, diagnostic, and system-as-actor):
 - **Explain at every handoff point.** Where the urgency agent hands to the coordinator, and the
   coordinator to the clinician, the UI shows what crossed the boundary.
 
+## Frontend Aesthetics
+
+The interface should look like a working clinical operations tool: restrained, legible, dense, and
+calm under pressure.
+
+- **Primary surface:** a full-width ranked list, not a card-heavy dashboard. The first screen should
+  immediately show the ranked referrals and their decision-support status.
+- **Information density:** use compact rows, fixed columns, concise labels, and predictable alignment
+  so clinicians can compare patients quickly.
+- **Colour system:** use white and light grey as the base, restrained blue for structure and focus,
+  amber for warnings, and red only for urgent rule violations. Avoid decorative gradients and
+  marketing-style colour blocks.
+- **Clinical status badges:** CPC, CRT, MTS, NEWS2, and bed-pressure states should appear as labelled
+  badges or table cells. MTS category colours can be used only with visible text labels.
+- **Evidence panels:** expanded rows should show urgency evidence, capacity evidence, rule checks, and
+  graph citation identifiers in a grouped but compact layout.
+- **Action controls:** accept, reorder, and override controls should be visible in each actionable row.
+  Override controls must look deliberate and normal, not destructive by default.
+- **Typography:** use a clear sans-serif system font, compact body text, short headings, and no
+  oversized hero typography inside the app.
+- **Motion:** use minimal HTMX state changes and loading indicators. Do not use animation that delays
+  clinical review.
+- **Demo labelling:** synthetic-data status and decision-support boundaries must be visible in the
+  app chrome and any exported or screenshotted view.
+
 ## Accessibility
 
 - Never encode urgency by colour alone — MTS categories carry colour names (Red, Orange, Yellow,
