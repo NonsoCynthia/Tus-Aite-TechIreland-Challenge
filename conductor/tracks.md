@@ -7,19 +7,13 @@
 | Track | Type | Status | Description |
 |---|---|---|---|
 | [graph-foundation_20260826](./tracks/graph-foundation_20260826/index.md) | feature | pending | Knowledge graph foundation: OWL ontology, Oxigraph bootstrap, synthetic referral generator, SimPy bed simulation |
+| [explainable-agent-based-triage_20260828](./tracks/explainable-agent-based-triage_20260828/index.md) | feature | pending | Full build on top of graph-foundation: urgency agent, capacity agent, coordinator + audit trail, rationale layer, clinician UI + override loop, CPC/CRT compliance validation (proposal §14 Days 3–6) |
 
 ## Planned Tracks
 
-Derived from the proposal's Day 3–7 schedule. Create these with `/conductor:newTrack` as the
-foundation lands.
-
 | Track | Maps to | Depends on |
 |---|---|---|
-| Specialist agents — urgency (MTS/NEWS2) and capacity scoring | Day 3 | graph-foundation |
-| Coordination and audit trail — ranked list, `Decision` nodes, `cites` edges | Day 4 | specialist agents |
-| Clinician interface and override loop | Day 5 | coordination |
-| Validation and hardening — CPC/CRT rule checks, responsible AI boundary docs | Day 6 | clinician interface |
-| Rehearsal and submission package | Day 7 | all |
+| Rehearsal and submission package | Day 7 | explainable-agent-based-triage_20260828 |
 
 ---
 
