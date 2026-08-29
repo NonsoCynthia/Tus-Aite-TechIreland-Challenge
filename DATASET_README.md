@@ -130,7 +130,7 @@ That gives four linked problems:
 3. There is nothing better to build one from, because the record holds no clinical detail.
 4. Separately, nothing checks the resulting order against real bed and clinic availability.
 
-**This is what the dataset is built to address.** Not to assign priority, which triage already does, but to order patients *within* the priority a clinician set, using evidence the national record never captured, and to make that ordering explainable.
+**This is what the dataset is built to address.** Not to assign priority, which triage already does, but to order patients *within* the priority a clinician sets, using evidence the national record never captured, and to make that ordering explainable.
 
 It follows that the system may **never** move a patient across a category boundary. An urgent referral outranks a semi-urgent one, always, whatever any score says. That constraint is written into the rules as `RULE-ORDER` (section 7.24).
 
