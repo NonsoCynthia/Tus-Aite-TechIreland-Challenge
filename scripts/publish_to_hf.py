@@ -25,6 +25,13 @@ language: [en]
 tags: [synthetic, healthcare, ireland, waiting-list, triage, referral-prioritisation]
 pretty_name: Synthetic Irish Hospital Referral Prioritisation Dataset
 size_categories: [10K<n<100K]
+gated: manual
+extra_gated_heading: "Request access to this dataset"
+extra_gated_description: >
+  Synthetic data built for the TechIreland National AI Challenge 2026. No real patient,
+  clinician or hospital is represented. Access is granted individually while the project
+  is in development. You will be asked to share your username and email address.
+extra_gated_button_content: "Request access"
 ---
 
 # Synthetic Irish Hospital Referral Prioritisation Dataset
@@ -79,8 +86,9 @@ The repository holds the generator, the schema, the tests and the full specifica
 what every column means, where every number came from, and what the real data disproved
 along the way.
 
-**[github.com/NonsoCynthia/Tus-Aite-TechIreland-Challenge](https://github.com/NonsoCynthia/Tus-Aite-TechIreland-Challenge)**
-Branch `dataset_branch`. The repository is private; ask the team for access.
+**[github.com/NonsoCynthia/Tus-Aite-TechIreland-Challenge](https://github.com/NonsoCynthia/Tus-Aite-TechIreland-Challenge)**,
+branch `dataset_branch`. The repository is private and open to the project team only, so
+the link will not resolve unless you have been added to it.
 
 Start with `README.md` there, then `docs/GETTING_THE_DATA.md` to load it and
 `DATASET_README.md` for the column-by-column specification.

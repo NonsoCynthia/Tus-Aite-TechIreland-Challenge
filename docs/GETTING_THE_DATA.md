@@ -9,14 +9,28 @@ Companion documents: [`DATASET_README.md`](../DATASET_README.md) for what the da
 
 ## 1. What you need
 
-Docker Desktop, running. A Hugging Face account. And an invitation to the dataset, which
-is private. Ask Thabang (`ThabangIsaac1`).
+Docker Desktop, running. A Hugging Face account. And access to the dataset, which is
+gated: the page is public but the files are not, and Thabang approves each person
+individually.
 
-Then your own Hugging Face **read** token, from
-[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). Name it
-something you will recognise later, like `triage-dataset-read`.
+### Getting access
 
-**Make your own token. Never use somebody else's.** A shared token reaches a commit or a
+1. Open
+   [huggingface.co/datasets/Thabang/irish-referral-prioritisation](https://huggingface.co/datasets/Thabang/irish-referral-prioritisation)
+   while logged in, and click **Request access**. It has to be done in a browser. There is
+   no way to request it from a script.
+2. You will share your username and email address. Thabang approves it.
+3. Ask before you request if you are unsure whether you should have it. A rejected request
+   is final and cannot be made again.
+
+### Your token
+
+Once approved, make your own **read** token at
+[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) and put it on the
+`HF_TOKEN` line of your `.env`. Name it something you will recognise later, like
+`triage-dataset-read`.
+
+**Make your own. Never use somebody else's.** A shared token reaches a commit or a
 screenshot eventually, and revoking it then breaks everyone at once rather than one
 person. Yours costs thirty seconds and can be deleted without anyone noticing.
 
@@ -136,7 +150,7 @@ Face.
 |---|---|
 | `Cannot connect to the Docker daemon` | Start Docker Desktop |
 | `port is already allocated` | Change `POSTGRES_PORT` or `PGADMIN_PORT` in `.env` |
-| `401` or `Repository Not Found` on `make load` | Missing or wrong `HF_TOKEN`, or you have not been invited. A private repo you cannot see returns 404, not "denied" |
+| `401`, `403` or `GatedRepoError` on `make load` | One of: no `HF_TOKEN` in `.env`, a wrong or deleted token, or your access request is still pending. Open the dataset page in a browser: if it shows a request form, you are not approved yet |
 | `password authentication failed` in pgAdmin | Use `POSTGRES_PASSWORD` from `.env`; if you changed `POSTGRES_USER`, update `db/pgadmin/servers.json` too |
 | `could not translate host name "localhost"` | You added a server by hand. Use `db:5432`. See section 3 |
 | `container name "/triage_db" is already in use` | Another copy of this project is running. `docker compose down` there first |
