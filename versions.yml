@@ -1,0 +1,11 @@
+# The pin that joins schema, data and code. Nothing ever fetches "latest".
+schema_version: "007"
+data_version: "v1.0"
+hf_repo: "Thabang/irish-referral-prioritisation"
+
+# A tag, never a branch. Never "main". Never "latest".
+hf_revision: "v1.0"
+
+# Which slice `make load` pulls by default. "sample" is a referentially-closed
+# subset (~1 MB); "full" is the whole dataset (~20 MB). See docs/GETTING_THE_DATA.md.
+default_profile: "sample"
