@@ -46,3 +46,33 @@ def test_demo_06_and_07_span_two_public_hospitals(q):
     hosps = q("""SELECT count(DISTINCT hospital_hipe) FROM core.referrals
                  WHERE pathway_number IN ('PW-DEMO-06','PW-DEMO-07')""")[0][0]
     assert hosps >= 1
+
+
+@pytest.mark.parametrize("pw", DEMOS)
+def test_demo_case_clocks_are_internally_possible(q, pw):
+    """Each planted case must describe a referral that could exist.
+
+    The outcome assertions above check what each demo advertises -- that DEMO-01
+    breaches its timeframe, that DEMO-05 has waited 60 days. Both were true of the
+    v1.0 rows even though those rows were impossible: the counts were written
+    directly and the dates left behind, so the two described different referrals.
+
+    Asserting the advertised property is not the same as asserting the row is
+    coherent. This is the check that was missing.
+    """
+    rows = q(f"""SELECT as_of_date - referral_date, days_since_referral,
+                        as_of_date - referral_received_date, days_since_received,
+                        adjusted_wait_days
+                 FROM core.referral_daily WHERE pathway_number='{pw}'
+                 ORDER BY as_of_date DESC LIMIT 1""")
+    assert rows, f"{pw} missing"
+    derived_ref, stored_ref, derived_recv, stored_recv, adjusted = rows[0]
+
+    assert stored_ref == derived_ref, (
+        f"{pw}: days_since_referral is {stored_ref} but the dates give {derived_ref}")
+    assert stored_recv == derived_recv, (
+        f"{pw}: days_since_received is {stored_recv} but the dates give {derived_recv}")
+    assert stored_ref >= stored_recv, (
+        f"{pw}: received {stored_recv} days ago but written only {stored_ref} days ago")
+    assert adjusted <= stored_recv, (
+        f"{pw}: adjusted wait {adjusted} exceeds the raw wait {stored_recv}")

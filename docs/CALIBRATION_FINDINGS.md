@@ -230,11 +230,13 @@ circularity would be a concern.
 
 ---
 
-## 7. Known limitations in v1.0
+## 7. Known limitations, and what was fixed in v1.1
 
-Found by a cold-reader review of the repository after `v1.0` was published. Both change
-generated data, so neither is fixed in place: correcting them needs a new data version
-and a re-publish, not a quiet edit to code that a published tag already pins.
+Found by a cold-reader review of the repository, and by a check of the loaded database
+afterwards. Each changes generated data, so none could be quietly edited into code that a
+published tag already pins.
+
+**7.4 is fixed in v1.1.** 7.1 to 7.3 remain open.
 
 ### 7.1 Cross-hospital linkage is not demonstrated
 
@@ -288,3 +290,43 @@ appears in no calibration file.
 It affects only the claim that risk varies by condition. The generator docstring has been
 corrected to say so; the parameter name remains misleading and should be renamed when the
 model is fixed.
+
+
+### 7.4 Planted wait clocks contradicted their own dates — FIXED in v1.1
+
+Two of the seven planted demo referrals shipped in `v1.0` describing referrals that could
+not exist.
+
+| pathway | dates implied | stored counts said |
+|---|---|---|
+| `PW-DEMO-01` | 11 days since referral, **0 since received** | 63 and **58** |
+| `PW-DEMO-05` | 12 since referral, 9 since received | 12 and **64** |
+
+`PW-DEMO-01` claimed 58 days past receipt while its `referral_received_date` was the
+snapshot date itself. `PW-DEMO-05` claimed 64 days of waiting on a letter written 12 days
+earlier — received before it was written. 11 rows, 2 referrals.
+
+**Cause.** `plant()` forced the demo behaviour by writing `days_since_received`,
+`adjusted_wait_days` and `days_awaiting_triage` directly while leaving `referral_date`,
+`referral_received_date` and `days_since_referral` at their generated values. The counts
+and the dates then described different referrals.
+
+**Why nothing caught it.** No CHECK related the counts to the dates — `003_core.sql`
+asserted `adjusted_wait_days <= days_since_received` and non-negativity, but never that
+`days_since_received = as_of_date - referral_received_date`. And
+`test_planted_cases.py` asserted what each demo *advertises* — that DEMO-01 breaches 28
+days, that DEMO-05 has waited 60 — both of which were true of the broken rows. **Asserting
+the advertised property is not the same as asserting the row is possible.** That is the
+same failure mode as 7.1 above.
+
+**Fix.** `plant()` now sets the dates and derives the counts from them, so every daily row
+computes its own wait exactly as the generator does for every other referral. DEMO-01's
+triage event moved with it, or the referral would be triaged before the hospital received
+it. Migration `008_wait_clock_consistency.sql` makes the combination unloadable, and
+`test_referential.py` and `test_planted_cases.py` assert the same thing so a regression
+fails in CI naming the generator rather than at load time naming a constraint.
+
+**Version interaction.** Schema 008 and data `v1.0` are incompatible by design: loading
+`v1.0` against 008 fails with `CheckViolation ... rd_counts_match_dates`, naming
+`PW-DEMO-01`. Anyone pinned to `v1.0` must stay on schema 007. `v1.1` is the first data
+version that loads against 008. The `v1.0` tag remains on Hugging Face — tags are history.

@@ -38,6 +38,13 @@ hf_revision: "v1.0"        # a tag, never a branch
 default_profile: "sample"
 ```
 
+
+> **Schema 008 requires data v1.1 or later.** Migration 008 asserts that the stored
+> wait counts equal their date arithmetic, and two planted referrals in `v1.0` violate
+> it. Loading `v1.0` against schema 008 fails with a `rd_counts_match_dates` check
+> violation. If you are pinned to `v1.0`, stay on schema 007. See
+> `docs/CALIBRATION_FINDINGS.md` §7.4.
+
 **Nothing ever fetches "latest".** `hf_revision` is a git tag on the Hugging Face
 repository. If it said `main`, then two people running the same command on the same day
 could get different data and neither would know. A tag means the version you loaded is

@@ -90,6 +90,21 @@ to copy, only Irish shapes to match. Every calibration parameter is labelled `fi
 - Routine-category vitals come from physiological reference ranges, not from data:
   MIMIC's demo subset contains only two ESI 4-5 stays.
 
+## Changelog
+
+### v1.1
+Fixes two planted demo referrals whose wait clocks contradicted their own dates.
+`PW-DEMO-01` recorded 58 days since receipt against a received date equal to the snapshot
+date; `PW-DEMO-05` recorded 64 days of waiting on a letter written 12 days earlier. The
+generator now sets the dates and derives the counts from them, and a new schema constraint
+makes the combination unloadable.
+
+**Requires schema 008.** Data `v1.0` will not load against schema 008 and `v1.1` will not
+load against 007 in a way that is checked. Pin both together.
+
+### v1.0
+First release.
+
 ## Full specification
 
 See `DATASET_README.md` in the source repository, plus

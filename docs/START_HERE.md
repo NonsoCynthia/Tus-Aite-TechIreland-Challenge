@@ -147,6 +147,13 @@ More, with expected results, in [VERIFY_IN_PGADMIN.md](VERIFY_IN_PGADMIN.md).
 
 ---
 
+
+> **Schema 008 requires data v1.1 or later.** Migration 008 asserts that the stored
+> wait counts equal their date arithmetic, and two planted referrals in `v1.0` violate
+> it. Loading `v1.0` against schema 008 fails with a `rd_counts_match_dates` check
+> violation. If you are pinned to `v1.0`, stay on schema 007. See
+> `docs/CALIBRATION_FINDINGS.md` §7.4.
+
 ## f. Sample versus full
 
 You get the **sample** by default: about 1.3 MB, 609 referrals, 21,348 rows. It is fast

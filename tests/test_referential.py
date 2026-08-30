@@ -75,3 +75,35 @@ def test_pathway_numbers_collide_across_hospitals_but_never_merge(q):
     wrong = q("""SELECT count(*) FROM core.observations o
                  JOIN core.referrals r ON r.pathway_number = o.pathway_number""")[0][0]
     assert wrong > correct, "joining on pathway_number alone did not inflate; collision missing"
+
+
+def test_wait_counts_match_the_dates_they_come_from(q):
+    """referral_daily stores both dates and derived day-counts. They must agree.
+
+    Computing the counts once at load time is the right design -- it stops every
+    part of the system recalculating a waiting time and disagreeing. But nothing
+    asserted the counts stayed in step with the dates, and in v1.0 two planted demo
+    referrals shipped where they had not: one recorded 58 days since receipt against
+    a received date equal to the snapshot date.
+
+    Migration 008 enforces this in the database. This asserts it here too, so a
+    generator regression fails in CI with a message naming the generator, rather
+    than at load time naming a constraint.
+    """
+    drifted = q("""
+        SELECT hospital_hipe, pathway_number, as_of_date,
+               days_since_referral, as_of_date - referral_date,
+               days_since_received, as_of_date - referral_received_date
+        FROM core.referral_daily
+        WHERE days_since_referral <> as_of_date - referral_date
+           OR days_since_received <> as_of_date - referral_received_date
+        LIMIT 10""")
+    assert drifted == [], (
+        f"{len(drifted)} row(s) have day-counts that disagree with their own dates. "
+        f"First: {drifted[0] if drifted else ''}")
+
+
+def test_no_referral_is_received_before_it_was_written(q):
+    """A hospital cannot receive a referral before the GP wrote it."""
+    assert q("""SELECT count(*) FROM core.referral_daily
+                WHERE days_since_referral < days_since_received""")[0][0] == 0

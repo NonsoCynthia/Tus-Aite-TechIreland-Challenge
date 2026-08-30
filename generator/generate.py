@@ -868,11 +868,59 @@ def plant(gen: "Generator") -> None:
             value = str(value)
         df.loc[mask, col] = value
 
-    # 01 urgent and past its 28-day timeframe
+    # Set the DATES and derive the counts from them, never the other way round.
+    #
+    # An earlier version wrote days_since_received and adjusted_wait_days directly
+    # and left referral_date and referral_received_date at whatever the generator
+    # produced. The counts and the dates then described different referrals:
+    # PW-DEMO-01 claimed 58 days since receipt while its received date was the
+    # snapshot date itself, and PW-DEMO-05 claimed 64 days of waiting on a letter
+    # written 12 days earlier -- received before it was written. Both shipped in
+    # v1.0. Migration 008 now makes that combination unloadable.
+    def set_wait(pathway: str, received_days_ago: int, letter_to_receipt: int) -> None:
+        """Back-date one referral so its wait falls out of its own dates.
+
+        received_days_ago is measured from the LAST snapshot, so the wait grows
+        across the window exactly as it does for every other referral.
+        """
+        mask = d["pathway_number"] == pathway
+        if not mask.any():
+            return
+        last_day = pd.to_datetime(d["as_of_date"]).max()
+        received = last_day - pd.Timedelta(days=received_days_ago)
+        written = received - pd.Timedelta(days=letter_to_receipt)
+
+        d.loc[mask, "referral_received_date"] = received
+        d.loc[mask, "referral_date"] = written
+        d.loc[mask, "record_creation_date"] = received
+
+        as_of = pd.to_datetime(d.loc[mask, "as_of_date"])
+        since_written = (as_of - written).dt.days
+        since_received = (as_of - received).dt.days
+        d.loc[mask, "days_since_referral"] = since_written
+        d.loc[mask, "days_since_received"] = since_received
+        # plant() strips suspensions from these pathways below, so the adjusted
+        # wait is the raw wait. Nothing is being hidden by that equality.
+        d.loc[mask, "adjusted_wait_days"] = since_received
+        return since_received
+
+    # 01 urgent and past its 28-day timeframe. 58 days at the last snapshot, still
+    # 45 and therefore still breached at the first.
     m = d["pathway_number"] == "PW-DEMO-01"
-    for col, val in [("days_since_received", 58), ("adjusted_wait_days", 58),
-                     ("days_since_referral", 63), ("triage_status", "triaged")]:
-        put(d, m, col, val)
+    set_wait("PW-DEMO-01", received_days_ago=58, letter_to_receipt=5)
+    put(d, m, "triage_status", "triaged")
+
+    # Its triage event has to move with it, or the referral is triaged before the
+    # hospital receives it.
+    tri_01 = gen.t["triage_events"]
+    m01 = tri_01["pathway_number"] == "PW-DEMO-01"
+    if m01.any():
+        last_day = pd.to_datetime(d["as_of_date"]).max()
+        received_01 = last_day - pd.Timedelta(days=58)
+        tri_01.loc[m01, "sent_for_triage_date"] = received_01 + pd.Timedelta(days=2)
+        tri_01.loc[m01, "triage_date"] = received_01 + pd.Timedelta(days=5)
+        tri_01.loc[m01, "date_returned_from_triage"] = received_01 + pd.Timedelta(days=5)
+        tri_01.loc[m01, "turnaround_days"] = 3
 
     # 03 urgent by pathway, entirely normal vitals: vitals alone do not identify urgency
     o = gen.t["observations"]
@@ -881,12 +929,17 @@ def plant(gen: "Generator") -> None:
                      ("spo2", 99), ("pain", 1), ("avpu", "A"), ("news2", 0)]:
         put(o, m3, col, val)
 
-    # 05 awaiting triage for 60+ days, no category at all: the invisible population
+    # 05 awaiting triage for 60+ days, no category at all: the invisible population.
+    # 64 days at the last snapshot, 51 at the first -- still the longest untriaged
+    # wait in the set, which is the point of the case.
     m5 = d["pathway_number"] == "PW-DEMO-05"
-    for col, val in [("triage_status", "awaiting_triage"), ("triage_event_id", ""),
-                     ("days_awaiting_triage", 64), ("days_since_received", 64),
-                     ("adjusted_wait_days", 64)]:
-        put(d, m5, col, val)
+    since_received_05 = set_wait("PW-DEMO-05", received_days_ago=64, letter_to_receipt=3)
+    put(d, m5, "triage_status", "awaiting_triage")
+    put(d, m5, "triage_event_id", "")
+    if since_received_05 is not None:
+        # A referral nobody has triaged has been waiting for triage for exactly as
+        # long as the hospital has held it.
+        d.loc[m5, "days_awaiting_triage"] = since_received_05.astype(str)
     # Re-read after the rename loop above. Using the frame captured before it
     # would assign back the pre-rename pathway numbers and silently break the
     # referral_daily -> triage_events foreign key.
