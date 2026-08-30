@@ -21,7 +21,7 @@ row-level data; the rest are aggregates.**
 | NTPF Outpatient MDS v2.6 | Specification | Field names, code values, rules |
 
 **No Irish source publishes patient-level waiting list data.** It does not exist publicly.
-So there are no Irish rows to copy — only Irish *shapes* to match. MIMIC matters because
+So there are no Irish rows to copy, only Irish *shapes* to match. MIMIC matters because
 it is the only place the real relationship between nurse-assigned urgency and observed
 vitals can be measured, including how often the two disagree.
 
@@ -46,7 +46,7 @@ and triage category disagree, and the `latent_hazard` model.
 
 Three data-quality problems in MIMIC were excluded rather than absorbed, each scoped to the
 column it affects, with the as-measured value kept alongside: a diastolic pressure of 879
-mmHg, a Celsius reading sitting in the Fahrenheit column, and free-text entries in a 0–10
+mmHg, a Celsius reading sitting in the Fahrenheit column, and free-text entries in a 0 to 10
 pain field.
 
 ## 3. How it is generated
@@ -60,12 +60,12 @@ Two decisions carry the whole design.
 **Vitals are resampled from real MIMIC rows, not drawn from a fitted Gaussian.** Fitting
 means and standard deviations throws away skew, heavy tails, within-patient correlation and
 the ceiling where oxygen saturation piles up at 100%. Measured: a Gaussian gave an AUC of
-0.732 against real MIMIC's own 0.651 — our synthetic data separated the categories *more
+0.732 against real MIMIC's own 0.651. Our synthetic data separated the categories *more
 cleanly than reality*. Resampling 190 real rows with a small jitter gives 0.630, inside
 MIMIC's own confidence interval. The distribution is right because it *is* the
 distribution.
 
-**`latent_hazard` never touches `news2`.** It is the answer key — which patients
+**`latent_hazard` never touches `news2`.** It is the answer key: which patients
 deteriorate while waiting. If risk were a function of what the ranking agent reads, then
 "our ranking reduces deterioration" would be true by construction whether or not the system
 worked. Its noise term is large on purpose and must not be reduced to make results look
@@ -81,11 +81,11 @@ Each was an assumption in the original build specification. Each was checked and
 ### An early warning score does not identify referral urgency
 
 The specification required the correlation between `news2` and `severity_rank` to land in
-0.35–0.65. A sweep across the one free parameter never exceeded **0.253**, at any value —
+0.35 to 0.65. A sweep across the one free parameter never exceeded **0.253**, at any value,
 including values that would amplify beyond MIMIC's own measured separation.
 
 The best possible rule based on `news2` alone recovers the triage category only **17.5
-percentage points** better than guessing the most common one, and **54–59%** of the
+percentage points** better than guessing the most common one, and **54 to 59%** of the
 highest-acuity patients score `news2 ≤ 2`.
 
 This is a property of the instruments, not a defect in the fit. NEWS2 detects
@@ -98,14 +98,14 @@ an urgency agent must read condition, pathway, referral source and the high-need
 just physiology.
 
 The band was replaced by a check anchored in the source rather than chosen: the generated
-AUC must not exceed MIMIC's own by more than 0.05. One-sided on purpose — overlap looser
+AUC must not exceed MIMIC's own by more than 0.05. One-sided on purpose: overlap looser
 than reality passes, and only cleaner-than-real separation fails. That gate caught a real
 defect on its first run, which is how the resampling decision in §3 was found.
 
 ### Irish urgent referrals breach their timeframe almost always
 
 The specification expected fewer than 40% to breach. NTPF's own published bands imply
-**91.2%** for the 28-day urgent target — 28 days is under a month, and only 59.6% of the
+**91.2%** for the 28-day urgent target. 28 days is under a month, and only 59.6% of the
 national list waits under six. The generator produces 90.0%, within 1.1 points. The
 assertion is now anchored to the NTPF figure rather than the original guess.
 
@@ -117,7 +117,7 @@ Routine vitals come from standard adult physiological reference ranges instead, 
 Routine parameter is labelled `modelled`, not `fitted`. It is the clinically correct choice
 anyway: a routine outpatient referral is by definition someone with no acute derangement.
 
-**Population caveat.** MIMIC is an emergency department cohort — 55.6% urgent. An
+**Population caveat.** MIMIC is an emergency department cohort, 55.6% urgent. An
 outpatient waiting list is close to the inverse. Within-category vitals come from MIMIC;
 category proportions never do, and a test asserts the generated urgent share stays below
 40%.
@@ -138,15 +138,15 @@ demo names.
 
 **5.3 `latent_hazard` does not depend on the condition.** Despite the parameter name, the
 base is a uniform draw that never reads the diagnosis. Age and noise are real. The
-non-circularity guarantee is unaffected — it still never touches `news2`.
+non-circularity guarantee is unaffected: it still never touches `news2`.
 
-**5.4 Planted wait clocks contradicted their dates — fixed in v1.1.** Two demo referrals
+**5.4 Planted wait clocks contradicted their dates, fixed in v1.1.** Two demo referrals
 shipped in `v1.0` recording waits their own dates could not support: one claimed 58 days
 since receipt against a received date equal to the snapshot date. `plant()` had written the
 counts directly and left the dates behind. Migration 008 now makes that combination
 unloadable.
 
 **The common thread in 5.1, 5.2 and 5.4 is worth naming.** In each case a test asserted
-what the demo case *advertises* — that it breaches its timeframe, that it has waited 60
-days — rather than whether the row could exist. Asserting the advertised property is not
+what the demo case *advertises*, that it breaches its timeframe or has waited 60
+days, rather than whether the row could exist. Asserting the advertised property is not
 the same as asserting the thing is real.

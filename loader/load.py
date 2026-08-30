@@ -175,7 +175,7 @@ def load_data(conn: psycopg.Connection, profile: str) -> None:
         path = src / csv_name(table)
         if not path.exists():
             if table == "ground_truth":
-                print(f"  {table:24} {'—':>8}  (absent; held out builds may omit it)")
+                print(f"  {table:24} {'-':>8}  (absent; held out builds may omit it)")
                 continue
             sys.exit(f"Missing data file: {path}")
 

@@ -33,7 +33,7 @@ size_categories: [10K<n<100K]
 > represented. Hospital names are invented and their codes use a reserved range that
 > matches no real facility.
 
-A hospital outpatient waiting list — people waiting for a clinic appointment, what is
+A hospital outpatient waiting list: people waiting for a clinic appointment, what is
 wrong with them, how urgent a clinician judged them, and how full the wards and clinics
 are. It exists to answer one question: **among patients already marked equally urgent,
 who should be seen next, and why?**
@@ -45,15 +45,15 @@ clinics but no queue of their own.
 
 | | |
 |---|---|
-| **Referral** | One person waiting for one appointment. Identified by `hospital_hipe` + `pathway_number` — numbers are only unique *within* a hospital. |
+| **Referral** | One person waiting for one appointment. Identified by `hospital_hipe` + `pathway_number`. Numbers are only unique *within* a hospital. |
 | **Triage category** | How urgent a clinician judged it: Urgent, Semi-Urgent or Routine. Assigned once, and nothing in the data reorders across categories. |
 | **Timeframe** | How long that category should wait: 28 days if Urgent, 91 if Semi-Urgent. |
-| **Wait** | Four different clocks, because they give different answers. `adjusted_wait_days` excludes time when care was bought privately and the clock paused — use it for breach checks. |
+| **Wait** | Four different clocks, because they give different answers. `adjusted_wait_days` excludes time when care was bought privately and the clock paused. Use it for breach checks. |
 | **Conditions and observations** | What is wrong with the patient, and their vital signs. |
 | **Capacity** | Wards, bed occupancy three times a day, and clinic appointment slots. |
 
 **Vitals do not tell you who is urgent.** Roughly two thirds of the urgent referrals here
-have entirely unremarkable observations — a suspected melanoma is urgent because of the
+have entirely unremarkable observations. A suspected melanoma is urgent because of the
 referral pathway, not the physiology. That is measured from real triage data, not assumed.
 
 `ground_truth.csv` is the **answer key**: which patients deteriorated while waiting. It is
@@ -67,7 +67,7 @@ unvalidated, and results depending on it must say so.
 | `sample/` | 1.3 MB | 2 | 609 |
 | `full/` | 11 MB | 6 | 5,200 |
 
-`sample/` is a real slice of `full/`, closed under its foreign keys — every table it
+`sample/` is a real slice of `full/`, closed under its foreign keys: every table it
 references, it contains. Use it to check a pipeline works; use `full/` for anything you
 report.
 
@@ -75,12 +75,12 @@ Pin a **tag**, never a branch. `v1.1` is current.
 
 ## More
 
-The repository holds the generator, the schema, the tests and the full specification —
+The repository holds the generator, the schema, the tests and the full specification:
 what every column means, where every number came from, and what the real data disproved
 along the way.
 
 **[github.com/NonsoCynthia/Tus-Aite-TechIreland-Challenge](https://github.com/NonsoCynthia/Tus-Aite-TechIreland-Challenge)**
-— branch `dataset_branch`. The repository is private; ask the team for access.
+Branch `dataset_branch`. The repository is private; ask the team for access.
 
 Start with `README.md` there, then `docs/GETTING_THE_DATA.md` to load it and
 `DATASET_README.md` for the column-by-column specification.

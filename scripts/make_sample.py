@@ -129,7 +129,7 @@ def main() -> None:
     for name in CHILD_TABLES:
         df = read(name)
         if df is None:
-            print(f"  {name:24} {'—':>8}  (absent)")
+            print(f"  {name:24} {'-':>8}  (absent)")
             continue
         counts[name] = write(in_seed(df), name)
 
@@ -156,7 +156,7 @@ def main() -> None:
     for name in CAPACITY_TABLES:
         df = read(name)
         if df is None:
-            print(f"  {name:24} {'—':>8}  (absent)")
+            print(f"  {name:24} {'-':>8}  (absent)")
             continue
         counts[name] = write(df[df["hospital_hipe"].isin(hospitals_present)], name)
 

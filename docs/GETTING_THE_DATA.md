@@ -10,7 +10,7 @@ Companion documents: [`DATASET_README.md`](../DATASET_README.md) for what the da
 ## 1. What you need
 
 Docker Desktop, running. A Hugging Face account. And an invitation to the dataset, which
-is private — ask Thabang (`ThabangIsaac1`).
+is private. Ask Thabang (`ThabangIsaac1`).
 
 Then your own Hugging Face **read** token, from
 [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). Name it
@@ -37,7 +37,7 @@ make load                 # downloads and loads, ~1 min
 | | Set it to |
 |---|---|
 | `HF_TOKEN` | Your own read token from step 1. Nothing works without it. |
-| `POSTGRES_PASSWORD`, `PGADMIN_PASSWORD` | Anything you like. Local-only — the database is not reachable from outside your machine. |
+| `POSTGRES_PASSWORD`, `PGADMIN_PASSWORD` | Anything you like. Local-only. The database is not reachable from outside your machine. |
 | `PGADMIN_EMAIL` | Any address. It is only a login name. |
 | Everything else | Leave it. |
 
@@ -48,7 +48,7 @@ rather than through a login error.
 ## 3. Looking at it
 
 Open **http://localhost:5050**, log in with your `PGADMIN_EMAIL` and `PGADMIN_PASSWORD`.
-**Triage local** is already in the sidebar — expand it and give it your
+**Triage local** is already in the sidebar. Expand it and give it your
 `POSTGRES_PASSWORD`. Then `Databases → triage → Schemas → core → Tables`.
 
 You do not need to add a server. But if you ever add one by hand, this is the mistake
@@ -67,7 +67,7 @@ Same database, two addresses.
 make verify        # 9 passed, 0 failed
 ```
 
-Seven checks, nine assertions — the first one tests three schemas separately.
+Seven checks, nine assertions. The first one tests three schemas separately.
 
 Three worth running by eye, in the pgAdmin query tool:
 
@@ -97,8 +97,8 @@ Semi-Urgent, silently.
 
 | | Size | Hospitals | Referrals |
 |---|---|---|---|
-| **`sample`** — the default | 1.3 MB | 2, both public | 609 |
-| `full` | 11 MB | 6 — 4 public, 2 private | 5,200 |
+| **`sample`** (the default) | 1.3 MB | 2, both public | 609 |
+| `full` | 11 MB | 6: 4 public, 2 private | 5,200 |
 
 ```bash
 make load FETCH_PROFILE=full
@@ -107,8 +107,8 @@ make load FETCH_PROFILE=full
 Only the profile you ask for is downloaded; `sample` never fetches the full data at all.
 
 **Use `full` for anything you show people.** The sample covers the two largest hospitals,
-so the contrast between a 640-bed teaching hospital and a 110-bed district one — which is
-part of what the data exists to show — is not in it. The private sites are capacity only
+so the contrast between a 640-bed teaching hospital and a 110-bed district one, which is
+part of what the data exists to show, is not in it. The private sites are capacity only
 and carry no referrals by design; patients reach them through a suspension, which pauses
 their waiting clock.
 
@@ -126,9 +126,9 @@ planted demo cases.
 make reset        # wipes and reloads, ~2 min
 ```
 
-Safe. It removes only this project's own database — the compose project name is pinned, so
-no other Docker project on your machine is in scope — and the data comes back from
-Hugging Face.
+Safe. It removes only this project's own database. The compose project name is pinned, so no
+other Docker project on your machine is in scope, and the data comes back from Hugging
+Face.
 
 ## 7. When it goes wrong
 
@@ -138,9 +138,9 @@ Hugging Face.
 | `port is already allocated` | Change `POSTGRES_PORT` or `PGADMIN_PORT` in `.env` |
 | `401` or `Repository Not Found` on `make load` | Missing or wrong `HF_TOKEN`, or you have not been invited. A private repo you cannot see returns 404, not "denied" |
 | `password authentication failed` in pgAdmin | Use `POSTGRES_PASSWORD` from `.env`; if you changed `POSTGRES_USER`, update `db/pgadmin/servers.json` too |
-| `could not translate host name "localhost"` | You added a server by hand. Use `db:5432` — see section 3 |
+| `could not translate host name "localhost"` | You added a server by hand. Use `db:5432`. See section 3 |
 | `container name "/triage_db" is already in use` | Another copy of this project is running. `docker compose down` there first |
-| `rd_counts_match_dates` violation on load | You are loading data `v1.0` against schema 008. They are incompatible — pin `v1.1` |
+| `rd_counts_match_dates` violation on load | You are loading data `v1.0` against schema 008. They are incompatible. Pin `v1.1` |
 | `permission denied for schema eval` | Correct. See section 4 |
 
 `make load` will not quietly generate data locally when it cannot reach Hugging Face. It

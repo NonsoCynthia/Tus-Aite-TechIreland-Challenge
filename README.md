@@ -1,4 +1,4 @@
-# Tus-Aite-TechIreland-Challenge — dataset
+# Tus-Aite-TechIreland-Challenge: the dataset
 
 A synthetic Irish hospital outpatient waiting list, and the pipeline that generates,
 validates and publishes it. Built for the TechIreland National AI Challenge 2026.
@@ -17,7 +17,7 @@ make up                   # Postgres and pgAdmin
 make load                 # download and load
 ```
 
-You need Docker, a Hugging Face account and an invitation to the dataset — it is private.
+You need Docker, a Hugging Face account and an invitation to the dataset, which is private.
 Full setup in [docs/GETTING_THE_DATA.md](docs/GETTING_THE_DATA.md).
 
 ## Documentation
@@ -34,12 +34,12 @@ and its [addendum](docs/BUILD_MANUAL_ADDENDUM.md); code comments cite them by se
 ## What is in it
 
 24 tables. 17 hold the input data, 7 are written by whatever consumes it, and one is a
-held-out answer key that is never loaded. Six fictitious hospitals — four public with
+held-out answer key that is never loaded. Six fictitious hospitals: four public with
 waiting lists, two private that carry capacity but no queue.
 
 The referral side follows the NTPF Outpatient Waiting List Minimum Data Set: real field
-names, real code values, real rules. The clinical layer — conditions and observations — is
-ours, because the national record contains no clinical detail at all. That absence is the
+names, real code values, real rules. The clinical layer, meaning conditions and observations, is
+ours because the national record contains no clinical detail at all. That absence is the
 problem the dataset exists to illustrate.
 
 Distributions are fitted from public sources rather than invented. Generation is
