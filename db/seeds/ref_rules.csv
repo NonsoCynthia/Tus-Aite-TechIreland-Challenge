@@ -1,0 +1,6 @@
+rule_id,statement,applies_to,threshold_days
+RULE-CRT-URGENT,An urgent referral should be seen within 28 days,triaged_urgent,28
+RULE-CRT-SEMI,A semi-urgent referral should be seen within 13 weeks,triaged_semi_urgent,91
+RULE-TRIAGE-TURNAROUND,A referral should not sit untriaged indefinitely,awaiting_triage,21
+RULE-ORDER,A referral may never be ranked above one of higher clinical priority,all,
+RULE-TIEBREAK,Same category and status ordered oldest referral first,all,

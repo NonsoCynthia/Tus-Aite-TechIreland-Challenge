@@ -1,0 +1,8 @@
+specialty_hipe,specialty_name,is_paediatric
+2600,General Surgery,false
+0100,Cardiology,false
+0300,Dermatology,false
+1800,Orthopaedics,false
+0700,Gastro-Enterology,false
+0600,Otolaryngology (ENT),false
+0601,Paediatric ENT,true
