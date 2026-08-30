@@ -70,6 +70,10 @@ def read(name: str) -> pd.DataFrame | None:
     path = SRC / f"{name}.csv"
     if not path.exists():
         return None
+    # dtype=str is load-bearing, not a default. specialty_hipe '0601' is Paediatric
+    # ENT; let pandas infer and it becomes the integer 601, the foreign key stops
+    # resolving, and the sample fails to load. keep_default_na=False stops an empty
+    # ihi_number becoming the string "nan".
     return pd.read_csv(path, dtype=str, keep_default_na=False, na_values=[])
 
 

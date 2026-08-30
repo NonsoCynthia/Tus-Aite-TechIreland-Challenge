@@ -49,7 +49,8 @@ def scored(q):
     df = pd.DataFrame(rows, columns=["cat", "news2"]).astype({"news2": float})
     if len(df) < 2000:
         pytest.skip(f"only {len(df)} scored referrals loaded; these are dataset-level "
-                    f"checks. Load the full profile: make load FETCH_PROFILE=full")
+                    f"checks, not slice-level ones. Load the full set: "
+                    f"make load FETCH_PROFILE=full")
     return df
 
 

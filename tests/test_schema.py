@@ -48,3 +48,33 @@ def test_agent_rw_can_read_inputs_and_write_outputs(conn):
     "idx_bs_snapshot", "idx_cs_date", "idx_conditions_one_primary", "idx_ws_one_primary"])
 def test_expected_indexes_exist(q, idx):
     assert q(f"SELECT count(*) FROM pg_indexes WHERE indexname='{idx}'")[0][0] == 1
+
+
+def test_pgadmin_server_file_matches_the_live_connection(q):
+    """db/pgadmin/servers.json is a static file, so it can drift from .env.
+
+    pgAdmin cannot read environment variables, so the pre-provisioned connection
+    hardcodes the username and database. Change POSTGRES_USER in .env without
+    changing this file and pgAdmin fails to log in with an authentication error
+    that points at nothing useful. This asserts they still agree, so drift fails a
+    test instead of costing somebody an afternoon.
+    """
+    import json
+    from pathlib import Path
+
+    server = json.loads(
+        (Path(__file__).resolve().parent.parent / "db" / "pgadmin" / "servers.json")
+        .read_text())["Servers"]["1"]
+
+    live_user = q("SELECT current_user")[0][0]
+    live_db = q("SELECT current_database()")[0][0]
+
+    assert server["Username"] == live_user, (
+        f"servers.json Username is {server['Username']!r} but the database user is "
+        f"{live_user!r}. Update db/pgadmin/servers.json to match your .env.")
+    assert server["MaintenanceDB"] == live_db, (
+        f"servers.json MaintenanceDB is {server['MaintenanceDB']!r} but the database "
+        f"is {live_db!r}. Update db/pgadmin/servers.json to match your .env.")
+    assert server["Host"] == "db" and server["Port"] == 5432, (
+        "pgAdmin runs inside the Docker network, so it must reach the database at "
+        "db:5432. localhost:5433 is the address from your own machine.")

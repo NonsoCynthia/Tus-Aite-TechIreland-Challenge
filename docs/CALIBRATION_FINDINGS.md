@@ -226,3 +226,65 @@ introduced to weaken MIMIC's vitals-to-acuity coupling, on the reasoning that Ir
 CPC is assigned from a referral letter rather than at the bedside. The sweep showed no
 weakening is needed: MIMIC's own coupling is already far below the level at which
 circularity would be a concern.
+
+
+---
+
+## 7. Known limitations in v1.0
+
+Found by a cold-reader review of the repository after `v1.0` was published. Both change
+generated data, so neither is fixed in place: correcting them needs a new data version
+and a re-publish, not a quiet edit to code that a published tag already pins.
+
+### 7.1 Cross-hospital linkage is not demonstrated
+
+`DATASET_README.md` §10.2 explains that where a national identifier exists, the same
+person waiting at two hospitals can be recognised as one person — and that this is what
+`PW-DEMO-06` and `PW-DEMO-07` are for.
+
+**In `v1.0` no person appears at two hospitals.** Measured on `out/patients.csv`: 3,412
+patients carry an IHI and **zero** IHIs occur at more than one hospital.
+
+The cause is in `Generator.gen_people`. It walks a running index across the per-hospital
+patient loops against a person pool sized at `total * 1.3`, so the index never wraps and
+no person is ever reused at a second hospital. `cross_hospital_share: 0.04` in
+`generator/config.yml` is read by nothing.
+
+Consequence: `PW-DEMO-06` and `PW-DEMO-07` exist as pathway numbers with the right shape,
+but they do not demonstrate multi-list visibility, and the contrast the pair is meant to
+draw — identifier present versus absent — is not observable. `tests/test_planted_cases.py`
+did not catch it because it asserts the pathways exist, not that they share a person.
+
+**To fix:** make `gen_people` deliberately reuse `cross_hospital_share` of persons across
+two hospitals, then assert in `test_planted_cases.py` that `PW-DEMO-06`'s person has
+patient rows at two hospitals and `PW-DEMO-07`'s does not.
+
+### 7.2 `planted_cases` in the config is decorative
+
+`generator/config.yml` declares all seven demo cases with a `profile` for each.
+**No Python reads that block.** `plant()` hardcodes the behaviour of `PW-DEMO-01`, `03`
+and `05`; `02`, `04`, `06` and `07` are renamed into place and otherwise carry whatever
+the generator happened to produce.
+
+So `PW-DEMO-02` is not guaranteed to be the longest-waiting routine referral in an empty
+ward, and `PW-DEMO-04` is not guaranteed to sit three days from its timeframe. They are
+ordinary referrals wearing demo names.
+
+**To fix:** either drive `plant()` from the config block, or delete the block and state in
+`config.yml` which cases are actually shaped and which are placeholders.
+
+### 7.3 `latent_hazard` does not depend on the condition
+
+The generator docstring and `assumed_parameters.yml` both describe `latent_hazard` as
+drawn from condition and age. The age term and the noise term are real; the condition term
+is not — `base` is a uniform draw over `base_by_condition_range` and never reads the
+referral's diagnosis, because `self.refs` carries no condition code at that point.
+
+Deterioration also couples to waiting time through `min(1.0, waited / 400.0)`, which
+appears in no calibration file.
+
+**This does not affect the non-circularity guarantee**, which is the property that matters:
+`latent_hazard` still never touches `news2`, so the agent cannot read back its own input.
+It affects only the claim that risk varies by condition. The generator docstring has been
+corrected to say so; the parameter name remains misleading and should be renamed when the
+model is fixed.

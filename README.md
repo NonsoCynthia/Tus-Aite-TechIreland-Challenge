@@ -7,6 +7,37 @@ The project turns fragmented referral, urgency, and bed-capacity data into a ran
 shortlist that a clinician can inspect, accept, reorder, or override. The system does not admit,
 schedule, diagnose, or make final clinical decisions. It provides auditable decision support.
 
+## Working with the dataset
+
+**New here? Start with [`docs/START_HERE.md`](docs/START_HERE.md).** Three commands and
+you have the data running locally.
+
+The synthetic dataset described in feature 1 below is built, tested and published from
+this repository. It lives on Hugging Face as a private, tagged release and is pulled in
+by `make load`.
+
+| Document | What it covers |
+|---|---|
+| [docs/START_HERE.md](docs/START_HERE.md) | **Start here.** Setup, credentials, three commands, looking at the data |
+| [docs/HUGGINGFACE_ACCESS.md](docs/HUGGINGFACE_ACCESS.md) | Getting access to the dataset and your own token |
+| [docs/GETTING_THE_DATA.md](docs/GETTING_THE_DATA.md) | Sample vs full, and why the sample is a closed slice |
+| [docs/VERIFY_IN_PGADMIN.md](docs/VERIFY_IN_PGADMIN.md) | Seven queries that prove the install is good |
+| [DATASET_README.md](DATASET_README.md) | What every table and column means. The specification. |
+| [docs/CALIBRATION_FINDINGS.md](docs/CALIBRATION_FINDINGS.md) | Where the numbers came from, and what the data disproved |
+| [docs/BUILD_MANUAL.md](docs/BUILD_MANUAL.md) | The original build specification. Code comments cite it by section. Two assertions in §10.4 are struck through as falsified. |
+| [docs/BUILD_MANUAL_ADDENDUM.md](docs/BUILD_MANUAL_ADDENDUM.md) | Eleven corrections to the manual. Where they disagree, the addendum wins. |
+
+### Relationship to the graph layer
+
+This repository produces and stores the dataset in PostgreSQL. The graph layer described
+in `conductor/tech-stack.md` consumes it from there. Converting the relational tables to
+RDF is a downstream transform owned by the graph track, not by this repository. The
+relational schema is designed to make that transform straightforward: every table has an
+explicit primary key, all foreign keys are declared, and the agent output tables in the
+`agent` schema carry provenance on each row rather than in a side channel.
+
+---
+
 ## Product Features
 
 ### 1. Synthetic Irish Patient and Referral Dataset

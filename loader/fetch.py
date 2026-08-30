@@ -1,13 +1,13 @@
 """Pull the pinned dataset revision from Hugging Face into data/.
 
 Two profiles:
-    sample  a referentially-closed slice, roughly 1 MB     (the default)
-    full    the whole dataset, roughly 20 MB
+    sample  a referentially-closed slice, roughly 1.3 MB     (the default)
+    full    the whole dataset, roughly 11 MB
 
 `allow_patterns` is what makes the sample cheap: only files under the chosen
 profile's directory are transferred. Asking for 'sample' never downloads the
 full data at all, which is the point of the split -- a pipeline check should not
-wait on twenty megabytes.
+wait on eleven megabytes.
 
 The revision is a TAG, never a branch. Nothing here ever fetches "latest".
 """

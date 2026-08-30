@@ -1,8 +1,17 @@
 .PHONY: up down migrate seed calibrate fetch load generate reset test verify logs psql volumes
 
+# Make does not read .env on its own -- only `docker compose` does. Without this,
+# `make up` echoed the hardcoded 5433/5050 fallbacks even after you changed the port,
+# and `make psql` ran `psql -U -d` with empty values. Both now report the truth.
+-include .env
+export
+
 # Which slice to generate: small (fast, ~200 referrals) or full (~5,200 referrals).
 PROFILE ?= small
-# Which slice to fetch from Hugging Face: sample (~1 MB) or full (~20 MB).
+# Which slice to fetch from Hugging Face AND load: sample (~1.3 MB) or full (~11 MB).
+# Both `fetch` and `load` use this, so `make load FETCH_PROFILE=full` downloads the
+# full set and loads the full set. They must agree: fetching one and loading the
+# other leaves the loader looking for a directory that was never downloaded.
 FETCH_PROFILE ?= sample
 
 up:
@@ -26,7 +35,7 @@ fetch:
 	docker compose run --rm loader python -m loader.fetch --profile $(FETCH_PROFILE)
 
 load: migrate seed fetch
-	docker compose run --rm loader python -m loader.load
+	docker compose run --rm loader python -m loader.load --profile $(FETCH_PROFILE)
 
 generate:
 	docker compose run --rm loader python -m generator.generate --profile $(PROFILE)

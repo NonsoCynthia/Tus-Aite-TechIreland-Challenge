@@ -12,9 +12,17 @@ enforced here rather than trusted to care:
      shrinks the between-category mean separation toward the grand mean; the
      within-category spread stays at the MIMIC-fitted value.
 
-  2. latent_hazard is NEVER computed from news2. It is drawn from condition and
-     age with a large noise term. That noise is what forces the agent to identify
-     risk from partial information instead of reading back its own input.
+  2. latent_hazard is NEVER computed from news2. That is the guarantee that keeps
+     the evaluation honest: if risk were a function of what the agent reads, the
+     agent would be graded against its own input.
+
+     KNOWN LIMITATION. Despite the parameter being named base_by_condition_range,
+     `base` is currently a uniform draw over that range and does NOT depend on the
+     referral's condition -- self.refs carries no condition code at that point. Age
+     and the noise term are real. Deterioration also couples to waiting time via
+     min(1.0, waited / 400.0), which the calibration file does not mention. See
+     docs/CALIBRATION_FINDINGS.md; correcting it changes generated data and so needs
+     a new data version, not a quiet edit.
 
 Determinism, section 8.5: seeded RNG, no set iteration, sorted before write, fixed
 column order, "\\n" line terminator, no datetime.now() in generated content.
@@ -88,12 +96,12 @@ def vitals_model(cal: dict) -> tuple[dict, float]:
     categories are as separated as MIMIC measured; at 0.0 they are identical and
     the vitals carry no signal about category at all.
     """
-    v = cal["vitals_by_category"]
-    coupling = v["coupling"]["coupling_coefficient"]["value"]
+    vitals_cal = cal["vitals_by_category"]
+    coupling = vitals_cal["coupling"]["coupling_coefficient"]["value"]
 
     per_cat: dict[int, dict[str, tuple[float, float]]] = {}
     weights: dict[int, int] = {}
-    for label, block in v["categories"].items():
+    for label, block in vitals_cal["categories"].items():
         code = CATEGORY_CODE[label]
         # Routine carries n_source_rows rather than n_stays: it is derived from
         # reference ranges, not fitted, because MIMIC's demo has only 2 ESI 4-5
@@ -147,16 +155,16 @@ def covariance_model(cal: dict, vitals: dict) -> dict:
 
     out = {}
     for code, stats in vitals.items():
-        sd = np.array([stats[k][1] for k in VITAL_ORDER])
+        std_devs = np.array([stats[vital][1] for vital in VITAL_ORDER])
         entry = by_cat.get(label_for.get(code, ""))
         if entry:
-            order = entry["order"]
-            m = np.array(entry["matrix"], dtype=float)
-            idx = [order.index(k) for k in VITAL_ORDER]
-            corr = m[np.ix_(idx, idx)]
+            source_order = entry["order"]
+            matrix = np.array(entry["matrix"], dtype=float)
+            position = [source_order.index(vital) for vital in VITAL_ORDER]
+            corr = matrix[np.ix_(position, position)]
         else:
             corr = np.eye(len(VITAL_ORDER))
-        out[code] = np.outer(sd, sd) * corr
+        out[code] = np.outer(std_devs, std_devs) * corr
     return out
 
 
@@ -191,22 +199,22 @@ class Generator:
         self.cfg = cfg
         self.cal = cal
         self.profile = profile
-        p = cfg["profiles"][profile]
+        profile_cfg = cfg["profiles"][profile]
 
         self.rng = np.random.default_rng(cfg["seed"])
         random.seed(cfg["seed"])
 
-        wanted = p["hospitals"]
+        wanted = profile_cfg["hospitals"]
         self.hospitals = [
             h for h in cfg["hospitals"] if wanted == "all" or h["hipe"] in wanted
         ]
         self.public = [h for h in self.hospitals if h["type"] == "public"]
-        self.scale = p["referrals_scale"]
+        self.scale = profile_cfg["referrals_scale"]
 
         self.end = cfg["simulation"]["end_date"]
         if isinstance(self.end, str):
             self.end = date.fromisoformat(self.end)
-        self.days = [self.end - timedelta(days=i) for i in range(p["days"] - 1, -1, -1)]
+        self.days = [self.end - timedelta(days=i) for i in range(profile_cfg["days"] - 1, -1, -1)]
         self.start = self.days[0]
         self.snapshot_times = cfg["simulation"]["snapshot_times"]
 
@@ -222,7 +230,7 @@ class Generator:
 
     def _specialty_weights(self) -> dict[str, float]:
         mix = self.cal["specialty_mix"].get("specialties", {})
-        w = {}
+        weights = {}
         for code in SPECIALTIES:
             block = mix.get(code) or mix.get(int(code)) if isinstance(mix, dict) else None
             if isinstance(block, dict):
@@ -230,11 +238,11 @@ class Generator:
                 if isinstance(prop, dict):
                     prop = prop.get("value")
                 if isinstance(prop, (int, float)):
-                    w[code] = float(prop)
-        if len(w) != len(SPECIALTIES) or abs(sum(w.values())) < 1e-9:
-            w = {c: 1.0 / len(SPECIALTIES) for c in SPECIALTIES}
-        total = sum(w.values())
-        return {k: v / total for k, v in w.items()}
+                    weights[code] = float(prop)
+        if len(weights) != len(SPECIALTIES) or abs(sum(weights.values())) < 1e-9:
+            weights = {code: 1.0 / len(SPECIALTIES) for code in SPECIALTIES}
+        total = sum(weights.values())
+        return {code: share / total for code, share in weights.items()}
 
     def _wait_bands(self) -> list[tuple[int, int, float]]:
         """Waiting-time bands from NTPF, fitted.
@@ -243,18 +251,19 @@ class Generator:
         the national distribution across wait bands, so the shape comes from the
         source rather than from a shape parameter someone liked.
         """
-        d = self.cal["specialty_mix"].get("national_wait_band_distribution", {})
-        bands = [(1, 183, d.get("m0_6")), (183, 365, d.get("m6_12")),
-                 (365, 548, d.get("m12_18")), (548, 900, d.get("m18_plus"))]
-        bands = [(lo, hi, p) for lo, hi, p in bands if isinstance(p, (int, float))]
+        national = self.cal["specialty_mix"].get("national_wait_band_distribution", {})
+        # NTPF publishes shares per band in months; these are the bands in days.
+        bands = [(1, 183, national.get("m0_6")), (183, 365, national.get("m6_12")),
+                 (365, 548, national.get("m12_18")), (548, 900, national.get("m18_plus"))]
+        bands = [(lo, hi, share) for lo, hi, share in bands if isinstance(share, (int, float))]
         if not bands:
             raise SystemExit("specialty_mix.yml has no fitted wait-band distribution.")
-        total = sum(p for _, _, p in bands)
-        return [(lo, hi, p / total) for lo, hi, p in bands]
+        total = sum(share for _, _, share in bands)
+        return [(lo, hi, share / total) for lo, hi, share in bands]
 
     def _draw_wait(self) -> int:
-        i = int(self.rng.choice(len(self.bands), p=[p for _, _, p in self.bands]))
-        lo, hi, _ = self.bands[i]
+        chosen = int(self.rng.choice(len(self.bands), p=[share for _, _, share in self.bands]))
+        lo, hi, _ = self.bands[chosen]
         return int(self.rng.integers(lo, hi))
 
     # -- 1. hospitals, wards, ward_specialty -------------------------------- #

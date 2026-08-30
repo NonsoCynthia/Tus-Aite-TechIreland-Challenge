@@ -1146,6 +1146,10 @@ Where it does not, the two records are, as far as anything can tell, two unrelat
 
 We could have filled in every identifier and made the demonstration tidier. We did not, because the gap is the point. It shows exactly what a national shared care record would fix.
 
+> **Known limitation in v1.0.** The generator does not currently place any person at
+> two hospitals, so this cross-hospital linkage is described here but not yet observable
+> in the published data. See `docs/CALIBRATION_FINDINGS.md` §7.1.
+
 ### 10.3 A referral can exist with no urgency category at all
 
 The national record only requires a triage category once the referral has come back from triage. Before that, there is a GP's opinion and nothing else.

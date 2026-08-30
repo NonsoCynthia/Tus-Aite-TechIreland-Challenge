@@ -79,7 +79,7 @@ To confirm everything worked:
 make verify
 ```
 
-Seven checks. The seventh one passes by *failing* — see section 6.
+Seven checks, reported as nine assertions. The seventh one passes by *failing* — see section 6.
 
 ---
 
@@ -89,11 +89,11 @@ There are two slices of the same data.
 
 | Profile | Size | Referrals | What it is for |
 |---|---|---|---|
-| **`sample`** | ~1 MB | ~600 | The default. Checking that the pipeline works. |
-| `full` | ~20 MB | ~5,200 | Real runs, evaluation, anything you will present. |
+| **`sample`** | ~1.3 MB | ~600 | The default. Checking that the pipeline works. |
+| `full` | ~11 MB | ~5,200 | Real runs, evaluation, anything you will present. |
 
 `make load` pulls **`sample`**, because most of the time you are checking that something
-works rather than measuring anything. Downloading twenty megabytes to find out whether
+works rather than measuring anything. Downloading eleven megabytes to find out whether
 your migrations applied is a slow way to learn a fast fact.
 
 Only the files for the profile you asked for are transferred. Asking for `sample` does
@@ -155,19 +155,22 @@ The selection is deterministic — referrals sorted by `pathway_number`, then th
 ## 5. Switching to the full dataset
 
 ```bash
-make fetch FETCH_PROFILE=full
-make load
+make load FETCH_PROFILE=full
 ```
 
-Or change `default_profile` in `versions.yml` if you want it permanently.
+One command. `make load` runs fetch and load together, and both take `FETCH_PROFILE`,
+so passing it to `make fetch` alone would download the full set and then load the
+sample over it.
 
-It costs about 20 MB of download and roughly 70 MB in Postgres once indexes are built.
+It costs about 11 MB of download and roughly 70 MB in Postgres once indexes are built.
 Both are small. Use `full` whenever you are measuring something rather than checking
 that something runs.
 
-**Use `full` for anything you will present.** The sample covers two hospitals; the
-regional variation between a 640-bed teaching hospital and a 110-bed district one is
-part of what the dataset exists to show, and it is not visible in a two-hospital slice.
+**Use `full` for anything you will present.** The sample covers two of the six
+hospitals, both large and both public: 9001 St Brendan's (640 beds) and 9002 Kilbrannan
+(420 beds). The full set adds 9003 Ardfinnan (280) and 9004 Loughrea (110), plus the two
+private sites. The regional variation between a teaching hospital and a district one is
+part of what the dataset exists to show, and a two-hospital slice cannot show it.
 
 ---
 
