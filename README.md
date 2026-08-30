@@ -17,8 +17,9 @@ make up                   # Postgres and pgAdmin
 make load                 # download and load
 ```
 
-You need Docker, a Hugging Face account and an invitation to the dataset, which is private.
-Full setup in [docs/GETTING_THE_DATA.md](docs/GETTING_THE_DATA.md).
+You need Docker and a Hugging Face account. The dataset page is public but the files are
+gated, so request access on it and Thabang approves you. Full setup in
+[docs/GETTING_THE_DATA.md](docs/GETTING_THE_DATA.md).
 
 ## Documentation
 
