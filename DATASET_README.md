@@ -69,10 +69,13 @@ Read this once and the rest will make sense. Everything here is either an Irish 
 | **IHI** | Individual Health Identifier | A national number for a person, the same at every hospital. Often missing. See section 10.2. |
 | **PPSN** | Personal Public Service Number | Ireland's national ID number. Present in the real specification, not used here. |
 
-### Clinical scoring
+### Clinical observations and scoring
 
 | Term | Full name | What it means |
 |---|---|---|
+| **Observations** | | The umbrella term for everything recorded at a patient's bedside: measured vitals, reported symptoms, and clinical scores. Nurses call a set of them "obs". |
+| **Vitals** | Vital signs | The measured ones: heart rate, blood pressure, breathing rate, temperature, oxygen. Objective. |
+| **Symptoms** | | What the patient reports: pain, nausea, what they say is wrong. Subjective. Clinicians keep these separate from vitals. |
 | **NEWS2** | National Early Warning Score, version 2 | A number from 0 upward, worked out from a patient's vital signs. Higher means more physically unwell right now. |
 | **MTS** | Manchester Triage System | The colour-coded urgency scale used for adults in Irish emergency departments: red, orange, yellow, green, blue. |
 | **ICTS** | Irish Children's Triage System | The children's version of the above. |
@@ -80,6 +83,7 @@ Read this once and the rest will make sense. Everything here is either an Irish 
 | **SpO2** | Oxygen saturation | How much oxygen is in the blood, as a percentage. |
 | **ICD-10-AM** | International Classification of Diseases, 10th revision, Australian Modification | The coding system Irish hospitals use to record diagnoses. `K83.1` means blocked bile duct. |
 | **SNOMED CT** | Systematized Nomenclature of Medicine, Clinical Terms | A different, more detailed clinical coding system. Included for future compatibility. |
+| **FHIR** | Fast Healthcare Interoperability Resources | The international standard for exchanging health data between systems. Pronounced "fire". Its `Observation` record holds exactly what our `observations` table holds. |
 
 ### Beds and capacity
 
@@ -126,11 +130,11 @@ So inside a category there is nothing left to reason with except how long someon
 That gives four linked problems:
 
 1. Triage assigns a category. **This part works.**
-2. Inside a category, the only ordering signal is waiting time.
+2. Inside a category, the only thing left to order by is waiting time.
 3. There is nothing better to build one from, because the record holds no clinical detail.
 4. Separately, nothing checks the resulting order against real bed and clinic availability.
 
-**This is what the dataset is built to address.** Not to assign priority, which triage already does, but to order patients *within* the priority a clinician sets, using evidence the national record never captured, and to make that ordering explainable.
+**This is what the dataset is built to address.** Not to assign priority, which triage already does, but to order patients *within* the priority a clinician set, using evidence the national record never captured, and to make that ordering explainable.
 
 It follows that the system may **never** move a patient across a category boundary. An urgent referral outranks a semi-urgent one, always, whatever any score says. That constraint is written into the rules as `RULE-ORDER` (section 7.24).
 
@@ -212,8 +216,8 @@ Sizes vary deliberately. If all four public hospitals were the same, there would
    persons                        conditions
       │  (national ID)               ▲   what is wrong with them
       │                              │
-   patients ──────────────► referral_daily ◄────── signals
-      (hospital record)         │    │   ▲          vital signs
+   patients ──────────────► referral_daily ◄────── observations
+      (hospital record)         │    │   ▲       vitals, symptoms, scores
                                 │    │   │
                                 │    │   └───── triage_events
                                 │    │           the urgency decision
@@ -242,11 +246,11 @@ Section 7 describes every table, in this order:
 |---|---|---|
 | **A. The waiting list** | `referral_daily`, `triage_events` | The heart of the dataset. Everything else attaches to these. |
 | **B. The people** | `patients`, `persons` | Who the referrals belong to. |
-| **C. The clinical layer** `OURS` | `conditions`, `signals` | What the national record is missing. |
+| **C. The clinical layer** `OURS` | `conditions`, `observations` | What the national record is missing. |
 | **D. The hospital's capacity** | `hospitals`, `hospital_specialty`, `wards`, `ward_specialty`, `bed_status`, `clinic_sessions` | What the hospital actually has available. |
 | **E. What happened along the way** | `cancellation_events`, `suspension_events` | The referral's history. |
 | **F. Dictionaries** | `ref_specialty`, `ref_codes`, `ref_rules` | Lookup lists. Consulted, not read start to finish. |
-| **G. Held out** | `ground_truth` | Used for scoring only. Never loaded. |
+| **G. Held out** | `ground_truth` | The answer key. Kept out of the database so the system cannot read it. |
 
 ### 6.3 The two keys that hold it together
 
@@ -431,29 +435,41 @@ Patients with no national identifier have no row here at all. That absence is th
 
 ---
 
-### 7.6 `signals` — vital signs and triage scores
+### 7.6 `observations` — vitals, symptoms and triage scores
 
-`OURS` — because the national waiting list records no observations of any kind.
+`OURS` — because the national waiting list records no clinical observations of any kind.
 
-Column names deliberately match the MIMIC-IV-ED dataset (section 3.3), so real distributions can be fitted from it without renaming anything.
+**Why it is called `observations` and not `vitals`.** In Irish and international clinical practice, "observations" (nurses say "obs") is the umbrella term for everything recorded on an observation chart at the bedside. That covers three different kinds of thing, and this table holds all three:
+
+| Kind | Columns | Who produces it |
+|---|---|---|
+| **Vitals** — measured | `hr`, `sbp`, `dbp`, `rr`, `temp`, `spo2` | A machine or a nurse |
+| **Symptoms** — reported | `pain`, `chiefcomplaint` | The patient |
+| **Assessments and scores** — judged or calculated | `avpu`, `news2`, `mts_category`, `icts_category` | The clinician, or arithmetic |
+
+Calling the table `vitals` would misfile the patient's own reported pain and complaint. Calling it `symptoms` would misfile the blood pressure. Clinicians keep measured and reported information strictly apart, because one is evidence and the other is testimony. `observations` is the standard word that correctly covers both, plus the scores that are neither.
+
+It is also the exact term used in FHIR, the international standard for exchanging health data, where `Observation` is the resource holding vitals, scores and coded assessments together. That matters if this ever connects to a national system.
+
+Individual column names deliberately match the MIMIC-IV-ED dataset (section 3.3), so real distributions can be fitted from it without renaming anything.
 
 | Field | Type | Null? | Description |
 |---|---|---|---|
 | `hospital_hipe` | `char(4)` | no | Part of primary key. |
 | `pathway_number` | `text` | no | Part of primary key. |
-| `obs_datetime` | `timestamp` | no | When measured. Part of primary key. |
-| `hr` | `integer` | yes | Heart rate, beats per minute. |
-| `sbp` | `integer` | yes | Systolic blood pressure, the higher of the two blood pressure numbers. |
-| `dbp` | `integer` | yes | Diastolic blood pressure, the lower one. |
-| `rr` | `integer` | yes | Respiratory rate, breaths per minute. |
-| `temp` | `numeric(4,1)` | yes | Temperature in Celsius. |
-| `spo2` | `integer` | yes | Oxygen saturation, as a percentage. |
-| `pain` | `integer` | yes | Patient's own pain rating, 0 to 10. |
-| `avpu` | `char(1)` | yes | How conscious they are: `A`, `V`, `P` or `U`. |
-| `chiefcomplaint` | `text` | yes | What the patient says is wrong, in their words. |
-| `news2` | `integer` | yes | Early warning score, calculated from the vital signs above. |
-| `mts_category` | `text` | yes | Manchester Triage System colour, for adults. |
-| `icts_category` | `text` | yes | Irish Children's Triage System colour, for children. |
+| `obs_datetime` | `timestamp` | no | When recorded. Part of primary key. |
+| `hr` | `integer` | yes | *Vital.* Heart rate, beats per minute. |
+| `sbp` | `integer` | yes | *Vital.* Systolic blood pressure, the higher of the two blood pressure numbers. |
+| `dbp` | `integer` | yes | *Vital.* Diastolic blood pressure, the lower one. |
+| `rr` | `integer` | yes | *Vital.* Respiratory rate, breaths per minute. |
+| `temp` | `numeric(4,1)` | yes | *Vital.* Temperature in Celsius. |
+| `spo2` | `integer` | yes | *Vital.* Oxygen saturation, as a percentage. |
+| `pain` | `integer` | yes | *Symptom.* The patient's own pain rating, 0 to 10. |
+| `chiefcomplaint` | `text` | yes | *Symptom.* What the patient says is wrong, in their words. |
+| `avpu` | `char(1)` | yes | *Assessment.* How conscious they are: `A`, `V`, `P` or `U`. |
+| `news2` | `integer` | yes | *Score.* Early warning score, calculated from the vitals above. |
+| `mts_category` | `text` | yes | *Assessment.* Manchester Triage System colour, for adults. |
+| `icts_category` | `text` | yes | *Assessment.* Irish Children's Triage System colour, for children. |
 
 **Example**
 
@@ -463,9 +479,9 @@ Column names deliberately match the MIMIC-IV-ED dataset (section 3.3), so real d
 | PW-5120 | 2026-08-20 11:02 | 72 | 124 | 14 | 36.7 | 99 | 0 | green |
 | PW-3345 | 2026-02-02 15:30 | 78 | 136 | 16 | 36.4 | 98 | 1 | green |
 
-PW-5120 is a suspected melanoma. Normal vital signs, but clinically urgent.
+PW-5120 is a suspected melanoma. Every vital sign is normal, and the patient is clinically urgent.
 
-**Vital signs alone do not tell you who is urgent**, and this dataset is built so that stays true. If they did, the whole exercise would be circular.
+**Vitals alone do not tell you who is urgent**, and this dataset is built so that stays true. If they did, the whole exercise would be circular.
 
 ---
 
@@ -790,23 +806,76 @@ A violation of this rule is a defect, not a judgement call. It is the one rule a
 
 ## Group G — Held out
 
+One file, deliberately kept outside the database.
+
 ---
 
-### 7.18 `ground_truth` — used for scoring only, never loaded
+### 7.18 `ground_truth` — the answer key, never loaded
 
-**This file is not part of the dataset the system sees.**
+**This file is not part of the dataset the system sees.** The loader ignores it. Only the scoring script opens it, and only after a ranking has been produced.
+
+#### Why it exists
+
+To answer "did the ranking help?" you need to know who was genuinely at risk.
+
+If that were sitting in the database, the urgency agent could read it and sort by it. The system would score perfectly and prove nothing. So the answer is kept in a separate file the system cannot reach, and the agents have to work risk out for themselves from vitals and conditions, the way a clinician would.
 
 | Field | Type | Null? | Description |
 |---|---|---|---|
 | `hospital_hipe` | `char(4)` | no | Part of primary key. |
 | `pathway_number` | `text` | no | Part of primary key. |
-| `latent_hazard` | `numeric(4,3)` | no | Hidden risk of getting worse while waiting. |
+| `latent_hazard` | `numeric(4,3)` | no | Hidden risk of getting worse while waiting, 0 to 1. |
 | `deterioration_date` | `date` | yes | If and when they did get worse. |
 | `deterioration_type` | `text` | yes | `emergency_admission` or `death`. |
 
-`latent_hazard` is drawn when the patient is created. It depends loosely on their condition and age, with a great deal of unexplained variation, exactly as in real life where no clinician can perfectly predict who will deteriorate.
+**Example**
 
-**It is never loaded into the database.** If the system could see it, the system would rank perfectly by simply reading the answer, and the whole evaluation would be meaningless.
+| hospital_hipe | pathway_number | latent_hazard | deterioration_date | deterioration_type |
+|---|---|---|---|---|
+| 9001 | PW-0412 | 0.812 | 2026-08-26 | emergency_admission |
+| 9001 | PW-3345 | 0.094 | *null* | *null* |
+
+#### What informs it — an honest split
+
+The two halves of this table have very different standing, and we do not blur them.
+
+**The outcome columns are grounded in the national specification.**
+
+`deterioration_type` is not invented vocabulary. It maps onto two real removal reason codes:
+
+| Code | Meaning in the national specification | Our column |
+|---|---|---|
+| 104 | Admitted as inpatient, day case, or attended emergency for the same condition | `emergency_admission` |
+| 11 | Is deceased | `death` |
+
+Code 104 describes a patient who was waiting for a planned appointment and instead ended up admitted or in emergency for the very thing they were waiting about. That is deterioration while waiting, and the Irish system already records it.
+
+This matters for what happens after the challenge. A real pilot would not need our simulation. It would count removal reason 104 in live data and measure exactly the same variable.
+
+**The risk column is our assumption, and nothing more.**
+
+`latent_hazard` has no source. No Irish document says a patient with a blocked bile duct has a 0.81 chance of deteriorating. That number does not exist anywhere. We generate it.
+
+It is drawn once when the patient is created, loosely conditional on their condition and age, with deliberately **large unexplained variation**.
+
+That variation is the important part, and it is there for a specific reason. If risk were a clean function of the early warning score, and the urgency agent also scores on the early warning score, then "our ranking reduces deterioration" would be true automatically, by construction, regardless of whether the system worked. The system would be graded against its own inputs.
+
+The large random element prevents that. It means the vitals and conditions the agent can see only *partly* predict who deteriorates, which is also true in real medicine, where no clinician can reliably say who will get worse.
+
+So the agent can only improve the outcome by genuinely identifying high-risk patients from partial information. That makes the claim testable rather than circular.
+
+#### How to report it
+
+Two numbers come out of the evaluation, and they should not be given equal weight.
+
+| Metric | Needs `ground_truth`? | What the audience must accept |
+|---|---|---|
+| **Missed deadlines** | No | Nothing. A published 28-day rule, a date, and arithmetic. |
+| **Deteriorations** | Yes | Our hazard model, which is synthetic and unvalidated. |
+
+**Lead with missed deadlines.** Nobody has to trust anything to accept that number.
+
+**Put deterioration second, and state plainly that the risk model is ours and unvalidated.** Hiding it invites a reader to assume the result is circular, and they would be right to.
 
 ---
 
@@ -875,14 +944,14 @@ What each score was based on. **This table is the reason explanation is possible
 | `agent_name` | `text` | no | Part of primary key. |
 | `hospital_hipe` | `char(4)` | no | Part of primary key. |
 | `pathway_number` | `text` | no | Part of primary key. |
-| `evidence_type` | `text` | no | `signal`, `condition`, `triage_event`, `bed_status` or `clinic_session`. Part of primary key. |
+| `evidence_type` | `text` | no | `observation`, `condition`, `triage_event`, `bed_status` or `clinic_session`. Part of primary key. |
 | `evidence_key` | `text` | no | Points at the exact input row used. Part of primary key. |
 
 **Example**
 
 | run_id | agent_name | pathway_number | evidence_type | evidence_key |
 |---|---|---|---|---|
-| RUN-0931 | urgency | PW-0412 | signal | 9001:PW-0412:2026-08-19T09:14 |
+| RUN-0931 | urgency | PW-0412 | observation | 9001:PW-0412:2026-08-19T09:14 |
 | RUN-0931 | urgency | PW-0412 | condition | 9001:PW-0412:K83.1 |
 | RUN-0931 | urgency | PW-0412 | triage_event | TE-0412 |
 | RUN-0931 | capacity | PW-0412 | bed_status | 9001:W-STB-04:2026-08-28T08:00 |
@@ -1014,7 +1083,7 @@ referral_daily          (one row per day; showing 2026-08-28)
         ├──► conditions
         │      K83.1 Obstruction of bile duct  (primary)
         │
-        ├──► signals
+        ├──► observations
         │      2026-08-19 09:14 · HR 104 · RR 22 · Temp 38.2 · NEWS2 5
         │
         ├──► triage_events
@@ -1116,7 +1185,7 @@ That is why a suspension both pauses the clock and consumes a private slot. Thos
 | 3 | `patients` | B | ~8,000 | National specification, fields 1, 2, 4, 9, 10, 16 |
 | 4 | `persons` | B | ~5,000 | National specification, field 2 |
 | 5 | `conditions` | C | ~10,000 | `OURS`, shaped by HIPE |
-| 6 | `signals` | C | ~12,000 | `OURS`, shaped by MIMIC-IV-ED |
+| 6 | `observations` | C | ~12,000 | `OURS`, shaped by MIMIC-IV-ED |
 | 7 | `hospitals` | D | 6 | `OURS` |
 | 8 | `hospital_specialty` | D | ~30 | `OURS` |
 | 9 | `wards` | D | ~40 | `OURS` |
@@ -1128,7 +1197,7 @@ That is why a suspension both pauses the clock and consumes a private slot. Thos
 | 15 | `ref_specialty` | F | 7 | National specification, specialty codes |
 | 16 | `ref_codes` | F | ~120 | National specification, thirteen code lists |
 | 17 | `ref_rules` | F | 5 | National outpatient protocol |
-| — | `ground_truth` | G | ~8,000 | Held out. Not loaded. |
+| — | `ground_truth` | G | ~8,000 | Outcome codes from the national specification; risk model `OURS`. Never loaded. |
 
 Row counts assume roughly 2,000 active referrals per public hospital over a two-week simulated period with daily snapshots. They are estimates for planning, not targets.
 
