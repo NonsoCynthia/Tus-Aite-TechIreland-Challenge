@@ -240,7 +240,20 @@ Everything else in manual section 11.2 stands, including the synthetic-data stat
 
 ---
 
-## 10. The graph layer is not a conflict. Do not raise it.
+## 10. ~~The graph layer is not a conflict. Do not raise it.~~ SUPERSEDED
+
+> **SUPERSEDED.** This instruction asked for a paragraph in the repository README
+> explaining the relationship to the graph layer. That paragraph has been removed and this
+> section no longer applies.
+>
+> The reasoning that replaced it: this branch is scoped to the data, and the README should
+> describe only what the branch builds. Naming the graph layer here imports a concern that
+> belongs to the branches implementing it, and gives a newcomer a product tour instead of a
+> path to the data. The substance of the instruction still holds — PostgreSQL is the
+> generation and storage layer, RDF conversion is a downstream transform owned by the graph
+> track — it simply does not need saying in this README.
+>
+> The rest of the section is kept below as the record of what was originally specified.
 
 You may notice that `conductor/tech-stack.md` specifies Oxigraph, RDF and SPARQL, while this build uses PostgreSQL. This is **not** a contradiction and **not** an open item.
 
