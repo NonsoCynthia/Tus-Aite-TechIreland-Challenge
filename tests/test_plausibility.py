@@ -14,7 +14,7 @@ system orders patients WITHIN a category.
 
 So the band is replaced by a realism check anchored in the source data, plus a
 within-category discriminability check, which is what a within-category ranker
-actually depends on. See docs/CALIBRATION_FINDINGS.md.
+actually depends on. See docs/HOW_THE_DATA_WAS_MADE.md.
 """
 import numpy as np
 import pandas as pd
@@ -140,7 +140,7 @@ def test_breach_rate_matches_what_ntpf_implies(q, scored):
 
     So the assertion is anchored to the source rather than to the original guess.
     The generator draws waits from those bands, so the two should agree; a wide gap
-    means the wait model has drifted away from NTPF. See docs/CALIBRATION_FINDINGS.md.
+    means the wait model has drifted away from NTPF. See docs/HOW_THE_DATA_WAS_MADE.md.
     """
     import yaml
     from pathlib import Path

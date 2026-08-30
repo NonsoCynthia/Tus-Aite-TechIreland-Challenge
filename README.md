@@ -9,23 +9,24 @@ schedule, diagnose, or make final clinical decisions. It provides auditable deci
 
 ## Working with the dataset
 
-**New here? Start with [`docs/START_HERE.md`](docs/START_HERE.md).** Three commands and
-you have the data running locally.
-
 The synthetic dataset described in feature 1 below is built, tested and published from
-this repository. It lives on Hugging Face as a private, tagged release and is pulled in
-by `make load`.
+this repository. It lives on Hugging Face as a private, tagged release and is pulled in by
+`make load`.
 
-| Document | What it covers |
+```bash
+cp .env.example .env      # add your Hugging Face token
+make up                   # Postgres and pgAdmin
+make load                 # download and load
+```
+
+| | |
 |---|---|
-| [docs/START_HERE.md](docs/START_HERE.md) | **Start here.** Setup, credentials, three commands, looking at the data |
-| [docs/HUGGINGFACE_ACCESS.md](docs/HUGGINGFACE_ACCESS.md) | Getting access to the dataset and your own token |
-| [docs/GETTING_THE_DATA.md](docs/GETTING_THE_DATA.md) | Sample vs full, and why the sample is a closed slice |
-| [docs/VERIFY_IN_PGADMIN.md](docs/VERIFY_IN_PGADMIN.md) | Seven queries that prove the install is good |
+| [docs/GETTING_THE_DATA.md](docs/GETTING_THE_DATA.md) | **Start here.** Access, setup, loading, checking it worked |
+| [docs/HOW_THE_DATA_WAS_MADE.md](docs/HOW_THE_DATA_WAS_MADE.md) | Sources, what was measured versus chosen, what the data disproved |
 | [DATASET_README.md](DATASET_README.md) | What every table and column means. The specification. |
-| [docs/CALIBRATION_FINDINGS.md](docs/CALIBRATION_FINDINGS.md) | Where the numbers came from, and what the data disproved |
-| [docs/BUILD_MANUAL.md](docs/BUILD_MANUAL.md) | The original build specification. Code comments cite it by section. Two assertions in §10.4 are struck through as falsified. |
-| [docs/BUILD_MANUAL_ADDENDUM.md](docs/BUILD_MANUAL_ADDENDUM.md) | Eleven corrections to the manual. Where they disagree, the addendum wins. |
+
+The original build specification is kept in [docs/BUILD_MANUAL.md](docs/BUILD_MANUAL.md)
+and its [addendum](docs/BUILD_MANUAL_ADDENDUM.md); code comments cite them by section.
 
 ### Relationship to the graph layer
 

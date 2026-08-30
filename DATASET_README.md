@@ -483,7 +483,7 @@ PW-5120 is a suspected melanoma. Every vital sign is normal, and the patient is 
 
 **Vitals alone do not tell you who is urgent**, and this dataset is built so that stays true. If they did, the whole exercise would be circular.
 
-This is now measured rather than asserted. Fitting the vitals distributions from real triage data (MIMIC-IV-ED Demo, 207 stays with a recorded acuity) shows an early warning score barely discriminates triage acuity at all: the best possible rule based on `news2` alone recovers the category only 17.5 percentage points better than guessing the most common one, and 54 to 59 per cent of the highest-acuity patients score `news2 <= 2`. NEWS2 was built to detect deterioration in admitted ward patients over time; triage acuity reflects predicted resource use and presenting complaint. They measure different things. See `docs/CALIBRATION_FINDINGS.md`.
+This is now measured rather than asserted. Fitting the vitals distributions from real triage data (MIMIC-IV-ED Demo, 207 stays with a recorded acuity) shows an early warning score barely discriminates triage acuity at all: the best possible rule based on `news2` alone recovers the category only 17.5 percentage points better than guessing the most common one, and 54 to 59 per cent of the highest-acuity patients score `news2 <= 2`. NEWS2 was built to detect deterioration in admitted ward patients over time; triage acuity reflects predicted resource use and presenting complaint. They measure different things. See `docs/HOW_THE_DATA_WAS_MADE.md`.
 
 ---
 
@@ -1148,7 +1148,7 @@ We could have filled in every identifier and made the demonstration tidier. We d
 
 > **Known limitation in v1.0.** The generator does not currently place any person at
 > two hospitals, so this cross-hospital linkage is described here but not yet observable
-> in the published data. See `docs/CALIBRATION_FINDINGS.md` §7.1.
+> in the published data. See `docs/HOW_THE_DATA_WAS_MADE.md` §7.1.
 
 ### 10.3 A referral can exist with no urgency category at all
 

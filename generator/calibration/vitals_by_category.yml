@@ -401,7 +401,7 @@ coupling:
         BUILD_MANUAL section 10.4 is unreachable at any coupling value, including values
         above 1.0 that would amplify beyond MIMIC's measured separation. The band was
         specified without checking whether NEWS2 discriminates triage acuity; it does not.
-        See docs/CALIBRATION_FINDINGS.md. The sweep is a result, not a discarded step.
+        See docs/HOW_THE_DATA_WAS_MADE.md. The sweep is a result, not a discarded step.
 
 disagreement:
   gp_triage_disagreement_rate:

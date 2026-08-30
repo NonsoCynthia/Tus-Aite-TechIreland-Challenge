@@ -21,7 +21,7 @@ enforced here rather than trusted to care:
      referral's condition -- self.refs carries no condition code at that point. Age
      and the noise term are real. Deterioration also couples to waiting time via
      min(1.0, waited / 400.0), which the calibration file does not mention. See
-     docs/CALIBRATION_FINDINGS.md; correcting it changes generated data and so needs
+     docs/HOW_THE_DATA_WAS_MADE.md; correcting it changes generated data and so needs
      a new data version, not a quiet edit.
 
 Determinism, section 8.5: seeded RNG, no set iteration, sorted before write, fixed

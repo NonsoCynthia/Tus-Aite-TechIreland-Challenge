@@ -1,214 +1,166 @@
 # Getting the Data
 
-How to get a working database on your laptop, and why it is arranged this way.
+Everything needed to go from an empty machine to a database you can query.
 
-Companion documents: `DATASET_README.md` (what the data means), `docs/VERIFY_IN_PGADMIN.md`
-(how to check your install by hand).
-
----
-
-## Contents
-
-1. [What lives where](#1-what-lives-where)
-2. [Three commands](#2-three-commands)
-3. [Sample and full](#3-sample-and-full)
-4. [Why the sample is a slice and not the first few rows](#4-why-the-sample-is-a-slice-and-not-the-first-few-rows)
-5. [Switching to the full dataset](#5-switching-to-the-full-dataset)
-6. [When it goes wrong](#6-when-it-goes-wrong)
+Companion documents: [`DATASET_README.md`](../DATASET_README.md) for what the data means,
+[`HOW_THE_DATA_WAS_MADE.md`](HOW_THE_DATA_WAS_MADE.md) for where it came from.
 
 ---
 
-## 1. What lives where
+## 1. What you need
 
-Three things are versioned separately, and a single file joins them.
+Docker Desktop, running. A Hugging Face account. And an invitation to the dataset, which
+is private — ask Thabang (`ThabangIsaac1`).
 
-| What | Where | How often it changes |
-|---|---|---|
-| **Schema** | Git, as numbered migration files | Rarely, and reviewed |
-| **Data** | Hugging Face, as tagged releases | Often |
-| **Code** | Git | Constantly |
+Then your own Hugging Face **read** token, from
+[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). Name it
+something you will recognise later, like `triage-dataset-read`.
 
-`versions.yml` is the join:
-
-```yaml
-schema_version: "007"
-data_version: "v1.0"
-hf_repo: "Thabang/irish-referral-prioritisation"
-hf_revision: "v1.0"        # a tag, never a branch
-default_profile: "sample"
-```
-
-
-> **Schema 008 requires data v1.1 or later.** Migration 008 asserts that the stored
-> wait counts equal their date arithmetic, and two planted referrals in `v1.0` violate
-> it. Loading `v1.0` against schema 008 fails with a `rd_counts_match_dates` check
-> violation. If you are pinned to `v1.0`, stay on schema 007. See
-> `docs/CALIBRATION_FINDINGS.md` §7.4.
-
-**Nothing ever fetches "latest".** `hf_revision` is a git tag on the Hugging Face
-repository. If it said `main`, then two people running the same command on the same day
-could get different data and neither would know. A tag means the version you loaded is
-the version you can name.
-
-The dataset is private. Put a Hugging Face token in your `.env` as `HF_TOKEN` before you
-start. It is never written to disk by any script here and never committed — `.env` is
-git-ignored.
-
----
+**Make your own token. Never use somebody else's.** A shared token reaches a commit or a
+screenshot eventually, and revoking it then breaks everyone at once rather than one
+person. Yours costs thirty seconds and can be deleted without anyone noticing.
 
 ## 2. Three commands
 
 ```bash
-cp .env.example .env     # once
-make up                  # start Postgres and pgAdmin
-make load                # migrate, seed, fetch from Hugging Face, load
+cp .env.example .env      # then edit it, see below
+make up                   # Postgres and pgAdmin, ~1 min the first time
+make load                 # downloads and loads, ~1 min
 ```
 
-That is it. `make load` does four things in order, and each one is also available on its
-own if you need it:
+`make load` ends with `loaded 21,348 rows across 17 tables from 'sample'`.
 
-| Command | What it does |
+### What goes in `.env`
+
+`.env` is git-ignored, so your values stay on your machine.
+
+| | Set it to |
 |---|---|
-| `make migrate` | Applies `db/migrations/*.sql` in filename order |
-| `make seed` | Loads the three dictionary tables from `db/seeds/` |
-| `make fetch` | Downloads the pinned revision from Hugging Face into `data/` |
-| `make load` | All three, then loads the CSVs into Postgres |
+| `HF_TOKEN` | Your own read token from step 1. Nothing works without it. |
+| `POSTGRES_PASSWORD`, `PGADMIN_PASSWORD` | Anything you like. Local-only — the database is not reachable from outside your machine. |
+| `PGADMIN_EMAIL` | Any address. It is only a login name. |
+| Everything else | Leave it. |
 
-Postgres is on **`localhost:5433`**, not 5432. Many people already have a Postgres on
-5432 and the clash costs an hour on day one.
+If you change `POSTGRES_USER` or `POSTGRES_DB`, also change `db/pgadmin/servers.json`,
+which has them written in. A test fails if the two disagree, so you find out immediately
+rather than through a login error.
 
-pgAdmin is at **http://localhost:5050**, and the server connection is already there when
-you log in. You do not need to add it.
+## 3. Looking at it
 
-To confirm everything worked:
+Open **http://localhost:5050**, log in with your `PGADMIN_EMAIL` and `PGADMIN_PASSWORD`.
+**Triage local** is already in the sidebar — expand it and give it your
+`POSTGRES_PASSWORD`. Then `Databases → triage → Schemas → core → Tables`.
+
+You do not need to add a server. But if you ever add one by hand, this is the mistake
+almost everyone makes once:
+
+| Connecting from | Host | Port |
+|---|---|---|
+| pgAdmin, which runs **inside** Docker | `db` | `5432` |
+| A tool on **your own** machine | `localhost` | `5433` |
+
+Same database, two addresses.
+
+## 4. Checking it worked
 
 ```bash
-make verify
+make verify        # 9 passed, 0 failed
 ```
 
-Seven checks, reported as nine assertions. The seventh one passes by *failing* — see section 6.
+Seven checks, nine assertions — the first one tests three schemas separately.
 
----
+Three worth running by eye, in the pgAdmin query tool:
 
-## 3. Sample and full
+```sql
+-- Everything loaded: expect core 18, agent 7, eval 1
+SELECT table_schema, count(*) FROM information_schema.tables
+WHERE table_schema IN ('core','agent','eval') GROUP BY 1 ORDER BY 1;
 
-There are two slices of the same data.
+-- Urgency sorts correctly: expect Urgent, Semi-Urgent, Routine, Excluded
+SELECT description, severity_rank FROM core.ref_codes
+WHERE code_table='triage_category' ORDER BY severity_rank NULLS LAST;
 
-| Profile | Size | Referrals | What it is for |
+-- The answer key is unreachable: expect an ERROR
+SET ROLE agent_rw; SELECT count(*) FROM eval.ground_truth; RESET ROLE;
+```
+
+**That last error is the test passing.** `eval.ground_truth` records which patients
+actually deteriorated. If the ranking system could read it, it would score perfectly by
+looking up the answer. The database refuses, so the guarantee holds by construction rather
+than by everyone remembering. Do not file it as a bug.
+
+Sorting on `code_value` instead of `severity_rank` is the other trap: the real codes are
+Urgent 1, Routine 2, Semi-Urgent **3**, so sorting by code puts Routine ahead of
+Semi-Urgent, silently.
+
+## 5. Sample and full
+
+| | Size | Hospitals | Referrals |
 |---|---|---|---|
-| **`sample`** | ~1.3 MB | ~600 | The default. Checking that the pipeline works. |
-| `full` | ~11 MB | ~5,200 | Real runs, evaluation, anything you will present. |
-
-`make load` pulls **`sample`**, because most of the time you are checking that something
-works rather than measuring anything. Downloading eleven megabytes to find out whether
-your migrations applied is a slow way to learn a fast fact.
-
-Only the files for the profile you asked for are transferred. Asking for `sample` does
-not download the full data and then discard it — it never requests it at all.
-
-The sample is a real slice of the published data, not a separate generation. It is
-derived from `full` by `scripts/make_sample.py`, so anything true of the sample is true
-of the full dataset. It contains:
-
-- All seven planted demo cases, `PW-DEMO-01` through `PW-DEMO-07`
-- The planted cross-hospital pathway-number collision
-- 300 ordinary referrals from each of the two public hospitals it covers, `9001` and `9002`
-- Every child row belonging to those referrals, and every parent row they need
-- All three dictionary tables, whole
-
----
-
-## 4. Why the sample is a slice and not the first few rows
-
-This is the part worth understanding, because the obvious approach fails in a way that
-wastes your afternoon.
-
-Every table describing a referral — `conditions`, `observations`, `triage_events`,
-`cancellation_events`, `suspension_events` — has a foreign key pointing at
-`core.referrals`. So the tables are not independent lists that can each be shortened.
-
-Take the first 5,000 rows of each file and you get a set of observations belonging to
-referrals that are not in your slice. Postgres refuses them, and the load stops partway
-through with a foreign key violation. The error names a constraint, so it reads like a
-schema problem. It is not. It is a sampling problem, and the error message points in
-entirely the wrong direction.
-
-So the sample is built the other way round:
-
-```
-1. Choose the referrals        the 7 demo cases, the planted collision,
-                               and 300 each from hospitals 9001 and 9002
-2. Take all their children     every referral_daily row for every day,
-                               every observation, condition, triage event,
-                               cancellation and suspension
-3. Take the parents they need  the patients those referrals belong to, the
-                               persons those patients are, the hospitals and
-                               services involved
-4. Take the capacity           wards, ward-specialty allocations, bed status
-                               and clinic sessions for those hospitals
-5. Take the dictionaries whole about 130 rows between them; slicing them
-                               would only punch holes for no saving
-```
-
-The result is **closed**: every foreign key in the sample resolves inside the sample.
-`tests/test_sample_closure.py` asserts exactly that, so if the sampler ever breaks you
-find out from a test naming the sampler, rather than from Postgres naming a constraint.
-
-The selection is deterministic — referrals sorted by `pathway_number`, then the first
-300 — so the same full dataset always produces the same sample.
-
----
-
-## 5. Switching to the full dataset
+| **`sample`** — the default | 1.3 MB | 2, both public | 609 |
+| `full` | 11 MB | 6 — 4 public, 2 private | 5,200 |
 
 ```bash
 make load FETCH_PROFILE=full
 ```
 
-One command. `make load` runs fetch and load together, and both take `FETCH_PROFILE`,
-so passing it to `make fetch` alone would download the full set and then load the
-sample over it.
+Only the profile you ask for is downloaded; `sample` never fetches the full data at all.
 
-It costs about 11 MB of download and roughly 70 MB in Postgres once indexes are built.
-Both are small. Use `full` whenever you are measuring something rather than checking
-that something runs.
+**Use `full` for anything you show people.** The sample covers the two largest hospitals,
+so the contrast between a 640-bed teaching hospital and a 110-bed district one — which is
+part of what the data exists to show — is not in it. The private sites are capacity only
+and carry no referrals by design; patients reach them through a suspension, which pauses
+their waiting clock.
 
-**Use `full` for anything you will present.** The sample covers two of the six
-hospitals, both large and both public: 9001 St Brendan's (640 beds) and 9002 Kilbrannan
-(420 beds). The full set adds 9003 Ardfinnan (280) and 9004 Loughrea (110), plus the two
-private sites. The regional variation between a teaching hospital and a district one is
-part of what the dataset exists to show, and a two-hospital slice cannot show it.
+The sample is a real slice of the published data, not a separate generation, so anything
+true of it is true of the full set. It is **closed under the foreign keys**: every table
+describing a referral points back at `core.referrals`, so taking the first N rows of each
+file gives you observations belonging to referrals that are not there, and the load dies
+on a constraint violation *after* the download. Instead the sample picks a set of
+referrals and takes every child row and every parent they need. It carries all seven
+planted demo cases.
 
----
+## 6. Starting over
 
-## 6. When it goes wrong
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| Specialty `0601` is missing | Leading zeros lost | Read CSVs with `dtype=str` |
-| Routine ranks above Semi-Urgent | Sorted on `code_value` | Sort on `severity_rank` |
-| Two patients merged into one | Joined on `patient_id` alone | Always `hospital_hipe` **and** `patient_id` |
-| Breach counts look too high | Used the raw wait | Use `adjusted_wait_days` |
-| Foreign key violation loading observations | `referrals` not derived first | Follow `LOAD_ORDER` exactly |
-| pgAdmin cannot connect | Used `localhost:5433` | From inside Docker it is `db:5432` |
-| Port 5432 already in use | An existing local Postgres | Already handled — we use 5433 |
-| `make fetch` fails on a private repo | No token | Set `HF_TOKEN` in `.env` |
-
-**Two things that look like bugs and are not.**
-
-Query 7 in `make verify` and in `docs/VERIFY_IN_PGADMIN.md` **fails on purpose**:
-
-```sql
-SET ROLE agent_rw;
-SELECT count(*) FROM eval.ground_truth;   -- ERROR: permission denied
+```bash
+make reset        # wipes and reloads, ~2 min
 ```
 
-`eval.ground_truth` is the answer key. If an agent could read it, it would rank perfectly
-by looking up the answer and the whole evaluation would mean nothing. The database
-refuses the read, so the guarantee is a property of the system rather than something
-everyone has to remember. **The error is the pass.**
+Safe. It removes only this project's own database — the compose project name is pinned, so
+no other Docker project on your machine is in scope — and the data comes back from
+Hugging Face.
 
-And `make fetch` will not quietly generate data locally when it cannot reach Hugging
-Face. It stops and tells you why. Data that silently differs between team members is the
-exact failure this arrangement exists to prevent, and it is much harder to notice than a
-download that failed.
+## 7. When it goes wrong
+
+| What you see | Fix |
+|---|---|
+| `Cannot connect to the Docker daemon` | Start Docker Desktop |
+| `port is already allocated` | Change `POSTGRES_PORT` or `PGADMIN_PORT` in `.env` |
+| `401` or `Repository Not Found` on `make load` | Missing or wrong `HF_TOKEN`, or you have not been invited. A private repo you cannot see returns 404, not "denied" |
+| `password authentication failed` in pgAdmin | Use `POSTGRES_PASSWORD` from `.env`; if you changed `POSTGRES_USER`, update `db/pgadmin/servers.json` too |
+| `could not translate host name "localhost"` | You added a server by hand. Use `db:5432` — see section 3 |
+| `container name "/triage_db" is already in use` | Another copy of this project is running. `docker compose down` there first |
+| `rd_counts_match_dates` violation on load | You are loading data `v1.0` against schema 008. They are incompatible — pin `v1.1` |
+| `permission denied for schema eval` | Correct. See section 4 |
+
+`make load` will not quietly generate data locally when it cannot reach Hugging Face. It
+stops and says why. Two people silently holding different data is much harder to notice
+than a download that failed, and much worse when someone presents a result from it.
+
+## 8. Versions
+
+`versions.yml` pins schema, data and code together:
+
+```yaml
+schema_version: "008"
+data_version:   "v1.1"
+hf_revision:    "v1.1"     # a tag, never a branch
+```
+
+**Nothing fetches "latest".** A tag means the version you loaded is one you can name. If
+this said `main`, two people running the same command on the same day could get different
+data and neither would know.
+
+Schema 008 and data `v1.0` are incompatible: 008 asserts the stored wait counts equal
+their date arithmetic, and two planted referrals in `v1.0` break that. If you are pinned
+to `v1.0`, stay on schema 007.

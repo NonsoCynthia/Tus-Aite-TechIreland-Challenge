@@ -1,8 +1,7 @@
 """Publish the dataset to Hugging Face and tag it.
 
-Only after `make test` passes. Private unless the operator says otherwise, and the
-licence is left as TODO: it is awkward to change after publication and it is not
-this script's decision to make.
+Only after `make test` passes. Private unless the operator says otherwise. No licence
+field is declared; that is not this script's decision to make.
 
 The tag is what everyone pins to. Without it there is no versioning, only a moving
 target.
@@ -29,10 +28,6 @@ size_categories: [10K<n<100K]
 ---
 
 # Synthetic Irish Hospital Referral Prioritisation Dataset
-
-> **Licence: not yet decided.** No licence field is declared on purpose. A licence is
-> awkward to change after publication, so it is left to the project owners rather than
-> guessed at here. Treat this dataset as all-rights-reserved until one is set.
 
 > **Every record in this dataset is synthetic. No real patient, clinician, or hospital
 > is represented. Hospital names are invented and hospital codes use a reserved range
@@ -108,7 +103,7 @@ First release.
 ## Full specification
 
 See `DATASET_README.md` in the source repository, plus
-`docs/CALIBRATION_FINDINGS.md` for what the calibration measured, including three
+`docs/HOW_THE_DATA_WAS_MADE.md` for what the calibration measured, including three
 assumptions in the original build specification that the data falsified.
 """
 
