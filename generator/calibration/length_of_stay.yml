@@ -1,0 +1,678 @@
+# Inpatient length of stay and bed occupancy, fitted from ESRI Research Series 213.
+#
+# These two quantities drive the SimPy bed model: ALOS sets how long a bed is held,
+# the occupancy rate sets how many beds that bed-day volume implies.
+#
+# READ THIS BEFORE USING ANY NUMBER BELOW:
+#   RS213 is a PROJECTION report. It is full of 2040 numbers and OECD comparator
+#   numbers that look like occupancy rates and length-of-stay figures but are not
+#   observations. Every parameter here records the year it refers to and whether it
+#   is an observation or a scenario assumption. Do not lift a 2040 figure into the
+#   base-year model. See `figures_deliberately_not_used` at the bottom for the
+#   specific numbers on these pages that were rejected and why.
+
+provenance:
+  source: >-
+    ESRI Research Series 213 - "Projections of national demand and bed capacity
+    requirements for public acute hospitals in Ireland, 2023-2040: Based on the
+    Hippocrates model". Brick, A., Kakoulidou, T. and Humes, H. (May 2025).
+    Economic and Social Research Institute, Dublin.
+  url: https://www.esri.ie/system/files/publications/RS213.pdf
+  doi: https://doi.org/10.26504/rs213
+  licence: >-
+    ESRI Research Series, free public download, no paywall or registration. Report
+    states no reuse restriction beyond normal academic citation; cite as above.
+  granularity: >-
+    National aggregate, public acute hospitals only. Annual. Base year 2023, with a
+    2019-2024 historical series and 2024-2040 projections. NOT patient-level: RS213
+    publishes no individual LOS records, so no distribution can be fitted directly
+    from it - only mean LOS and the two dispersion statistics noted below.
+  retrieved: 2026-08-30
+  raw_file: generator/calibration/_raw/esri_rs213.pdf
+  raw_text: generator/calibration/_raw/esri_rs213.txt
+  sha256: 85a1df4aec9003525d7730f33d1a87bdf985ca64729443d7897ae5f945a14bdb
+  bytes: 2034113
+  pdf_pages: 114
+  page_numbering: >-
+    Every page reference in this file is the PRINTED page number (the folio shown on
+    the page), not the PDF page index. The offset is exactly 13: printed = PDF - 13.
+    This was verified against the report's own table of contents for seven separate
+    captions before any figure was read.
+
+underlying_data_sources:
+  note: >-
+    RS213 does not itself collect data. It restates two upstream sources. Recorded so
+    the provenance chain is not lost.
+  hipe: >-
+    Hospital In-Patient Enquiry, Healthcare Pricing Office. Source of all discharge
+    and bed-day counts, hence of every ALOS figure below.
+  hse_biu_acute: >-
+    HSE Business Intelligence Unit (Acute). Source of the occupancy rates. Their
+    published formula (RS213 p.38 footnote 47) is:
+    (bed days used - AMAU same day discharges) * 100 / (bed days available).
+
+# ---------------------------------------------------------------------------
+# 1. BED OCCUPANCY RATE
+# ---------------------------------------------------------------------------
+
+occupancy:
+
+  inpatient_occupancy_rate_2023:
+    value: 0.926
+    as_percent: 92.6
+    kind: fitted
+    year: 2023
+    status: observed
+    basis: HSE BIU Acute reported rate
+    page: 38
+    table: "TABLE 3.6 National day patient and inpatient bed occupancy rate, 2019-2023"
+    cell: "row 2023, column 'Inpatient occupancy rate (average annual)'"
+    also_appears: >-
+      Restated identically on p.96, TABLE F.1 "Inpatient occupancy rate, HSE and
+      OECD, 2019-2023", row 2023, column "HSE BIU Acute (%)". Two independent
+      tables in the report agree on this figure.
+    quote: >-
+      "In our main modelling scenarios, three inpatient occupancy rates are
+      considered. In the first instance, the reported 2023 inpatient occupancy rate
+      of 92.6 per cent is applied and assumed to remain constant to 2040." (p.38,
+      section 3.5.1, Model assumptions)
+    table_footnote: >-
+      Table 3.6 note a: "Excludes sameday AMAU discharges and National
+      Rehabilitation Hospital data." Note b: "OR for one hospital was not available
+      at the time of writing; this was estimated by the authors based on bed
+      availability and activity recorded in HIPE."
+    sanity_check: >-
+      92.6% sits inside the expected 90-95% band for Irish acute occupancy. PASS.
+
+  inpatient_occupancy_rate_2023_hipe_basis:
+    value: 0.897
+    as_percent: 89.7
+    kind: fitted
+    year: 2023
+    status: observed
+    basis: authors' own calculation from HIPE activity data
+    page: 96
+    table: "TABLE F.1 Inpatient occupancy rate, HSE and OECD, 2019-2023"
+    cell: "row 2023, column 'HIPE (%)'"
+    quote: >-
+      "Another issue is the inconsistency in activity data reported by some hospitals
+      to HSE BIU Acute and through HIPE. Using HIPE activity data for 2023, we
+      estimate an OR of 89.7 per cent compared to 92.6 reported by HSE BIU Acute
+      (Table F.1). Hospitals report activity independently to HSE BIU Acute and
+      typically report higher levels of activity compared to HIPE." (p.96, Appendix F)
+    use: >-
+      Alternative base. Held as the low end of a plausible base-year range, NOT as
+      the headline value - see occupancy_rate_for_simulation for why.
+
+  day_patient_occupancy_rate_2023:
+    value: 1.267
+    as_percent: 126.7
+    kind: fitted
+    year: 2023
+    status: observed
+    page: 38
+    table: "TABLE 3.6 National day patient and inpatient bed occupancy rate, 2019-2023"
+    cell: "row 2023, column 'Day patient occupancy rate'"
+    warning: >-
+      THIS IS NOT A UTILISATION FRACTION AND MUST NEVER BE FED INTO A BED MODEL AS
+      ONE. It exceeds 100% because a day bed is turned over more than once per day.
+      It is a turnover ratio in the same algebraic slot as an occupancy rate. Feeding
+      1.267 into an inpatient occupancy calculation would silently under-count beds.
+      Recorded only so the inpatient figure is not confused with it.
+
+  inpatient_occupancy_rate_history:
+    kind: fitted
+    status: observed
+    page: 38
+    table: "TABLE 3.6 National day patient and inpatient bed occupancy rate, 2019-2023"
+    unit: fraction
+    series:
+      2019: 0.945
+      2020: 0.812
+      2021: 0.860
+      2022: 0.909
+      2023: 0.926
+    interpretation: >-
+      The 2020-2021 trough is COVID-19 (activity collapsed, beds stayed open), not a
+      structural change. A simulator calibrated on 2020 or 2021 would be calibrated on
+      a pandemic. Use 2023. The 2019 value (94.5%) is the pre-COVID peak and is the
+      top of the credible range.
+
+  day_patient_occupancy_rate_history:
+    kind: fitted
+    status: observed
+    page: 38
+    table: "TABLE 3.6 National day patient and inpatient bed occupancy rate, 2019-2023"
+    unit: ratio_not_fraction
+    series:
+      2019: 1.349
+      2020: 1.111
+      2021: 1.180
+      2022: 1.246
+      2023: 1.267
+    warning: See day_patient_occupancy_rate_2023 - these are turnover ratios, not fractions.
+
+  occupancy_rate_for_simulation:
+    value: 0.926
+    as_percent: 92.6
+    kind: modelled
+    reason: >-
+      Three candidate base-year values exist: 92.6% (HSE BIU Acute), 89.7% (HIPE,
+      authors' calculation), and 94.5% (2019, pre-COVID). 92.6% is chosen because it
+      is the value RS213 itself uses to produce its published 2023 bed count, and
+      because that choice is independently verifiable: 92.6% reproduces RS213's own
+      reported 11,421 inpatient beds to within 2.4 beds (see validation_checks below).
+      89.7% does not - it yields about 11,790, which is some 370 beds wrong against
+      the report's own published output. Choosing the figure that closes the report's
+      internal arithmetic is a decision, not a measurement, so this is modelled
+      rather than fitted even though the number itself is a fitted one.
+    plausible_range_for_sensitivity:
+      low: 0.897
+      high: 0.945
+      note: >-
+        Low = HIPE basis 2023 (p.96). High = 2019 pre-COVID observed (p.38). Both are
+        observed values from this report, not invented bounds. Sweep between them to
+        test how hard the bed model leans on the occupancy assumption - RS213's own
+        sensitivity analysis (Table 6.2, p.66) shows this parameter is the single
+        largest source of variation in projected bed requirements.
+
+# ---------------------------------------------------------------------------
+# 2. AVERAGE LENGTH OF STAY
+# ---------------------------------------------------------------------------
+
+length_of_stay:
+
+  derivation_method:
+    note: >-
+      RS213 presents total inpatient ALOS ONLY as a bar chart (Figure 1.1, p.5) with
+      no data labels, so the total figure cannot be read off the page. It does print
+      discharges and bed days for 2023 in Table 4.1 (p.43) and for 2019-2024 in Table
+      1.1 (p.4). Every ALOS below is therefore computed as bed_days / discharges from
+      those tables. This is arithmetic on published cells, not an estimate.
+    validation_of_method: >-
+      The method is verified against the report's own prose. RS213 states emergency
+      inpatient ALOS in words for four years. Recomputing from Table 1.1 reproduces
+      all four: 2021 -> 7.085 (report says 7.1), 2022 -> 7.654 (report says 7.7),
+      2023 -> 7.699 (report says 7.7), 2024 -> 7.354 (report says 7.3; the rounding
+      band is 7.344-7.364, which straddles 7.35, so the unrounded 2024 counts must
+      sit in its lower part). The derivation is sound.
+    precision_caveat: >-
+      Table 4.1 and Table 1.1 report counts in thousands, so each derived ALOS carries
+      a rounding band of roughly +/-0.01 days. Bands are stated per parameter. Values
+      are given to 3 decimals to preserve the arithmetic, NOT because the source
+      resolves that finely.
+
+  alos_emergency_inpatient_2023:
+    value: 7.699
+    unit: days
+    kind: fitted
+    year: 2023
+    status: observed
+    rounding_band: [7.688, 7.710]
+    derivation: "3,095,000 emergency inpatient bed days / 402,000 emergency inpatient discharges"
+    page: 43
+    table: "TABLE 4.1 Discharges and bed days by patient type, 2023"
+    cell: "row 'Emergency' under Inpatients; N discharges ('000) = 402, N inpatient bed days ('000) = 3,926 total of which Emergency = 3,095"
+    corroborating_page: 5
+    corroborating_quote: >-
+      "While emergency inpatient ALOS was not impacted in 2020-2021, a significant
+      increase in ALOS was observed in 2022 (from 7.1 to 7.7 days), which remained in
+      2023. Provisional data for 2024 show that this reduced significantly in that
+      year (down to 7.3 days), again demonstrating the volatility of metrics in the
+      short term." (p.5, section 1.3, discussing Figure 1.1)
+    second_corroborating_quote: >-
+      "Provisional data for 2024 show that average length of stay (ALOS) for emergency
+      inpatients has reduced to 7.3 days from a high of 7.7 days in 2022 and 2023."
+      (p.93, Appendix E, "Impact of changing ALOS")
+    confidence: >-
+      Highest of any LOS figure here. The derived 7.699 matches the report's printed
+      7.7 exactly. This is the one ALOS value RS213 states directly in words.
+
+  alos_elective_inpatient_2023:
+    value: 5.942
+    unit: days
+    kind: fitted
+    year: 2023
+    status: observed
+    rounding_band: [5.902, 5.982]
+    derivation: "511,000 elective bed days / 86,000 elective discharges"
+    page: 43
+    table: "TABLE 4.1 Discharges and bed days by patient type, 2023"
+    cell: "row 'Elective' under Inpatients"
+    quote: >-
+      "Emergency inpatients accounted for 61.7 per cent of inpatient discharges and
+      78.8 per cent of inpatient bed days in 2023, compared to elective inpatients
+      accounting for 13.1 per cent of total inpatient discharges and 13 per cent of
+      inpatient bed days." (p.43, section 4.3)
+    caveat: >-
+      Smallest denominator of the three patient types (86 thousand), so the widest
+      rounding band. RS213 also warns (p.5) that 2022-2023 elective volumes are
+      depressed and that outsourced Safety Net activity is excluded from these counts.
+
+  alos_maternity_inpatient_2023:
+    value: 2.566
+    unit: days
+    kind: fitted
+    year: 2023
+    status: observed
+    rounding_band: [2.548, 2.584]
+    derivation: "254,000 maternity bed days / 99,000 maternity discharges"
+    page: 43
+    table: "TABLE 4.1 Discharges and bed days by patient type, 2023"
+    cell: "row 'Maternity' under Inpatients"
+
+  alos_amau_sameday_2023:
+    value: 1.0
+    unit: days
+    kind: fitted
+    year: 2023
+    status: observed_by_construction
+    derivation: "65,000 bed days / 65,000 discharges = exactly 1.0 by definition"
+    page: 43
+    table: "TABLE 4.1 Discharges and bed days by patient type, 2023"
+    quote: >-
+      Table 4.1 note b: "AMAU sameday cases are included in both the discharge and bed
+      day figures as they are included in the HIPE data. As with all sameday
+      inpatients, we allocate a bed day of one to each discharge. This activity is not
+      included in the available bed/occupancy rate data and therefore is not included
+      in our bed day or bed projections." (p.43)
+    consequence: >-
+      This is the single most important footnote in the file. AMAU sameday activity is
+      65,000 discharges each assigned exactly 1 day. Including it drags total ALOS
+      down by half a day AND breaks the occupancy arithmetic, because the occupancy
+      rate denominator excludes these beds entirely. See alos_for_simulation.
+
+  alos_all_inpatients_2023_including_amau:
+    value: 6.021
+    unit: days
+    kind: fitted
+    year: 2023
+    status: observed
+    rounding_band: [6.016, 6.027]
+    derivation: "3,926,000 total inpatient bed days / 652,000 total inpatient discharges"
+    page: 43
+    table: "TABLE 4.1 Discharges and bed days by patient type, 2023"
+    cell: "row 'Inpatients' (the total row), N = 652 discharges, 3,926 bed days"
+    do_not_use_for_bed_model: >-
+      Correct as a description of all HIPE inpatient activity, but WRONG as a bed
+      model input, because its bed-day base includes the 65,000 AMAU sameday bed days
+      that RS213 explicitly removes before converting bed days into beds.
+
+  alos_inpatient_excluding_amau_sameday_2023:
+    value: 6.576
+    unit: days
+    kind: fitted
+    year: 2023
+    status: observed
+    rounding_band: [6.556, 6.595]
+    rounding_band_note: >-
+      Wider than the other bands because this figure sums three separately-rounded
+      cells on each side of the ratio, so the error bound is +/-1,500 not +/-500.
+    derivation: >-
+      (511 + 3,095 + 254) thousand bed days / (86 + 402 + 99) thousand discharges
+      = 3,860,000 / 587,000. Elective + emergency + maternity, i.e. Table 4.1
+      inpatients with the AMAU sameday row removed.
+    page: 43
+    table: "TABLE 4.1 Discharges and bed days by patient type, 2023"
+    alternative_reading: >-
+      Subtracting the AMAU row from the total row instead of summing the three
+      component rows gives 3,861 rather than 3,860 thousand bed days, hence ALOS
+      6.578 rather than 6.576. The one-thousand gap is Table 4.1's rounding, not an
+      error. The two readings differ by 0.002 days, well inside the rounding band,
+      and both are carried through the bed-count validation below.
+    why_this_base: >-
+      This matches the activity base RS213 itself converts into beds. Confirmed
+      numerically: the two readings give 11,420.5 and 11,423.4 beds, which bracket
+      the report's own published 11,421 (Table 5.8, p.60). See validation_checks.
+    sanity_check: >-
+      6.576 days sits inside the expected 5-7 day band for acute ALOS. PASS.
+
+  alos_emergency_history:
+    kind: fitted
+    status: observed
+    page: 4
+    table: "TABLE 1.1 Public acute hospital activity ('000) and activity rates per 1,000 population, 2019-2024"
+    derivation: emergency inpatient bed days / emergency inpatient discharges, per year
+    unit: days
+    series:
+      2019: 7.159
+      2020: 7.131
+      2021: 7.085
+      2022: 7.654
+      2023: 7.699
+      2024: 7.354
+    note_2024: >-
+      HIPE data for 2024 are provisional (February 2025) per the Table 1.1 source line.
+      RS213 prints 7.3 for 2024; the derived point estimate is 7.354 with a rounding
+      band of 7.344-7.364, so the unrounded counts must lie below 7.35. Consistent
+      with the printed 7.3, but only just - do not treat 7.354 as exact.
+    interpretation: >-
+      RS213's own reading: "this suggests that there is some volatility in ALOS"
+      (p.93). The 2022 step up of about 0.57 days has not fully reversed. A simulator
+      should treat ALOS as drifting, not fixed.
+
+  alos_for_simulation:
+    value: 6.576
+    unit: days
+    kind: modelled
+    reason: >-
+      Chosen over alos_all_inpatients_2023_including_amau (6.021 days) because the
+      SimPy model allocates inpatient BEDS, and RS213 excludes AMAU sameday activity
+      from the bed conversion (Table 4.1 note b, p.43). Pairing the including-AMAU
+      ALOS with the AMAU-excluding occupancy rate would mix two different populations
+      and inflate the implied bed count by roughly 9%. The value itself is fitted; the
+      decision about which population it describes is the modelled part.
+    pairs_with: occupancy.occupancy_rate_for_simulation
+    population: >-
+      Elective + emergency + maternity inpatients in Irish public acute hospitals,
+      2023. Excludes AMAU sameday, day patients, and all private-hospital activity.
+
+# ---------------------------------------------------------------------------
+# 3. LOS DISTRIBUTION SHAPE
+# ---------------------------------------------------------------------------
+# A mean alone will not make occupancy move. The simulator needs a distribution.
+# RS213 publishes NO LOS distribution, no standard deviation and no percentile table.
+# It does publish two dispersion statistics in passing, and it does reveal the
+# distributional family it assumes internally. Both are used below. Everything here
+# is weaker evidence than sections 1 and 2 and is labelled accordingly.
+
+los_distribution:
+
+  family:
+    value: lognormal
+    kind: modelled
+    reason: >-
+      Not a generic default. RS213 itself treats LOS as lognormal within each DRG when
+      it identifies long-stay outliers, so the family is the report's own working
+      assumption rather than an outside import.
+    page: 35
+    quote: >-
+      "An alternative way to examine LOS outliers within the HIPE data is to identify
+      inpatient discharges where LOS is high relative to the mean LOS for the
+      post-discharge assigned DRG. We identify high outliers by first calculating the
+      mean of the log-transformed LOS for each DRG. In each DRG, extreme high outliers
+      (a) are identified as inpatient discharges whose LOS is greater than the mean
+      plus three times the standard deviation." (p.35, section 3.4.7)
+    supporting_note: >-
+      Right skew is corroborated independently on p.89: "just 5 per cent of discharges
+      accounted for 35.5 per cent of bed days for the selected conditions in 2023."
+      A symmetric LOS distribution cannot produce a concentration like that.
+
+  sigma_log_estimate_lorenz:
+    value: 1.273
+    kind: fitted
+    page: 89
+    figure: "FIGURE D.1 Cumulative distribution of emergency inpatient discharges and bed days for selected avoidable hospitalisations, 2023"
+    quote: >-
+      "Bed days for these conditions tend to be recorded by a relatively small group of
+      patients. Figure D.1 shows that just 5 per cent of discharges accounted for 35.5
+      per cent of bed days for the selected conditions in 2023." (p.89, Appendix D)
+    derivation: >-
+      For a lognormal, the share of the total contributed by the top p fraction is
+      Phi(sigma + Phi^-1(p)). Setting Phi(sigma + Phi^-1(0.05)) = 0.355 gives
+      sigma = Phi^-1(0.355) - Phi^-1(0.05) = -0.37186 - (-1.64485) = 1.27299.
+      Solved exactly, then verified by substitution (recovers 0.3550).
+    caveat: >-
+      Measured on the potentially-avoidable-emergency-hospitalisation subgroup, not on
+      all inpatients. That subgroup is older and longer-staying than average, so this
+      is likely an upper bound on dispersion for the whole inpatient population.
+
+  sigma_log_estimate_median_mean:
+    value: 1.212
+    kind: fitted
+    page: 89
+    derivation: >-
+      RS213 footnote 71 (p.89): "In total, 89,719 discharges and 834,727 bed days were
+      identified as potentially avoidable emergency hospitalisations from the full list
+      of conditions in 2023." That gives a subgroup mean LOS of 9.3038 days. The same
+      page states that removing 25% of these discharges at the MEDIAN LOS removes
+      c. 12% of bed days, which implies median = 0.12 * 834,727 / (0.25 * 89,719)
+      = 4.4658 days. For a lognormal, median/mean = exp(-sigma^2/2), so
+      sigma = sqrt(-2 * ln(4.4658 / 9.3038)) = sqrt(-2 * ln(0.48001)) = 1.21160.
+    quote: >-
+      "we assume that the avoidable bed days associated with a 25 per cent reduction in
+      discharges equals the median length of stay (LOS) for avoidable discharges
+      multiplied by the number of potentially avoidable discharges to be removed. This
+      corresponds to a c. 12 per cent reduction in bed days." (p.89, Appendix D)
+    caveat: >-
+      The 12 per cent is stated as "c. 12 per cent", so this estimate inherits that
+      approximation. Same subgroup caveat as the Lorenz estimate.
+
+  sigma_log:
+    value: 1.242
+    kind: modelled
+    reason: >-
+      Midpoint of the two independent estimates above (1.27299 and 1.21160), which
+      agree to within 4.9% of their midpoint despite being derived from completely
+      different statements on the same page - one from a Lorenz concentration point,
+      one from a median-to-mean ratio. That agreement is the main reason this
+      parameter is offered at all. Taking the midpoint of two subgroup-derived
+      estimates and applying it to the whole inpatient population is a choice, hence
+      modelled. Treat as the weakest number in this file and sweep it.
+    sensitivity_range: [1.212, 1.273]
+    cross_check: >-
+      Applying sigma = 1.27299 to the subgroup mean of 9.3038 days predicts a subgroup
+      median of 4.138 days, against 4.466 days implied independently by the report's
+      own 12% statement. Two unrelated routes through the same page land 7% apart.
+    known_limitation: >-
+      Derived entirely from the avoidable-emergency subgroup. RS213 publishes nothing
+      that pins dispersion for elective or maternity inpatients, whose LOS
+      distributions are certainly tighter. If the simulator models patient types
+      separately, this sigma is defensible for emergency only.
+
+  mu_log:
+    value: 1.1121
+    kind: modelled
+    reason: >-
+      Not independent. Back-solved so the lognormal reproduces the fitted mean:
+      mu = ln(mean) - sigma^2 / 2 = ln(6.576) - 1.242^2 / 2 = 1.883427 - 0.771282
+      = 1.112145. Computed from the PUBLISHED (rounded) values of
+      alos_for_simulation and sigma_log rather than from unrounded intermediates, so
+      that anyone recomputing it from this file gets the same answer. Recompute
+      whenever either input changes.
+    implied_median_days: 3.041
+    implied_mean_days: 6.576
+    round_trip_check: >-
+      exp(mu + sigma^2/2) = 6.576000, which recovers alos_for_simulation exactly.
+    plausibility_note: >-
+      An implied median of about 3 days against a mean of 6.58 is consistent with a
+      real acute inpatient mix, in which a large mass of 1-3 day stays (including all
+      sameday-standardised inpatients) sits alongside a long tail. RS213 states that
+      inpatient bed days are standardised so the minimum stay is 1 day, so the
+      simulator must floor sampled LOS at 1 day to match the source convention.
+
+  minimum_los_days:
+    value: 1.0
+    unit: days
+    kind: fitted
+    page: 5
+    quote: >-
+      Figure 1.1 notes: "Excludes AMAU sameday discharges. In this analysis, inpatient
+      bed days are standardised such that the minimum stay is equal to one (including
+      sameday inpatients)." (p.5)
+    implementation: >-
+      Sample from the lognormal then apply max(sampled, 1.0). Do not truncate the
+      distribution before sampling - the source floors, it does not exclude.
+
+# ---------------------------------------------------------------------------
+# 4. VALIDATION
+# ---------------------------------------------------------------------------
+
+validation_checks:
+
+  - check: >-
+      Do the chosen ALOS base and occupancy rate reproduce RS213's own published
+      2023 inpatient bed count? This is the decisive test of the whole file.
+    formula: "beds = total bed days / (365 * occupancy rate), RS213 p.96 Appendix F"
+    note_on_the_input: >-
+      Table 4.1 supports two equally legitimate readings of 2023 inpatient bed days
+      excluding AMAU sameday, because it rounds every cell to thousands: summing the
+      three component rows gives 3,860 thousand, while subtracting the AMAU row from
+      the total row gives 3,861 thousand. Both are carried through below rather than
+      silently picking one.
+    computed: "3,860,000 / (365 * 0.926) = 11,420.5 beds; 3,861,000 / (365 * 0.926) = 11,423.4 beds"
+    published: "11,421 beds (Table 5.8 'Beds - Capacity requirements by bed type and projection scenario, 2023-2040', p.60, Estimated 2023, Inpatient beds)"
+    agreement: >-
+      The two readings bracket the published figure exactly: 11,420.5 <= 11,421 <=
+      11,423.4. Worst-case error 2.4 beds on 11,421, or 0.02%.
+    result: >-
+      PASS, and about as strong as this check can be. The ALOS base, the occupancy
+      rate and RS213's own published bed count are mutually consistent, which means
+      the tables were read correctly and paired correctly.
+
+  - check: Same test using the HIPE-basis occupancy rate instead
+    computed: "3,860,000 / (365 * 0.897) = 11,790 beds; 3,861,000 / (365 * 0.897) = 11,793 beds"
+    published: "11,421 beds"
+    agreement: "369-372 beds high, about 3.2% - does not close under either reading"
+    result: >-
+      FAIL, and informative. This is the evidence that 92.6% and not 89.7% is the
+      rate RS213 actually used, and it is why occupancy_rate_for_simulation is 0.926.
+
+  - check: Does the day-patient side of the same arithmetic also close?
+    formula: "beds = day patient discharges / (365 * day patient turnover ratio)"
+    computed: "1,205,000 / (365 * 1.267) = 2,605.66 beds"
+    published: "2,606 day beds (Table 5.8, p.60, Estimated 2023, Day beds)"
+    agreement: "rounds to the published figure exactly"
+    result: >-
+      PASS. Confirms the 126.7% figure is a turnover ratio occupying the occupancy
+      slot in the formula, exactly as flagged in the warning above.
+
+  - check: Does the derivation method reproduce the only ALOS values RS213 prints in words?
+    computed: "2021 = 7.085, 2022 = 7.654, 2023 = 7.699, 2024 = 7.354"
+    published: "7.1, 7.7, 7.7, 7.3 (p.5 and p.93)"
+    agreement: >-
+      All four match to the stated precision. 2024 requires the unrounded counts to
+      lie in the lower part of its 7.344-7.364 band to print as 7.3.
+    result: PASS
+
+  - check: Do the two independent lognormal sigma derivations agree?
+    computed: "Lorenz route 1.27299; median/mean route 1.21160"
+    agreement: "0.0614 apart, 4.9% of the midpoint"
+    result: >-
+      PASS for a shape parameter derived indirectly from prose. Not strong enough to
+      call sigma fitted at the population level, which is why sigma_log is modelled.
+
+  - check: Sanity bands required by the calibration brief
+    computed: "occupancy 92.6%; ALOS 6.576 days"
+    expected: "occupancy ~90-95%; ALOS ~5-7 days"
+    result: PASS on both. No figure in this file falls outside its expected band.
+
+source_discrepancies_found:
+  - issue: RS213 contradicts itself on the 2021 inpatient occupancy rate
+    table_3_6_page_38: 0.860
+    table_f_1_page_96: 0.862
+    note: >-
+      Both cells are labelled as the HSE BIU Acute series, so they should be
+      identical. Re-extracted directly from PDF pages 51 and 109 to rule out a text
+      extraction artefact; the discrepancy is genuinely in the published document.
+      0.2 percentage points, immaterial here because 2021 is a COVID year that is not
+      used, and both tables agree exactly on 2023. Recorded so a later reader who
+      finds the mismatch knows it was seen, not missed.
+  - issue: 2024 emergency ALOS rounds to 7.4 from the published thousands
+    note: >-
+      3,118 / 424 = 7.354, which rounds to 7.4, while RS213 prints 7.3. The rounding
+      band is 7.338-7.371, so the underlying unrounded counts must sit at its low
+      edge. Not an error in either direction - a consequence of Table 1.1 publishing
+      counts in thousands. Flagged because it shows the derived ALOS values are
+      precise to about +/-0.01 days and no further.
+
+figures_deliberately_not_used:
+  note: >-
+    These numbers appear on the same pages as the ones above and are the specific
+    traps this file exists to avoid. Each is a real published figure that would be
+    wrong in a 2023 base-year bed model.
+  figures:
+    - figure: 0.90
+      what: Inpatient occupancy rate target for 2040, high-pressure scenario
+      page: 60
+      why_rejected: >-
+        A 2040 scenario assumption, not an observation. Quote: "In the high-pressure and
+        progress scenarios, it reduces to 90 per cent and 85 per cent respectively by
+        2040." (p.60)
+    - figure: 0.85
+      what: Inpatient occupancy rate target for 2040, progress scenario
+      page: 60
+      why_rejected: Same as above. It is a policy target 17 years out.
+    - figure: 0.899
+      what: OECD curative occupancy rate for Ireland, 2019
+      page: 96
+      table: "TABLE F.1, column 'OECD curative (%)'"
+      why_rejected: >-
+        Wrong year and wrong definitional basis. RS213 states the curative-to-somatic
+        gap is "around 7 percentage points" and that HSE-to-OECD differences reach
+        "4.9(11.7) percentage points in 2022". Also n/a for 2023. This column is the
+        international comparator, not the Irish operational rate.
+    - figure: 0.888
+      what: OECD somatic occupancy rate for Ireland, 2019
+      page: 96
+      why_rejected: Same as above; also n/a for 2023.
+    - figure: Occupancy rates for other OECD countries
+      what: Figure 2.2, "Acute (curative) hospital beds per 1,000 population and occupancy rate (%) in OECD countries, 2019"
+      page: 18
+      why_rejected: >-
+        A different country's comparator chart, exactly the failure mode the brief
+        warned about. Not Irish operational data.
+    - figure: 1.267
+      what: Day patient occupancy rate 2023
+      page: 38
+      why_rejected: >-
+        Retained above but never used as an inpatient occupancy. It is a turnover ratio
+        above 100% and would corrupt any bed calculation it was substituted into.
+    - figure: "6,024 / 4,430 / 6,825"
+      what: Projected ADDITIONAL inpatient beds by 2040 across scenarios
+      page: 60
+      table: TABLE 5.8
+      why_rejected: 2040 projections. The base-year bed count is 11,421.
+    - figure: 0.10
+      what: The 10% ALOS reduction assumed by the earlier Keegan et al. (2018) Hippocrates run
+      page: 35
+      why_rejected: >-
+        A superseded modelling assumption from a previous report, not a measurement.
+        RS213 explicitly revisits and replaces it: "In this iteration, we examine the
+        available evidence in the Irish context for that assumption and make some
+        adjustments based on the results." (p.35)
+    - figure: "0.05 elective / age-varying emergency LOS reductions"
+      what: RS213's own forward LOS-reduction assumptions to 2040
+      page: 37
+      why_rejected: Projection assumptions, not observed 2023 behaviour.
+
+not_available_in_this_source:
+  note: >-
+    Recorded so nobody re-reads 114 pages looking for these. Each was searched for
+    explicitly and is genuinely absent.
+  items:
+    - >-
+      Standard deviation of LOS, for any patient group. RS213 references per-DRG
+      standard deviations in its outlier method but publishes none of them.
+    - >-
+      Any LOS percentile or quantile table.
+    - >-
+      Total inpatient ALOS as a printed number. Figure 1.1 (p.5) is an unlabelled bar
+      chart; only the emergency series is quantified, in prose.
+    - >-
+      LOS by specialty, diagnosis, or hospital.
+    - >-
+      Any time-of-day, day-of-week or seasonal admission or discharge pattern.
+    - >-
+      Occupancy rate broken down by bed type. RS213 flags this as a live data gap -
+      "It would be optimal to have occupancy rates for maternity, paediatric, critical
+      care and general adult beds" (p.68).
+    - >-
+      Occupancy rate variance or any distribution around the annual mean. The 92.6%
+      is an annual average; RS213 gives no within-year variation.
+
+parameter_counts:
+  fitted: 15
+  modelled: 5
+  assumed: 0
+  total: 20
+  counted_as: >-
+    Every mapping in this file that carries a `kind` key. Three of the fitted entries
+    are series rather than single scalars (the 2019-2023 inpatient and day-patient
+    occupancy histories, and the 2019-2024 emergency ALOS history); each is counted
+    once, as one parameter.
+  assumed_is_zero_because: >-
+    Every number in this file traces to a cell, a sentence or a footnote in RS213.
+    Nothing was invented to fill a gap. Where RS213 is silent - LOS standard
+    deviation, percentiles, specialty splits, seasonality - the gap is left open and
+    listed under not_available_in_this_source rather than filled with a placeholder.

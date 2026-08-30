@@ -1,0 +1,374 @@
+# Vitals distributions by triage category, fitted from MIMIC-IV-ED.
+# Generated from the raw triage table; every number below was measured, not estimated.
+
+provenance:
+  source: MIMIC-IV-ED Demo v2.2, triage table
+  url: https://physionet.org/files/mimic-iv-ed-demo/2.2/ed/triage.csv.gz
+  licence: ODbL 1.0 (open access, no credentialing required)
+  granularity: one row per ED stay, vitals recorded at triage
+  retrieved: 2026-08-30
+  raw_file: generator/calibration/_raw/mimic_triage.csv.gz
+  sha256_gz: 086dadcb49adc5f24bdda0e342ec9cf0fbcb2e9595516c5c101d408434e1e09b
+  rows_in_source: 222
+  rows_with_acuity: 207
+  rows_excluded_null_acuity: 15
+
+unit_conversions:
+  temperature:
+    source_unit: fahrenheit
+    target_unit: celsius
+    formula: (F - 32) * 5 / 9
+    applied: true
+    note: >-
+      MIMIC stores triage temperature in Fahrenheit. Every temperature figure in this file is
+      Celsius, converted before any mean or SD was taken. Our schema CHECK constraint is 30.0-43.0 C.
+
+category_mapping:
+  note: >-
+    MIMIC acuity is the Emergency Severity Index (1 = most urgent, 5 = least). Our triage
+    categories run in the opposite direction of severity_rank, so the mapping is stated explicitly.
+  map:
+    - mimic_acuity: 1-2
+      category: Urgent
+      code: 1
+      severity_rank: 1
+    - mimic_acuity: 3
+      category: Semi-Urgent
+      code: 3
+      severity_rank: 2
+    - mimic_acuity: 4-5
+      category: Routine
+      code: 2
+      severity_rank: 3
+
+statistics:
+  method: >-
+    Per category, per column: nulls dropped pairwise (not listwise), so n differs by column and
+    is reported for each. SD is the sample standard deviation, ddof=1.
+
+categories:
+  Urgent:
+    code: 1
+    severity_rank: 1
+    mimic_acuity_source: acuity 1-2
+    n_stays: 115
+    acuity_breakdown:
+      acuity_1: 18
+      acuity_2: 97
+    vitals:
+      heartrate:
+        unit: bpm
+        mean: 93.486
+        sd: 20.243
+        n: 107
+        min: 43.0
+        max: 157.0
+        nulls_dropped: 8
+        outliers_dropped: 0
+        kind: fitted
+      resprate:
+        unit: breaths_per_min
+        mean: 18.6262
+        sd: 3.5222
+        n: 107
+        min: 14.0
+        max: 32.0
+        nulls_dropped: 8
+        outliers_dropped: 0
+        kind: fitted
+      temperature_c:
+        unit: celsius
+        mean: 36.7516
+        sd: 0.4852
+        n: 104
+        min: 35.5556
+        max: 37.9444
+        nulls_dropped: 11
+        outliers_dropped: 0
+        kind: fitted
+      o2sat:
+        unit: percent
+        mean: 97.1698
+        sd: 3.2351
+        n: 106
+        min: 78.0
+        max: 100.0
+        nulls_dropped: 9
+        outliers_dropped: 0
+        kind: fitted
+      sbp:
+        unit: mmHg
+        mean: 132.7757
+        sd: 28.905
+        n: 107
+        min: 70.0
+        max: 217.0
+        nulls_dropped: 8
+        outliers_dropped: 0
+        kind: fitted
+      dbp:
+        unit: mmHg
+        mean: 71.434
+        sd: 16.2235
+        n: 106
+        min: 42.0
+        max: 117.0
+        nulls_dropped: 8
+        outliers_dropped: 1
+        kind: modelled
+        reason: >-
+          One MIMIC row (stay_id 37298974, acuity 2) records dbp as 879 mmHg against an sbp of 111 mmHg -
+          physiologically impossible and the only row in the file where dbp exceeds sbp. It alone inflates the
+          Urgent SD from 16.2235 to 79.7226. Excluded as a data-entry error. The unscreened fitted values are
+          recorded below so nothing is hidden.
+        unscreened_fitted:
+          mean: 78.9813
+          sd: 79.7226
+          n: 107
+          kind: fitted
+      pain:
+        unit: nrs_0_10
+        mean: 2.8913
+        sd: 3.6054
+        n: 92
+        min: 0.0
+        max: 10.0
+        nulls_dropped: 6
+        non_numeric_text_dropped: 11
+        non_numeric_values_in_this_category: [Critical, UA, ett, o, unable, uta]
+        outliers_dropped: 6
+        kind: modelled
+        reason: >-
+          MIMIC pain is a free-text field. Entries of 13 appear on a 0-10 numeric rating scale and are
+          out-of-range data entry, so values above 10 are excluded. The unscreened fitted values are recorded
+          below so nothing is hidden.
+        unscreened_fitted:
+          mean: 3.5102
+          sd: 4.2578
+          n: 98
+          kind: fitted
+
+  Semi-Urgent:
+    code: 3
+    severity_rank: 2
+    mimic_acuity_source: acuity 3
+    n_stays: 90
+    acuity_breakdown:
+      acuity_3: 90
+    vitals:
+      heartrate:
+        unit: bpm
+        mean: 88.5506
+        sd: 16.8395
+        n: 89
+        min: 59.0
+        max: 124.0
+        nulls_dropped: 1
+        outliers_dropped: 0
+        kind: fitted
+      resprate:
+        unit: breaths_per_min
+        mean: 17.6
+        sd: 2.14
+        n: 90
+        min: 14.0
+        max: 28.0
+        nulls_dropped: 0
+        outliers_dropped: 0
+        kind: fitted
+      temperature_c:
+        unit: celsius
+        mean: 36.6973
+        sd: 0.4783
+        n: 89
+        min: 35.3333
+        max: 37.8889
+        nulls_dropped: 0
+        outliers_dropped: 1
+        kind: modelled
+        reason: >-
+          One MIMIC row (stay_id 34992024, acuity 3) records temperature as 36.5, which is a Celsius reading
+          sitting in a Fahrenheit column. Converted as Fahrenheit it becomes 2.5 C, which violates our own
+          schema CHECK constraint of 30.0-43.0 and inflates the Semi-Urgent SD from 0.4783 to 3.6360. It is
+          excluded as a unit-entry error. The unscreened fitted values are recorded below so nothing is
+          hidden.
+        unscreened_fitted:
+          mean: 36.3173
+          sd: 3.636
+          n: 90
+          kind: fitted
+      o2sat:
+        unit: percent
+        mean: 98.2889
+        sd: 1.7562
+        n: 90
+        min: 92.0
+        max: 100.0
+        nulls_dropped: 0
+        outliers_dropped: 0
+        kind: fitted
+      sbp:
+        unit: mmHg
+        mean: 141.7778
+        sd: 25.919
+        n: 90
+        min: 94.0
+        max: 218.0
+        nulls_dropped: 0
+        outliers_dropped: 0
+        kind: fitted
+      dbp:
+        unit: mmHg
+        mean: 75.0
+        sd: 15.1049
+        n: 90
+        min: 44.0
+        max: 118.0
+        nulls_dropped: 0
+        outliers_dropped: 0
+        kind: fitted
+      pain:
+        unit: nrs_0_10
+        mean: 4.8068
+        sd: 3.9967
+        n: 88
+        min: 0.0
+        max: 10.0
+        nulls_dropped: 0
+        non_numeric_text_dropped: 1
+        non_numeric_values_in_this_category: [unable]
+        outliers_dropped: 1
+        kind: modelled
+        reason: >-
+          MIMIC pain is a free-text field. Entries of 13 appear on a 0-10 numeric rating scale and are
+          out-of-range data entry, so values above 10 are excluded. The unscreened fitted values are recorded
+          below so nothing is hidden.
+        unscreened_fitted:
+          mean: 4.8989
+          sd: 4.0677
+          n: 89
+          kind: fitted
+
+  Routine:
+    code: 2
+    severity_rank: 3
+    mimic_acuity_source: acuity 4-5
+    n_stays: 2
+    acuity_breakdown:
+      acuity_4: 2
+    warning: >-
+      SMALL SAMPLE - n=2. The MIMIC-IV-ED demo extract contains only 2 ESI-4 stays and
+      zero ESI-5 stays, so this category is fitted on 2 patients. The means are real measurements
+      but carry no useful precision, and the SDs are computed from two points. Treat every figure
+      in this category as UNVALIDATED and do not use it to drive a generator without sourcing a
+      full ESI 4-5 vitals distribution elsewhere. This is a limitation of the demo extract, not a
+      property of the population.
+    vitals:
+      heartrate:
+        unit: bpm
+        mean: 84.0
+        sd: 25.4558
+        n: 2
+        min: 66.0
+        max: 102.0
+        nulls_dropped: 0
+        outliers_dropped: 0
+        kind: fitted
+      resprate:
+        unit: breaths_per_min
+        mean: 16.0
+        sd: 2.8284
+        n: 2
+        min: 14.0
+        max: 18.0
+        nulls_dropped: 0
+        outliers_dropped: 0
+        kind: fitted
+      temperature_c:
+        unit: celsius
+        mean: 36.3056
+        sd: 0.3536
+        n: 2
+        min: 36.0556
+        max: 36.5556
+        nulls_dropped: 0
+        outliers_dropped: 0
+        kind: fitted
+      o2sat:
+        unit: percent
+        mean: 98.5
+        sd: 0.7071
+        n: 2
+        min: 98.0
+        max: 99.0
+        nulls_dropped: 0
+        outliers_dropped: 0
+        kind: fitted
+      sbp:
+        unit: mmHg
+        mean: 143.0
+        sd: 31.1127
+        n: 2
+        min: 121.0
+        max: 165.0
+        nulls_dropped: 0
+        outliers_dropped: 0
+        kind: fitted
+      dbp:
+        unit: mmHg
+        mean: 65.0
+        sd: 19.799
+        n: 2
+        min: 51.0
+        max: 79.0
+        nulls_dropped: 0
+        outliers_dropped: 0
+        kind: fitted
+      pain:
+        unit: nrs_0_10
+        mean: 8.0
+        sd: 0.0
+        n: 2
+        min: 8.0
+        max: 8.0
+        nulls_dropped: 0
+        non_numeric_text_dropped: 0
+        non_numeric_values_in_this_category: []
+        outliers_dropped: 0
+        kind: fitted
+
+coupling:
+  coupling_coefficient:
+    value: 0.6
+    kind: modelled
+    reason: >-
+      MIMIC acuity is assigned at the bedside by a nurse who is looking at the patient and partly using
+      the vitals themselves. Ireland's Clinical Prioritisation Category is assigned by a clinician reading
+      a referral letter, often without ever having seen the patient. The Irish relationship between
+      physiology and assigned urgency is therefore necessarily looser than MIMIC's measured coupling.
+    applies_to: between-category mean separation only
+    does_not_apply_to: within-category spread, which stays at the MIMIC-fitted SD values above
+    semantics: >-
+      For each vital, the category means are shrunk toward the pooled cross-category mean by this
+      factor: adjusted_mean = pooled_mean + coupling_coefficient * (category_mean - pooled_mean).
+      A value of 1.0 reproduces MIMIC's coupling exactly; 0.0 makes physiology independent of
+      assigned category. The SDs are left untouched.
+    status: >-
+      0.6 is a starting point, not a result. Phase 3b's sweep determines the final value. Any
+      output produced before that sweep completes is provisional.
+
+disagreement:
+  gp_triage_disagreement_rate:
+    value: 0.18
+    kind: assumed
+    note: >-
+      No published source gives how often a GP-assigned priority and the receiving service's
+      assigned triage category differ. This figure is not measured, not fitted, and not derived
+      from any dataset - it is a placeholder so the pipeline can run. Every result that depends on
+      it MUST be flagged as unvalidated wherever it is reported.
+
+parameter_counts:
+  fitted: 21
+  modelled: 5
+  assumed: 1
+  total: 27

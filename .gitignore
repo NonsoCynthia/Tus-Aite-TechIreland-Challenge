@@ -8,3 +8,10 @@ out/
 .pytest_cache/
 .DS_Store
 pgadmin-data/
+
+# Raw downloads used to fit calibration. The fitted YAML files are committed;
+# the source archives they were measured from are not.
+generator/calibration/_raw/
+
+# Derived from out/ by scripts/make_sample.py; published to HF, not committed.
+sample/
