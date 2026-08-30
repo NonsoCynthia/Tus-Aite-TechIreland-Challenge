@@ -30,10 +30,6 @@ Once approved, make your own **read** token at
 `HF_TOKEN` line of your `.env`. Name it something you will recognise later, like
 `triage-dataset-read`.
 
-**Make your own. Never use somebody else's.** A shared token reaches a commit or a
-screenshot eventually, and revoking it then breaks everyone at once rather than one
-person. Yours costs thirty seconds and can be deleted without anyone noticing.
-
 ## 2. Three commands
 
 ```bash
