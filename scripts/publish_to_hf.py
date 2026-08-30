@@ -29,86 +29,69 @@ size_categories: [10K<n<100K]
 
 # Synthetic Irish Hospital Referral Prioritisation Dataset
 
-> **Every record in this dataset is synthetic. No real patient, clinician, or hospital
-> is represented. Hospital names are invented and hospital codes use a reserved range
-> that does not correspond to any real facility.**
+> **Every record here is synthetic.** No real patient, clinician or hospital is
+> represented. Hospital names are invented and their codes use a reserved range that
+> matches no real facility.
 
-A synthetic outpatient waiting list that behaves like the Irish one. It exists to
-answer a single question: **among patients a clinician has already marked equally
-urgent, who should be seen next, and why?**
+A hospital outpatient waiting list — people waiting for a clinic appointment, what is
+wrong with them, how urgent a clinician judged them, and how full the wards and clinics
+are. It exists to answer one question: **among patients already marked equally urgent,
+who should be seen next, and why?**
 
-## Why it exists
+## What is in it
 
-The NTPF Outpatient Waiting List Minimum Data Set defines 74 fields, and not one of
-them says what is wrong with the patient. No diagnosis, no symptoms, no observations.
-So inside a priority category the only ordering signal left is how long someone has
-waited. This dataset adds the clinical evidence layer the national record never
-captured, and keeps every ranking traceable to the rows it was based on.
+Six hospitals. Four public, which have waiting lists; two private, which have beds and
+clinics but no queue of their own.
 
-## What is here
+| | |
+|---|---|
+| **Referral** | One person waiting for one appointment. Identified by `hospital_hipe` + `pathway_number` — numbers are only unique *within* a hospital. |
+| **Triage category** | How urgent a clinician judged it: Urgent, Semi-Urgent or Routine. Assigned once, and nothing in the data reorders across categories. |
+| **Timeframe** | How long that category should wait: 28 days if Urgent, 91 if Semi-Urgent. |
+| **Wait** | Four different clocks, because they give different answers. `adjusted_wait_days` excludes time when care was bought privately and the clock paused — use it for breach checks. |
+| **Conditions and observations** | What is wrong with the patient, and their vital signs. |
+| **Capacity** | Wards, bed occupancy three times a day, and clinic appointment slots. |
 
-| Directory | Size | Contents |
-|---|---|---|
-| `full/` | ~11 MB | The whole dataset, 17 input tables plus the held-out answer key |
-| `sample/` | ~1.3 MB | A referentially-closed slice for pipeline checks |
+**Vitals do not tell you who is urgent.** Roughly two thirds of the urgent referrals here
+have entirely unremarkable observations — a suspected melanoma is urgent because of the
+referral pathway, not the physiology. That is measured from real triage data, not assumed.
 
-**`sample/` is not the first N rows.** Every child table carries a foreign key to the
-referrals table, so a row-truncated sample fails to load. It is built by choosing a set
-of referrals and then taking every child row belonging to them and every parent they
-require, so every foreign key resolves inside the slice. It contains all seven planted
-demo cases.
+`ground_truth.csv` is the **answer key**: which patients deteriorated while waiting. It is
+held out and should never be loaded alongside the rest. Its risk model is synthetic and
+unvalidated, and results depending on it must say so.
 
-`ground_truth.csv` is the answer key and is **never loaded into the database** in
-normal use. If a ranking agent could read it, it would rank perfectly by looking up the
-answer.
+## The two folders
 
-## Grounding
+| | Size | Hospitals | Referrals |
+|---|---|---|---|
+| `sample/` | 1.3 MB | 2 | 609 |
+| `full/` | 11 MB | 6 | 5,200 |
 
-| Source | Used for | Granularity |
-|---|---|---|
-| NTPF Outpatient MDS v2.6 | Field names, code values, rules | specification |
-| NTPF open data | Specialty mix, wait-band distribution | aggregate |
-| MIMIC-IV-ED Demo (ODbL) | Vitals distributions by triage acuity | row-level, n=207 |
-| ESRI RS213 | Bed occupancy, length of stay | aggregate |
+`sample/` is a real slice of `full/`, closed under its foreign keys — every table it
+references, it contains. Use it to check a pipeline works; use `full/` for anything you
+report.
 
-No Irish source publishes patient-level waiting list data, so there are no Irish rows
-to copy, only Irish shapes to match. Every calibration parameter is labelled `fitted`,
-`modelled` or `assumed` in the repository: 90, 16 and 3 respectively.
+Pin a **tag**, never a branch. `v1.1` is current.
 
-## Known limitations
+## More
 
-- The `latent_hazard` model in `ground_truth` is **unvalidated**. No source says a
-  patient with a given condition has any particular chance of deteriorating. Its large
-  noise term is deliberate and must not be reduced.
-- Condition mix within specialty is **assumed**. The ICD-10-AM codes are real; the
-  shares are not.
-- Routine-category vitals come from physiological reference ranges, not from data:
-  MIMIC's demo subset contains only two ESI 4-5 stays.
+The repository holds the generator, the schema, the tests and the full specification —
+what every column means, where every number came from, and what the real data disproved
+along the way.
 
-## Changelog
+**[github.com/NonsoCynthia/Tus-Aite-TechIreland-Challenge](https://github.com/NonsoCynthia/Tus-Aite-TechIreland-Challenge)**
+— branch `dataset_branch`. The repository is private; ask the team for access.
 
-### v1.1
-Fixes two planted demo referrals whose wait clocks contradicted their own dates.
-`PW-DEMO-01` recorded 58 days since receipt against a received date equal to the snapshot
-date; `PW-DEMO-05` recorded 64 days of waiting on a letter written 12 days earlier. The
-generator now sets the dates and derives the counts from them, and a new schema constraint
-makes the combination unloadable.
-
-**Requires schema 008.** Data `v1.0` will not load against schema 008 and `v1.1` will not
-load against 007 in a way that is checked. Pin both together.
-
-### v1.0
-First release.
-
-## Full specification
-
-See `DATASET_README.md` in the source repository, plus
-`docs/HOW_THE_DATA_WAS_MADE.md` for what the calibration measured, including three
-assumptions in the original build specification that the data falsified.
+Start with `README.md` there, then `docs/GETTING_THE_DATA.md` to load it and
+`DATASET_README.md` for the column-by-column specification.
 """
 
 
 def main() -> None:
+    # The card describes the data; it changes more often than the data does, and
+    # re-uploading 11 MB to fix a sentence is wasteful.
+    card_only = "--card-only" in sys.argv
+
     token = os.environ.get("HF_TOKEN")
     if not token:
         sys.exit("HF_TOKEN is not set. Supply it at run time; it is never written to disk.")
@@ -116,7 +99,7 @@ def main() -> None:
     cfg = yaml.safe_load((ROOT / "versions.yml").read_text())
     repo, tag = cfg["hf_repo"], cfg["hf_revision"]
 
-    for d in (FULL, SAMPLE):
+    for d in (() if card_only else (FULL, SAMPLE)):
         if not d.is_dir() or not list(d.glob("*.csv")):
             sys.exit(f"{d} has no CSVs. Run `make generate PROFILE=full` and "
                      f"`python scripts/make_sample.py` first.")
@@ -133,12 +116,16 @@ def main() -> None:
         (ROOT / "_card.md").unlink(missing_ok=True)
     print("  uploaded dataset card")
 
-    for src, dest in ((FULL, "full"), (SAMPLE, "sample")):
+    for src, dest in (() if card_only else ((FULL, "full"), (SAMPLE, "sample"))):
         n = len(list(src.glob("*.csv")))
         mb = sum(f.stat().st_size for f in src.glob("*.csv")) / 1e6
         api.upload_folder(folder_path=str(src), path_in_repo=dest, repo_id=repo,
                           repo_type="dataset", allow_patterns=["*.csv"])
         print(f"  uploaded {dest}/  {n} files, {mb:.2f} MB")
+
+    if card_only:
+        print(f"\n  card updated on {repo}; data and tags untouched")
+        return
 
     try:
         api.create_tag(repo_id=repo, tag=tag, repo_type="dataset")
