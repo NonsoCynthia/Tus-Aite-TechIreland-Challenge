@@ -483,6 +483,8 @@ PW-5120 is a suspected melanoma. Every vital sign is normal, and the patient is 
 
 **Vitals alone do not tell you who is urgent**, and this dataset is built so that stays true. If they did, the whole exercise would be circular.
 
+This is now measured rather than asserted. Fitting the vitals distributions from real triage data (MIMIC-IV-ED Demo, 207 stays with a recorded acuity) shows an early warning score barely discriminates triage acuity at all: the best possible rule based on `news2` alone recovers the category only 17.5 percentage points better than guessing the most common one, and 54 to 59 per cent of the highest-acuity patients score `news2 <= 2`. NEWS2 was built to detect deterioration in admitted ward patients over time; triage acuity reflects predicted resource use and presenting complaint. They measure different things. See `docs/CALIBRATION_FINDINGS.md`.
+
 ---
 
 ## Group D — The hospital's capacity
