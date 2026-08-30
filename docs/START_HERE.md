@@ -201,6 +201,7 @@ is re-downloaded from Hugging Face. Run it any time something looks wrong.
 | `password authentication failed` in pgAdmin | Wrong password, or you changed `POSTGRES_USER` without updating `servers.json` | Use `POSTGRES_PASSWORD` from `.env`; see the note in section c |
 | pgAdmin says `could not translate host name "localhost"` | You added a server by hand using `localhost` | Use host `db`, port `5432` — pgAdmin runs inside Docker |
 | `make: *** No rule to make target` | You are not in the repository root | `cd` into the folder containing `Makefile` |
+| `Conflict. The container name "/triage_db" is already in use` | Another copy of this project is already running — a second clone, or an old one you forgot | `docker compose down` in the other copy first. The container names are fixed, so only one instance can run at a time on a machine. |
 | `permission denied for schema eval` | **Nothing. This is correct.** | See below |
 
 ### The error that is supposed to happen
