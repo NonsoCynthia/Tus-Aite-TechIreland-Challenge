@@ -152,6 +152,13 @@ def load_data(conn: psycopg.Connection, profile: str) -> None:
             f"Run `make fetch` to pull the pinned revision from Hugging Face first."
         )
 
+    # A load replaces the dataset. Clear the data tables first so re-loading a
+    # different profile does not collide with what is already there. The three
+    # dictionary tables are loaded separately by --seeds-only and are left alone.
+    targets = [f"{SCHEMA[t]}.{t}" for t in LOAD_ORDER if t not in DERIVED]
+    targets += ["core.referrals"]
+    conn.execute(f"TRUNCATE {', '.join(targets)} CASCADE")
+
     conn.execute("CREATE SCHEMA IF NOT EXISTS staging")
     conn.execute("DROP TABLE IF EXISTS staging.referral_daily")
     conn.execute(
