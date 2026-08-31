@@ -3,8 +3,8 @@
 A synthetic Irish hospital outpatient waiting list, and the pipeline that generates,
 validates and publishes it. Built for the TechIreland National AI Challenge 2026.
 
-This file preserves the README that came from `dataset_branch`, so the project-level
-`README.md` can remain focused on the full triage support product.
+**This branch is the data.** The agents, the graph layer and the clinician interface are
+built on other branches and are not described here.
 
 Every record is invented. No real patient, clinician or hospital appears anywhere in it,
 and the hospital codes use a reserved range that matches no real facility.
