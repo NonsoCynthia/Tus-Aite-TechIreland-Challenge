@@ -1,0 +1,90 @@
+seed: 20260901
+
+simulation:
+  start_date: 2026-08-17
+  end_date:   2026-08-30
+  snapshot_times: ["08:00", "14:00", "20:00"]
+
+hospitals:
+  - hipe: "9001"
+    name: "St Brendan's University Hospital"
+    region: "HSE Dublin and Midlands"
+    type: public
+    beds: 640
+    active_referrals: 2000
+  - hipe: "9002"
+    name: "Kilbrannan Regional Hospital"
+    region: "HSE West and North West"
+    type: public
+    beds: 420
+    active_referrals: 1600
+  - hipe: "9003"
+    name: "Ardfinnan General Hospital"
+    region: "HSE South West"
+    type: public
+    beds: 280
+    active_referrals: 1100
+  - hipe: "9004"
+    name: "Loughrea District Hospital"
+    region: "HSE West and North West"
+    type: public
+    beds: 110
+    active_referrals: 500
+  - hipe: "9101"
+    name: "Rosslare Private Clinic"
+    region: "HSE South East"
+    type: private
+    beds: 90
+    active_referrals: 0
+  - hipe: "9102"
+    name: "Riverbank Private Hospital"
+    region: "HSE Dublin and Midlands"
+    type: private
+    beds: 180
+    active_referrals: 0
+
+ihi_coverage: 0.65
+awaiting_triage_share: 0.18
+multi_list_share: 0.12
+cross_hospital_share: 0.04
+
+# How much to generate. `small` is for local iteration and pipeline checks;
+# `full` is what gets published.
+#
+# 9002 is NOT optional in the small profile. PW-DEMO-06 and PW-DEMO-07 are the
+# multi-list-across-two-hospitals cases, and they need two PUBLIC hospitals.
+# Private sites carry zero referrals by design (DATASET_README section 10.4), so
+# they cannot supply the second list. With only 9001 and a private site, two of
+# the seven planted demo cases cannot exist at all.
+profiles:
+  small:
+    hospitals: ["9001", "9002", "9101"]
+    days: 3
+    referrals_scale: 0.04
+  full:
+    hospitals: all
+    days: 14
+    referrals_scale: 1.0
+
+# The seven planted demo cases, at fixed pathway numbers, present in every run.
+# Random sampling will not reliably produce these, and the demo depends on them.
+planted_cases:
+  PW-DEMO-01: { hospital: "9001", profile: urgent_breached_worst_capacity }
+  PW-DEMO-02: { hospital: "9001", profile: routine_longest_wait_empty_ward }
+  PW-DEMO-03: { hospital: "9001", profile: urgent_by_pathway_normal_vitals }
+  PW-DEMO-04: { hospital: "9001", profile: semi_urgent_near_timeframe }
+  PW-DEMO-05: { hospital: "9001", profile: awaiting_triage_60_days }
+  PW-DEMO-06: { hospital: "9001", paired_with: "9002", profile: multi_list_ihi_present }
+  PW-DEMO-07: { hospital: "9001", paired_with: "9002", profile: multi_list_ihi_absent }
+
+# A pathway number is issued per hospital and is legitimately not globally unique.
+# The referential test asserts that joining on pathway_number ALONE returns more
+# rows than joining on (hospital_hipe, pathway_number) -- if it does not, there are
+# no collisions in the data and the test proves nothing. So one is planted.
+#
+# It must sit between 9001 and 9002 specifically: make_sample.py seeds from exactly
+# those two hospitals, so a collision planted anywhere else would never reach
+# sample/, and the test would pass while proving nothing on the default profile.
+planted_collision:
+  pathway_number: "PW-COLLIDE-01"
+  hospitals: ["9001", "9002"]

@@ -1,0 +1,16 @@
+# The pin that joins schema, data and code. Nothing ever fetches "latest".
+schema_version: "008"
+data_version: "v1.1"
+hf_repo: "Thabang/irish-referral-prioritisation"
+
+# A tag, never a branch. Never "main". Never "latest".
+#
+# schema 008 and data v1.0 are INCOMPATIBLE. Migration 008 asserts that the stored
+# wait counts equal their date arithmetic, and two planted demo referrals in v1.0
+# violate it. Anyone pinned to v1.0 must stay on schema 007; v1.1 is the first data
+# version that loads against 008. See docs/HOW_THE_DATA_WAS_MADE.md section 7.4.
+hf_revision: "v1.1"
+
+# Which slice `make load` pulls by default. "sample" is a referentially-closed
+# subset (~1.3 MB); "full" is the whole dataset (~11 MB). See docs/GETTING_THE_DATA.md.
+default_profile: "sample"

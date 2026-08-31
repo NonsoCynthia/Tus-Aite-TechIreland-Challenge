@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Triage local",
+      "Group": "Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "triage",
+      "Username": "triage_admin",
+      "SSLMode": "prefer",
+      "Comment": "Host is 'db' and port is 5432 because pgAdmin runs inside the Docker network. From your laptop the same database is localhost:5433."
+    }
+  }
+}

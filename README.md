@@ -7,6 +7,23 @@ The project turns fragmented referral, urgency, and bed-capacity data into a ran
 shortlist that a clinician can inspect, accept, reorder, or override. The system does not admit,
 schedule, diagnose, or make final clinical decisions. It provides auditable decision support.
 
+## Working with the dataset
+
+The synthetic dataset described in feature 1 below is built, tested and published from
+[`dataset/`](dataset/). It lives on Hugging Face as a tagged release and is pulled in by
+`make load`.
+
+```bash
+cd dataset
+cp .env.example .env      # add your Hugging Face token
+make up                   # Postgres and pgAdmin
+make load                 # download and load
+```
+
+Start with [dataset/docs/GETTING_THE_DATA.md](dataset/docs/GETTING_THE_DATA.md).
+
+---
+
 ## Product Features
 
 ### 1. Synthetic Irish Patient and Referral Dataset

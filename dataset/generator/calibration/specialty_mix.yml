@@ -1,0 +1,505 @@
+# NTPF outpatient waiting-list specialty mix + wait-band distribution.
+# Generated from the raw NTPF CSV; every leaf parameter carries a 'kind'.
+
+provenance:
+  source: National Treatment Purchase Fund (NTPF) — Outpatient Waiting List by Speciality, National
+  url: https://www.ntpf.ie/app/uploads/2026/08/OpenData_OPNational02_2026.csv
+  discovered_from: https://www.ntpf.ie/waiting-list-data/open-data/
+  discovered_as: "OP Waiting List by Speciality 2026"
+  licence: unstated
+  licence_note: >-
+    No licence is stated on the NTPF open-data page, and a data.gov.ie package_search
+    for this dataset returns 0 results. Recorded as unstated rather than asserting one.
+  granularity: national, monthly snapshot, by speciality x adult/child x 4 wait-time bands
+  retrieved: 2026-08-30
+  file: generator/calibration/_raw/OpenData_OPNational02_2026.csv
+  sha256: 275f2682e2090e1681d0b324e36dbba010c460d188ee853b37f1f6b1a75906da
+  bytes: 33688
+  server_last_modified: 'Thu, 13 Aug 2026 15:14:04 GMT'
+  encoding: utf-8-sig
+  raw_shape: [561, 8]
+  snapshots_in_file: 7
+  snapshot_dates: [2026-01-29, 2026-02-26, 2026-03-26, 2026-04-30, 2026-05-28, 2026-06-25, 2026-07-30]
+  snapshot_used: 2026-07-30
+  longer_series_available: https://www.ntpf.ie/app/uploads/2026/01/OpenData_OPNational02_2025.csv
+
+# ---------------------------------------------------------------------------
+# Method: choices made in reducing the raw file to these numbers.
+# ---------------------------------------------------------------------------
+method:
+
+  snapshot_selection:
+    value: 2026-07-30
+    kind: modelled
+    reason: >-
+      The 2026 file is year-to-date with 7 monthly snapshots. The most recent one is used
+      rather than a 7-month average, so the mix reflects the current state of the list
+      rather than smearing a list that is monotonically growing (631,607 -> 683,553 over
+      the 7 snapshots). Cross-snapshot spread is recorded under 'stability' below and is
+      small, so the choice is not load-bearing.
+
+  duplicate_key_handling:
+    value: groupby-sum on (ArchiveDate, Adult_Child, Speciality)
+    kind: modelled
+    reason: >-
+      The 29/01/2026 snapshot carries 28 duplicated (date, adult/child, speciality) keys
+      with no column distinguishing the two rows (106 rows vs ~76 in every other month).
+      Summing each pair reproduces a series continuous with February — e.g. Adult
+      Cardiology 39,197 + 2,430 = 41,627 against 41,730 in February — so the pair is a
+      split of one figure, not a repeat. Dropping duplicates instead would understate
+      January. Applied to the whole file; it is a no-op for the other six snapshots.
+
+  adult_child_aggregation:
+    value: summed across Adult and Child within each NTPF Speciality string
+    kind: modelled
+    reason: >-
+      Our seven codes are specialties, not age-split cohorts, so Adult and Child rows of
+      the same NTPF Speciality string are summed. No double-counting arises against 0601:
+      NTPF publishes 'Paediatric ENT' as its own Speciality string, disjoint from the
+      'Otolaryngology (ENT)' rows, so 0600 and 0601 draw on different lines of the file.
+
+  band_share_denominator:
+    value: sum of the four band columns (not the published Total column)
+    kind: modelled
+    reason: >-
+      126 of 561 raw rows have band-sum != Total, always by exactly +/-1
+      (band grand total 4,611,536 vs Total column 4,611,512, a gap of
+      24) — NTPF disclosure-control rounding, not a parse error.
+      Band shares therefore divide by the band sum so each specialty's four shares close
+      to 1.0; the published Total is what proportions divide by. Per-specialty band-sum
+      minus Total is recorded as 'band_total_discrepancy' so the gap stays visible.
+
+  proportion_denominator:
+    value: renormalised across our seven specialties
+    kind: modelled
+    reason: >-
+      'proportion' is renormalised so the seven sum to exactly 1.0, as required for a
+      draw over our specialty set. The unrenormalised share of the national list is kept
+      alongside as 'share_of_national' so the seven can be placed back in national context
+      — together they are 0.435993 of the ex-SDC national list.
+
+# ---------------------------------------------------------------------------
+# Statistical disclosure control: NTPF aggregates counts below 20 into a
+# 'Small Volume Specialties' bucket. Those rows are EXCLUDED from every
+# denominator and proportion below.
+# ---------------------------------------------------------------------------
+sdc_exclusion:
+  excluded_category: Small Volume Specialties
+  excluded: true
+  rows_excluded_from_snapshot_used:
+    value: 2
+    kind: fitted
+    note: >-
+      2 rows in the 2026-07-30 snapshot (one Adult, one Child),
+      1278 patients, dropped before any denominator was formed.
+  rows_excluded_whole_file:
+    value: 16
+    kind: fitted
+    note: >-
+      16 raw rows across all 7 snapshots, which reduce to 14 unique
+      (date, adult/child) keys after the January duplicate-key sum; 8963 patients in total.
+  patients_excluded_from_snapshot_used:
+    value: 1278
+    kind: fitted
+    note: 1278 of 683553 patients in the snapshot, i.e. 0.1870% of the national list.
+  effect_on_our_seven:
+    value: none directly
+    kind: fitted
+    note: >-
+      All seven of our specialties clear the disclosure threshold in the snapshot used, so
+      none of their counts sit inside the excluded bucket. One indirect effect is measured:
+      Child Cardiology surfaces as its own line in exactly one of the 7 snapshots
+      (26/03/2026, 21 patients) and is inside Small Volume in the other six, so 0100 is
+      adult-only in the snapshot used. The censored paediatric cardiology count is
+      therefore under 20 — bounded by the threshold, not estimated here.
+
+# ---------------------------------------------------------------------------
+# Denominators for the snapshot used, after SDC exclusion.
+# ---------------------------------------------------------------------------
+denominators:
+  national_waiting_ex_sdc:
+    value: 682275
+    kind: fitted
+    note: sum of Total over the 75 non-SDC rows (57 specialties) in the 2026-07-30 snapshot.
+  national_waiting_incl_sdc:
+    value: 683553
+    kind: fitted
+    note: published national outpatient total for the snapshot, retained for reconciliation only.
+  our_seven_waiting:
+    value: 297467
+    kind: fitted
+    note: denominator for the renormalised 'proportion' field.
+  our_seven_share_of_national:
+    value: 0.4359928
+    kind: fitted
+    note: 297467 of 682275; the seven cover just under half the ex-SDC national outpatient list.
+
+# ---------------------------------------------------------------------------
+# Specialty matching. All seven matched by exact NTPF Speciality string —
+# no fuzzy matching, no splitting, no invented lines.
+# ---------------------------------------------------------------------------
+matching:
+  strategy: exact string equality against the NTPF 'Speciality' column
+  ntpf_distinct_specialities: 59
+  all_seven_matched_exactly: true
+  paediatric_ent_0601:
+    has_distinct_ntpf_line: true
+    kind: fitted
+    note: >-
+      0601 does have its own NTPF line. 'Paediatric ENT' is one of the 59 distinct
+      Speciality values, present in all 7 snapshots, Child-only, 4,306 patients in
+      the snapshot used. Its proportion is measured, not assumed, and no adult/paediatric
+      split had to be invented. Note NTPF also lists a Child row under 'Otolaryngology
+      (ENT)' (7,666 patients) which is a separate line and stays with 0600 — NTPF
+      does not document how a paediatric ENT patient is routed between the two, so no
+      reallocation between 0600 and 0601 is attempted.
+  near_miss_lines_deliberately_excluded:
+    value: [Paed Cardiology, Paediatric Dermatology, Paed Gastro-Enterol, Paed Orthopaedic]
+    kind: modelled
+    reason: >-
+      NTPF publishes separate paediatric lines whose names resemble four of our codes.
+      They are distinct Speciality strings mapping to no code in our set, so they are left
+      in the national denominator and out of the seven. Folding them in would change the
+      meaning of the codes; only 0601 is a paediatric code in our set and it has its own
+      exact match.
+
+# ---------------------------------------------------------------------------
+# Fitted mix. 'proportion' is renormalised over the seven and sums to exactly 1.0.
+# 'share_of_national' is the unrenormalised share of the ex-SDC national list.
+# ---------------------------------------------------------------------------
+renormalised: true
+renormalisation_note: >-
+  The seven specialties are 43.5993% of the ex-SDC national outpatient list
+  (297467 of 682275). Each 'proportion' below divides by 297467, not by
+  682275, so the seven sum to exactly 1.0 at the 7 decimal places written.
+
+specialties:
+  "2600":
+    label: General Surgery
+    ntpf_speciality: General Surgery
+    match: exact string equality
+    ntpf_rows_summed: 2
+    adult_child_present: [Adult, Child]
+    waiting_count:
+      value: 32797
+      kind: fitted
+      note: NTPF published Total, 2026-07-30 snapshot, summed over 2 row(s).
+    share_of_national:
+      value: 0.0480701
+      kind: fitted
+      note: 32797 / 682275 (ex-SDC national).
+    proportion:
+      value: 0.1102542
+      kind: fitted
+      note: renormalised, 32797 / 297467.
+    wait_band_distribution:
+      kind: fitted
+      note: >-
+        Shares of 32796 (sum of the four NTPF band columns); band edges are
+        months waited. Written to 6 dp, at which the four values sum to 1.000000
+        — a decimal-rounding residual of 0.000000, not a measurement gap.
+        wait_band_counts below are the authoritative integers.
+      m0_6: 0.843396
+      m6_12: 0.12965
+      m12_18: 0.018874
+      m18_plus: 0.00808
+    wait_band_counts:
+      kind: fitted
+      note: raw NTPF band counts, given so any share above can be recomputed exactly.
+      m0_6: 27660
+      m6_12: 4252
+      m12_18: 619
+      m18_plus: 265
+    band_total_discrepancy:
+      value: -1
+      kind: fitted
+      note: band-sum (32796) minus published Total (32797); NTPF disclosure-control rounding.
+
+  "0100":
+    label: Cardiology
+    ntpf_speciality: Cardiology
+    match: exact string equality
+    ntpf_rows_summed: 1
+    adult_child_present: [Adult]
+    waiting_count:
+      value: 45266
+      kind: fitted
+      note: NTPF published Total, 2026-07-30 snapshot, summed over 1 row(s).
+    share_of_national:
+      value: 0.0663457
+      kind: fitted
+      note: 45266 / 682275 (ex-SDC national).
+    proportion:
+      value: 0.1521715
+      kind: fitted
+      note: renormalised, 45266 / 297467.
+    wait_band_distribution:
+      kind: fitted
+      note: >-
+        Shares of 45266 (sum of the four NTPF band columns); band edges are
+        months waited. Written to 6 dp, at which the four values sum to 0.999999
+        — a decimal-rounding residual of 0.000001, not a measurement gap.
+        wait_band_counts below are the authoritative integers.
+      m0_6: 0.600119
+      m6_12: 0.253192
+      m12_18: 0.10224
+      m18_plus: 0.044448
+    wait_band_counts:
+      kind: fitted
+      note: raw NTPF band counts, given so any share above can be recomputed exactly.
+      m0_6: 27165
+      m6_12: 11461
+      m12_18: 4628
+      m18_plus: 2012
+    band_total_discrepancy:
+      value: 0
+      kind: fitted
+      note: band-sum (45266) minus published Total (45266); NTPF disclosure-control rounding.
+
+  "0300":
+    label: Dermatology
+    ntpf_speciality: Dermatology
+    match: exact string equality
+    ntpf_rows_summed: 2
+    adult_child_present: [Adult, Child]
+    waiting_count:
+      value: 62842
+      kind: fitted
+      note: NTPF published Total, 2026-07-30 snapshot, summed over 2 row(s).
+    share_of_national:
+      value: 0.0921066
+      kind: fitted
+      note: 62842 / 682275 (ex-SDC national).
+    proportion:
+      value: 0.211257
+      kind: fitted
+      note: renormalised, 62842 / 297467.
+    wait_band_distribution:
+      kind: fitted
+      note: >-
+        Shares of 62843 (sum of the four NTPF band columns); band edges are
+        months waited. Written to 6 dp, at which the four values sum to 1.000000
+        — a decimal-rounding residual of 0.000000, not a measurement gap.
+        wait_band_counts below are the authoritative integers.
+      m0_6: 0.507376
+      m6_12: 0.221059
+      m12_18: 0.147876
+      m18_plus: 0.123689
+    wait_band_counts:
+      kind: fitted
+      note: raw NTPF band counts, given so any share above can be recomputed exactly.
+      m0_6: 31885
+      m6_12: 13892
+      m12_18: 9293
+      m18_plus: 7773
+    band_total_discrepancy:
+      value: 1
+      kind: fitted
+      note: band-sum (62843) minus published Total (62842); NTPF disclosure-control rounding.
+
+  "1800":
+    label: Orthopaedics
+    ntpf_speciality: Orthopaedics
+    match: exact string equality
+    ntpf_rows_summed: 2
+    adult_child_present: [Adult, Child]
+    waiting_count:
+      value: 83650
+      kind: fitted
+      note: NTPF published Total, 2026-07-30 snapshot, summed over 2 row(s).
+    share_of_national:
+      value: 0.1226045
+      kind: fitted
+      note: 83650 / 682275 (ex-SDC national).
+    proportion:
+      value: 0.2812077
+      kind: fitted
+      note: renormalised, 83650 / 297467.
+    wait_band_distribution:
+      kind: fitted
+      note: >-
+        Shares of 83652 (sum of the four NTPF band columns); band edges are
+        months waited. Written to 6 dp, at which the four values sum to 1.000001
+        — a decimal-rounding residual of 0.000001, not a measurement gap.
+        wait_band_counts below are the authoritative integers.
+      m0_6: 0.541446
+      m6_12: 0.268015
+      m12_18: 0.124516
+      m18_plus: 0.066024
+    wait_band_counts:
+      kind: fitted
+      note: raw NTPF band counts, given so any share above can be recomputed exactly.
+      m0_6: 45293
+      m6_12: 22420
+      m12_18: 10416
+      m18_plus: 5523
+    band_total_discrepancy:
+      value: 2
+      kind: fitted
+      note: band-sum (83652) minus published Total (83650); NTPF disclosure-control rounding.
+
+  "0700":
+    label: Gastro-Enterology
+    ntpf_speciality: Gastro-Enterology
+    match: exact string equality
+    ntpf_rows_summed: 1
+    adult_child_present: [Adult]
+    waiting_count:
+      value: 22482
+      kind: fitted
+      note: NTPF published Total, 2026-07-30 snapshot, summed over 1 row(s).
+    share_of_national:
+      value: 0.0329515
+      kind: fitted
+      note: 22482 / 682275 (ex-SDC national).
+    proportion:
+      value: 0.0755781
+      kind: fitted
+      note: renormalised, 22482 / 297467.
+    wait_band_distribution:
+      kind: fitted
+      note: >-
+        Shares of 22482 (sum of the four NTPF band columns); band edges are
+        months waited. Written to 6 dp, at which the four values sum to 1.000000
+        — a decimal-rounding residual of 0.000000, not a measurement gap.
+        wait_band_counts below are the authoritative integers.
+      m0_6: 0.659772
+      m6_12: 0.236945
+      m12_18: 0.092474
+      m18_plus: 0.010809
+    wait_band_counts:
+      kind: fitted
+      note: raw NTPF band counts, given so any share above can be recomputed exactly.
+      m0_6: 14833
+      m6_12: 5327
+      m12_18: 2079
+      m18_plus: 243
+    band_total_discrepancy:
+      value: 0
+      kind: fitted
+      note: band-sum (22482) minus published Total (22482); NTPF disclosure-control rounding.
+
+  "0600":
+    label: Otolaryngology (ENT)
+    ntpf_speciality: Otolaryngology (ENT)
+    match: exact string equality
+    ntpf_rows_summed: 2
+    adult_child_present: [Adult, Child]
+    waiting_count:
+      value: 46124
+      kind: fitted
+      note: NTPF published Total, 2026-07-30 snapshot, summed over 2 row(s).
+    share_of_national:
+      value: 0.0676032
+      kind: fitted
+      note: 46124 / 682275 (ex-SDC national).
+    proportion:
+      value: 0.1550559
+      kind: fitted
+      note: renormalised, 46124 / 297467.
+    wait_band_distribution:
+      kind: fitted
+      note: >-
+        Shares of 46124 (sum of the four NTPF band columns); band edges are
+        months waited. Written to 6 dp, at which the four values sum to 1.000000
+        — a decimal-rounding residual of 0.000000, not a measurement gap.
+        wait_band_counts below are the authoritative integers.
+      m0_6: 0.627613
+      m6_12: 0.257978
+      m12_18: 0.085248
+      m18_plus: 0.029161
+    wait_band_counts:
+      kind: fitted
+      note: raw NTPF band counts, given so any share above can be recomputed exactly.
+      m0_6: 28948
+      m6_12: 11899
+      m12_18: 3932
+      m18_plus: 1345
+    band_total_discrepancy:
+      value: 0
+      kind: fitted
+      note: band-sum (46124) minus published Total (46124); NTPF disclosure-control rounding.
+
+  "0601":
+    label: Paediatric ENT
+    ntpf_speciality: Paediatric ENT
+    match: exact string equality
+    ntpf_rows_summed: 1
+    adult_child_present: [Child]
+    waiting_count:
+      value: 4306
+      kind: fitted
+      note: NTPF published Total, 2026-07-30 snapshot, summed over 1 row(s).
+    share_of_national:
+      value: 0.0063112
+      kind: fitted
+      note: 4306 / 682275 (ex-SDC national).
+    proportion:
+      value: 0.0144756
+      kind: fitted
+      note: renormalised, 4306 / 297467.
+    wait_band_distribution:
+      kind: fitted
+      note: >-
+        Shares of 4307 (sum of the four NTPF band columns); band edges are
+        months waited. Written to 6 dp, at which the four values sum to 0.999999
+        — a decimal-rounding residual of 0.000001, not a measurement gap.
+        wait_band_counts below are the authoritative integers.
+      m0_6: 0.639192
+      m6_12: 0.231251
+      m12_18: 0.097051
+      m18_plus: 0.032505
+    wait_band_counts:
+      kind: fitted
+      note: raw NTPF band counts, given so any share above can be recomputed exactly.
+      m0_6: 2753
+      m6_12: 996
+      m12_18: 418
+      m18_plus: 140
+    band_total_discrepancy:
+      value: 1
+      kind: fitted
+      note: band-sum (4307) minus published Total (4306); NTPF disclosure-control rounding.
+
+# ---------------------------------------------------------------------------
+# National wait-band distribution (ex-SDC), for reference / fallback.
+# ---------------------------------------------------------------------------
+national_wait_band_distribution:
+  kind: fitted
+  note: all 57 non-SDC specialties, 2026-07-30 snapshot; shares of 682279.
+  m0_6: 0.596263
+  m6_12: 0.225673
+  m12_18: 0.104321
+  m18_plus: 0.073743
+national_wait_band_counts:
+  kind: fitted
+  note: raw band totals over all non-SDC specialties in the snapshot used.
+  m0_6: 406818
+  m6_12: 153972
+  m12_18: 71176
+  m18_plus: 50313
+
+# ---------------------------------------------------------------------------
+# Stability: the same renormalised proportion recomputed on each of the 7
+# monthly snapshots, same method. Bounds the cost of the snapshot choice.
+# ---------------------------------------------------------------------------
+stability:
+  kind: fitted
+  note: >-
+    min/max of each renormalised proportion across the 7 monthly snapshots in the file,
+    each recomputed with SDC excluded and January duplicate keys summed. Spread is at most
+    0.011595 in absolute proportion, so the mix is stable over the 7 months observed
+    and no snapshot choice within the file would move it much.
+  per_specialty:
+    "2600": {min: 0.110254, max: 0.114747, spread: 0.004493, label: General Surgery}
+    "0100": {min: 0.148854, max: 0.152172, spread: 0.003318, label: Cardiology}
+    "0300": {min: 0.210521, max: 0.219778, spread: 0.009257, label: Dermatology}
+    "1800": {min: 0.269612, max: 0.281208, spread: 0.011595, label: Orthopaedics}
+    "0700": {min: 0.072593, max: 0.075578, spread: 0.002986, label: Gastro-Enterology}
+    "0600": {min: 0.155056, max: 0.159372, spread: 0.004316, label: Otolaryngology (ENT)}
+    "0601": {min: 0.014476, max: 0.01607, spread: 0.001594, label: Paediatric ENT}
+  our_seven_share_of_national:
+    min: 0.435993
+    max: 0.44017
+    spread: 0.004177
+

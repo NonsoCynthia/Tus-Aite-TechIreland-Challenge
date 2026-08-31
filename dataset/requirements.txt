@@ -1,0 +1,9 @@
+# Bounds on first install; pinned to exact versions once the install is known good.
+# Unpinned dependencies undermine the determinism guarantee in BUILD_MANUAL.md section 8.5.
+psycopg[binary]>=3.1
+huggingface_hub>=0.24
+pyyaml>=6.0
+pandas>=2.2
+numpy>=1.26
+simpy>=4.1
+pytest>=8.0
