@@ -26,7 +26,35 @@ Two annotations in the source proposal are unresolved and should be closed out d
    cannot be built without a settled field list. Resolve in Phase 3 and record as an ADR.
 2. **How is urgency ascertained — does medical science have a way to measure urgency signals of
    emergencies?** (proposal §6, marginal note) — MTS and NEWS2 are the answer the project has already
-   committed to. Record the rationale as an ADR so the compliance lead can point at it.
+   committed to. Largely answered by the delivered schema: `core.observations` carries `news2`,
+   `mts_category` and `icts_category` already computed, alongside the raw components. Record the
+   rationale as an ADR so the compliance lead can point at it.
+
+3. **Where do agent outputs live — Postgres, the graph, or both?** Raised 2026-08-31 while
+   reconciling this track against ADR-001. **Blocks the specialist-agents track; does not block this
+   one.**
+
+   Migration 006 already models the entire agent output surface in Postgres — `agent.agent_scores`,
+   `agent_citations`, `decisions`, `decision_rankings`, `decision_citations`, `rule_checks` and
+   `overrides` — with `agent_rw` holding INSERT on all of them, and `rule_checks` carrying a foreign
+   key to `core.ref_rules`. The proposal (§9) says agents write scores back to the graph "as graph
+   nodes and edges, not just as messages passed between agents, which is what keeps the trail
+   auditable". ADR-001 settled the cohort data direction but is silent on outputs.
+
+   Three options, none yet chosen:
+
+   - **Postgres is the write target, graph projects it.** Consistent with ADR-001's one-source-of-record
+     logic, and relational constraints do real work here — `dr_unique_position` makes two patients at
+     the same rank impossible, `dc_role_valid` constrains why evidence was cited, and the FK to
+     `ref_rules` means a violation cannot name a rule that does not exist. Costs the proposal's claim
+     that the graph is where the audit trail lives; the graph becomes a query surface.
+   - **Graph is the write target.** Matches the proposal and the pitch. Forfeits the constraints above
+     unless they are reimplemented in SHACL or application code, and leaves `agent.*` an unused schema.
+   - **Both, with one designated primary.** Most faithful to the demo narrative, most integration
+     surface to maintain in a week, and creates a divergence risk between two audit trails — the exact
+     failure ADR-001 argued against for cohort data.
+
+   Whoever opens the specialist-agents track should decide this first and record it as ADR-002.
 
 ---
 

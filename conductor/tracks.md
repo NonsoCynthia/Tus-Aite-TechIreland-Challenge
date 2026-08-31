@@ -6,7 +6,7 @@
 
 | Track | Type | Status | Description |
 |---|---|---|---|
-| [graph-foundation_20260826](./tracks/graph-foundation_20260826/index.md) | feature | pending | Knowledge graph foundation: OWL ontology, Oxigraph bootstrap, synthetic referral generator, SimPy bed simulation |
+| [graph-foundation_20260826](./tracks/graph-foundation_20260826/index.md) | feature | pending | Knowledge graph foundation: OWL ontology, Oxigraph bootstrap, RDF projection over the `dataset/` Postgres pipeline |
 
 ## Planned Tracks
 
@@ -15,7 +15,7 @@ foundation lands.
 
 | Track | Maps to | Depends on |
 |---|---|---|
-| Specialist agents — urgency (MTS/NEWS2) and capacity scoring | Day 3 | graph-foundation |
+| Specialist agents — urgency (MTS/NEWS2) and capacity scoring | Day 3 | graph-foundation; **blocked on ADR-002**, see the track's `decisions.md` |
 | Coordination and audit trail — ranked list, `Decision` nodes, `cites` edges | Day 4 | specialist agents |
 | Clinician interface and override loop | Day 5 | coordination |
 | Validation and hardening — CPC/CRT rule checks, responsible AI boundary docs | Day 6 | clinician interface |
