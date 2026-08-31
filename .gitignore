@@ -1,17 +1,7 @@
-.env
+# Repository-wide. Each track keeps its own .gitignore for its own artefacts;
+# the dataset track's lives in dataset/.gitignore.
+.DS_Store
 __pycache__/
 *.pyc
 .venv/
 venv/
-data/
-out/
-.pytest_cache/
-.DS_Store
-pgadmin-data/
-
-# Raw downloads used to fit calibration. The fitted YAML files are committed;
-# the source archives they were measured from are not.
-generator/calibration/_raw/
-
-# Derived from out/ by scripts/make_sample.py; published to HF, not committed.
-sample/
