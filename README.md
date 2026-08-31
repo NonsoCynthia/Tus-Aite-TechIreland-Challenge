@@ -1,53 +1,184 @@
-# Tus-Aite-TechIreland-Challenge: the dataset
+# Tus-Aite-TechIreland-Challenge
 
-A synthetic Irish hospital outpatient waiting list, and the pipeline that generates,
-validates and publishes it. Built for the TechIreland National AI Challenge 2026.
+Explainable, agent-based triage support for Irish hospital patient flow, built for the
+TechIreland National AI Challenge 2026.
 
-**This branch is the data.** The agents, the graph layer and the clinician interface are
-built on other branches and are not described here.
+The project turns fragmented referral, urgency, and bed-capacity data into a ranked, evidence-backed
+shortlist that a clinician can inspect, accept, reorder, or override. The system does not admit,
+schedule, diagnose, or make final clinical decisions. It provides auditable decision support.
 
-Every record is invented. No real patient, clinician or hospital appears anywhere in it,
-and the hospital codes use a reserved range that matches no real facility.
+## Product Features
 
-## Get it running
+### 1. Synthetic Irish Patient and Referral Dataset
 
-```bash
-cp .env.example .env      # add your Hugging Face token
-make up                   # Postgres and pgAdmin
-make load                 # download and load
+- Generates synthetic patients, referrals, conditions, specialties, referral dates, and urgency
+  signals.
+- Calibrates case mix against Irish healthcare structures, including HIPE specialty, age, sex, and
+  length-of-stay statistics.
+- Calibrates list volumes and waiting-time bands against NTPF Open Data.
+- Labels every generated record as synthetic in the graph and the UI.
+- Uses seeded random generation so the same seed produces the same cohort for testing and demos.
+
+Implementation tools: Python 3.12, Pydantic v2, pandas, numpy, rdflib.
+
+### 2. Bed Occupancy and Patient Flow Simulation
+
+- Simulates arrivals, admissions, ward capacity, length of stay, discharge, and overcrowding.
+- Models ward-level `BedStatus` time series for use by the capacity agent.
+- Includes sustained-overcrowding scenarios where occupancy can exceed 100 percent.
+- Calibrates stress scenarios against HSE and INMO trolley/occupancy figures.
+
+Implementation tools: SimPy, Python 3.12, pandas, numpy.
+
+### 3. Knowledge Graph and Audit Trail
+
+- Uses an RDF/OWL knowledge graph as both the data layer and the explainability layer.
+- Represents `Patient`, `Referral`, `Condition`, `UrgencySignal`, `ClinicalPrioritisationCategory`,
+  `Specialty`, `Hospital`, `Ward`, `BedStatus`, `Agent`, `Decision`, `Clinician`, and override events.
+- Stores relationships such as `hasSignal`, `assignedTo`, `locatedAt`, `hasStatus`, `scored`,
+  `ranks`, and `cites`.
+- Makes `cites` the audit trail: walking backwards from a ranked decision reveals the exact evidence
+  behind it.
+- Declares CPC/CRT ordering constraints in the ontology.
+
+Implementation tools: Oxigraph, Docker Compose, RDF, OWL, SPARQL 1.1, rdflib, httpx.
+
+### 4. Urgency Agent
+
+- Reads referrals, conditions, vitals, and urgency signals from the graph.
+- Applies deterministic Manchester Triage System and NEWS2 scoring logic.
+- Writes urgency scores back as graph evidence.
+- Keeps scoring reproducible and unit-testable.
+
+Implementation tools: Python 3.12, SPARQL, Pydantic, pytest.
+
+### 5. Capacity Agent
+
+- Reads specialty, ward, and bed-status data from the graph.
+- Reasons over bed pressure, resource contention, and expected availability.
+- Writes capacity scores and cited capacity evidence back to the graph.
+
+Implementation tools: Python 3.12, SimPy outputs, SPARQL, pytest.
+
+### 6. Coordinating Agent
+
+- Combines urgency-agent and capacity-agent outputs into a ranked list.
+- Uses deterministic tie-breaking based on CPC, CRT breach status, and referral age.
+- Materialises `Decision` nodes and `cites` relationships in the graph.
+- Produces rankings that can be reconstructed from graph evidence.
+
+Implementation tools: Python 3.12, SPARQL over Oxigraph, rdflib/httpx.
+
+### 7. Explainable Rationale Generation
+
+- Generates short, clinician-readable rationales for each ranked referral.
+- Uses only evidence already cited in the graph.
+- Names the exact urgency signals, capacity constraints, CPC category, and CRT status.
+- Prevents the language model from changing scores, changing rank, or introducing unsupported facts.
+
+Implementation tools: Anthropic Python SDK, `claude-opus-5`, prompt caching, Message Batches API for
+bulk validation runs.
+
+### 8. Clinician Interface
+
+- Shows the ranked referral list as the main product surface.
+- Allows clinicians to expand each row and inspect the cited evidence.
+- Provides visible accept, reorder, and override controls.
+- Logs every clinician action back into the graph.
+- Shows CPC/CRT rule violations prominently.
+- Provides JSON API endpoints alongside the server-rendered UI.
+
+Implementation tools: FastAPI, Jinja2, HTMX, Uvicorn, HTML, CSS.
+
+### 9. Frontend Aesthetics and Interaction Design
+
+- Clinical, calm, and high-contrast interface designed for fast scanning.
+- Dense ranked-list layout rather than a marketing-style dashboard.
+- White and light-grey clinical base with restrained use of blue for structure, amber/red for rule
+  warnings, and labelled MTS category colours.
+- No urgency is communicated by colour alone; every colour signal has text beside it.
+- Evidence appears one interaction away through row expansion, not on a separate page.
+- Override controls are always visible and treated as first-class clinician judgement, not errors.
+- UI copy avoids diagnostic claims and avoids implying the system has acted on a patient.
+- Designed for WCAG 2.2 AA contrast and keyboard operation.
+
+### 10. CPC/CRT Compliance Validation
+
+- Checks rankings against NTPF Clinical Prioritisation Category rules.
+- Flags urgent referrals outside the 28-day Clinically Recommended Timeframe.
+- Flags semi-urgent referrals outside the 13-week Clinically Recommended Timeframe.
+- Validates same-category ordering by oldest referral first.
+- Produces evidence-backed rule-violation output for review.
+
+Implementation tools: Python 3.12, pytest, SPARQL queries, CI validation suite.
+
+### 11. Developer Workflow and Quality Gates
+
+- Uses `uv` for dependency management and a committed lockfile.
+- Uses Docker Compose for local Oxigraph and app services.
+- Uses pytest, pytest-cov, ruff, and mypy for quality control.
+- Uses tiered TDD: strict TDD for scoring/config logic, tests required for graph helpers and
+  generators, smoke tests for demo wiring.
+- Uses GitHub Actions for linting, type checking, tests, and rule-validation checks.
+
+Implementation tools: uv, Docker Compose, pytest, pytest-cov, ruff, mypy, GitHub Actions.
+
+## Architecture Summary
+
+```text
+Synthetic referrals + bed simulation
+        |
+        v
+RDF/OWL knowledge graph in Oxigraph
+        |
+        +--> Urgency agent: MTS/NEWS2 scoring
+        |
+        +--> Capacity agent: bed/resource pressure scoring
+        |
+        v
+Coordinating agent: ranked list + Decision/cites triples
+        |
+        v
+FastAPI + Jinja2 + HTMX clinician interface
+        |
+        v
+Clinician accept/reorder/override, logged back to graph
 ```
 
-You need Docker and a Hugging Face account. The dataset page is public but the files are
-gated, so request access on it and Thabang approves you. Full setup in
-[docs/GETTING_THE_DATA.md](docs/GETTING_THE_DATA.md).
+## Primary Stack
 
-## Documentation
-
-| | |
+| Area | Choice |
 |---|---|
-| [docs/GETTING_THE_DATA.md](docs/GETTING_THE_DATA.md) | **Start here.** Access, setup, loading, checking it worked |
-| [docs/HOW_THE_DATA_WAS_MADE.md](docs/HOW_THE_DATA_WAS_MADE.md) | Sources, what was measured versus chosen, what the data disproved |
-| [DATASET_README.md](DATASET_README.md) | What every table and column means. The specification. |
+| Language | Python 3.12 |
+| Web service | FastAPI |
+| Templates | Jinja2 |
+| Interactivity | HTMX |
+| Frontend | HTML + CSS, no SPA build step |
+| Triple store | Oxigraph |
+| Graph standards | RDF, OWL, SPARQL 1.1 |
+| Graph client/building | rdflib, httpx |
+| Simulation | SimPy |
+| Data/calibration | pandas, numpy, Pydantic v2 |
+| LLM rationale layer | Anthropic Python SDK, `claude-opus-5` |
+| Dependency management | uv |
+| Local services | Docker Compose |
+| Testing | pytest, pytest-cov |
+| Quality | ruff, mypy |
+| CI | GitHub Actions |
 
-The original build specification is kept in [docs/BUILD_MANUAL.md](docs/BUILD_MANUAL.md)
-and its [addendum](docs/BUILD_MANUAL_ADDENDUM.md); code comments cite them by section.
+## Current Build Track
 
-## What is in it
+The active track is the knowledge graph foundation:
 
-24 tables. 17 hold the input data, 7 are written by whatever consumes it, and one is a
-held-out answer key that is never loaded. Six fictitious hospitals: four public with
-waiting lists, two private that carry capacity but no queue.
+- Python project skeleton
+- Oxigraph bootstrap
+- OWL ontology
+- calibration config
+- synthetic referral generator
+- SimPy bed occupancy simulation
+- seeded graph handoff for the urgency, capacity, and coordinating agents
 
-The referral side follows the NTPF Outpatient Waiting List Minimum Data Set: real field
-names, real code values, real rules. The clinical layer, meaning conditions and observations, is
-ours because the national record contains no clinical detail at all. That absence is the
-problem the dataset exists to illustrate.
+The dataset branch README was preserved separately as `DATASET_BRANCH_README.md`.
 
-Distributions are fitted from public sources rather than invented. Generation is
-deterministic: the same seed produces byte-identical output, checked at both profiles.
-
-## How it is versioned
-
-Three things move separately and `versions.yml` pins them together: the schema as numbered
-migrations in git, the data as tagged releases on Hugging Face, and the code. Nothing
-fetches "latest".
+See `conductor/product.md`, `conductor/tech-stack.md`, and
+`conductor/tracks/graph-foundation_20260826/spec.md` for the detailed project plan.
