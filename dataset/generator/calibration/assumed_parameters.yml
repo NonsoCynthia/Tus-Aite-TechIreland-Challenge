@@ -1,0 +1,103 @@
+# Parameters with no published source.
+#
+# The other three calibration files each name a source in their provenance block,
+# because every number in them was measured from it. These have no source to name.
+# Putting them in a fitted file would let them inherit that file's credibility, so
+# they are declared separately and openly instead.
+#
+# BUILD_MANUAL_ADDENDUM section 4 names three parameters that must be marked
+# `assumed`. gp_triage_disagreement_rate is declared in vitals_by_category.yml,
+# beside the MIMIC distributions it modifies. The other two are here.
+
+provenance:
+  source: none. No published source exists for these
+  url: n/a
+  licence: n/a
+  granularity: n/a
+  retrieved: 2026-08-30
+  note: >-
+    Every value in this file is a judgement. None was measured. Each is a
+    placeholder chosen to be plausible, and results that depend on one must be
+    reported as unvalidated. This file exists so that dependency is visible
+    rather than buried among fitted numbers.
+
+parameters:
+
+  condition_mix_by_specialty:
+    kind: assumed
+    value:
+      # ICD-10-AM code -> share of primary diagnoses within that specialty.
+      # Codes are real; the shares are not measured.
+      "2600":   # General Surgery
+        K80.2: 0.28   # Calculus of gallbladder without cholecystitis
+        K40.9: 0.24   # Inguinal hernia, without obstruction or gangrene
+        K83.1: 0.11   # Obstruction of bile duct
+        K64.1: 0.10   # Second degree haemorrhoids
+        K35.8: 0.07   # Acute appendicitis, other and unspecified
+        R10.4: 0.20   # Other and unspecified abdominal pain
+      "0100":   # Cardiology
+        I25.1: 0.31   # Atherosclerotic heart disease
+        I48.0: 0.22   # Paroxysmal atrial fibrillation
+        I50.9: 0.16   # Heart failure, unspecified
+        R07.4: 0.16   # Chest pain, unspecified
+        I10:   0.15   # Essential hypertension
+      "0300":   # Dermatology
+        L40.0: 0.26   # Psoriasis vulgaris
+        D22.9: 0.24   # Melanocytic naevus, unspecified
+        L20.9: 0.19   # Atopic dermatitis, unspecified
+        C43.9: 0.11   # Malignant melanoma of skin, unspecified
+        L70.0: 0.20   # Acne vulgaris
+      "1800":   # Orthopaedics
+        M16.1: 0.29   # Primary coxarthrosis, bilateral
+        M17.1: 0.27   # Other primary gonarthrosis
+        M75.1: 0.16   # Rotator cuff syndrome
+        M54.5: 0.15   # Low back pain
+        M23.2: 0.13   # Meniscus derangement, old tear
+      "0700":   # Gastro-Enterology
+        K21.0: 0.27   # Gastro-oesophageal reflux with oesophagitis
+        K58.9: 0.23   # Irritable bowel syndrome without diarrhoea
+        K50.9: 0.17   # Crohn disease, unspecified
+        K51.9: 0.15   # Ulcerative colitis, unspecified
+        D12.6: 0.18   # Benign neoplasm of colon, unspecified
+      "0600":   # Otolaryngology (ENT)
+        J35.0: 0.30   # Chronic tonsillitis
+        H90.3: 0.22   # Sensorineural hearing loss, bilateral
+        J34.2: 0.19   # Deviated nasal septum
+        H65.3: 0.15   # Chronic mucoid otitis media
+        R49.0: 0.14   # Dysphonia
+      "0601":   # Paediatric ENT
+        J35.0: 0.34   # Chronic tonsillitis
+        H65.3: 0.30   # Chronic mucoid otitis media
+        J35.2: 0.21   # Hypertrophy of adenoids
+        H90.3: 0.15   # Sensorineural hearing loss, bilateral
+    note: >-
+      HIPE publishes diagnosis counts in aggregate, by broad chapter rather than by
+      specialty-and-code, so it constrains this only loosely. The remainder is
+      clinical judgement we do not have. The codes are real ICD-10-AM codes and the
+      pairings to specialty are sensible, but the SHARES are invented. Any claim
+      about how condition mix affects ranking is unvalidated. Do not present a
+      finding that rests on these proportions without saying so.
+
+  latent_hazard_model:
+    kind: assumed
+    value:
+      formula: clip(base_by_condition + age_effect + normal(0, 0.25), 0, 1)
+      noise_sd: 0.25
+      age_effect_per_decade_over_50: 0.04
+      base_by_condition_range: [0.05, 0.55]
+    note: >-
+      No Irish source says a patient with a blocked bile duct has any particular
+      chance of deteriorating while waiting. That number does not exist anywhere.
+      We generate it. DATASET_README section 7.18 already documents this as
+      unvalidated and it is repeated here so the generator's own configuration
+      carries the warning.
+
+      The noise_sd of 0.25 is large ON PURPOSE and must not be reduced to make
+      results look cleaner. If risk were a tidy function of the early warning score,
+      and the urgency agent also scores on the early warning score, then "our
+      ranking reduces deterioration" would be true by construction regardless of
+      whether the system worked at all. The system would be graded against its own
+      inputs. The noise is what forces the agent to identify risk from partial
+      information, which is the actual clinical problem.
+
+      latent_hazard must NEVER be computed from news2.

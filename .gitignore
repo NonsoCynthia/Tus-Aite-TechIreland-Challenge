@@ -1,0 +1,7 @@
+# Repository-wide. Each track keeps its own .gitignore for its own artefacts;
+# the dataset track's lives in dataset/.gitignore.
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+venv/

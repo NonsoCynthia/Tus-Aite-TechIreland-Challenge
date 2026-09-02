@@ -69,22 +69,86 @@ explainable shortlist that a human still signs off on.
 
 ## Core Features
 
-1. **Synthetic data generation** — patient and referral generator calibrated to HIPE specialty mix,
-   age/sex distribution, and length-of-stay statistics, plus NTPF list structure and volume, so the
-   case mix looks Irish though no individual record is real.
-2. **Bed occupancy simulation** — discrete-event queue (SimPy) calibrated to published HSE/INMO
-   trolley and occupancy figures, so the capacity agent is stress-tested against realistic contention.
-3. **Knowledge graph** — RDF/OWL store that doubles as the audit log, not merely a data store.
-4. **Urgency agent** — MTS and NEWS2 scoring logic, reading the graph via SPARQL and writing scored
-   edges back.
-5. **Capacity agent** — bed and resource constraint reasoning against the simulated occupancy model,
-   also writing scored edges back.
-6. **Coordinating agent** — merges both agents' outputs into a ranked list via SPARQL over both sets
-   of triples, materialising `Decision` nodes and `cites` relationships.
-7. **Clinician interface** — ranked list view with accept, reorder, and override controls; overrides
-   written back into the graph, closing the loop.
-8. **Compliance validation** — automated CPC/CRT rule checks across synthetic batches, plus documented
-   human-in-the-loop boundary.
+1. **Synthetic Irish patient and referral generation** — a Python generator creates synthetic
+   patients, referrals, specialties, referral dates, ICD-10-AM-coded conditions, and urgency signals.
+   It is calibrated to HIPE specialty mix, age/sex distribution, and length-of-stay statistics, plus
+   NTPF waiting-list structure and volume. The generator is seeded, reproducible, and every generated
+   entity is labelled synthetic in the graph and UI.
+2. **Calibration configuration** — HIPE, NTPF, HSE/INMO, MTS, NEWS2, and CPC/CRT assumptions live in
+   committed, inspectable config rather than hidden constants. Pydantic models validate malformed,
+   negative, or non-normalised inputs before they affect a run.
+3. **Bed occupancy simulation** — a SimPy discrete-event model simulates arrivals, admissions, length
+   of stay, discharge, ward capacity, and sustained overcrowding. It produces ward-level `BedStatus`
+   time series calibrated to HSE/INMO trolley and occupancy figures.
+4. **Knowledge graph foundation** — Oxigraph stores RDF/OWL triples and is bootstrapped through
+   Docker Compose. The graph represents `Patient`, `Referral`, `Condition`, `UrgencySignal`,
+   `ClinicalPrioritisationCategory`, `Specialty`, `Hospital`, `Ward`, `BedStatus`, `Agent`,
+   `Decision`, `Clinician`, and override events.
+5. **Audit-first graph relationships** — `presentsWith`, `hasSignal`, `assignedTo`, `locatedAt`,
+   `hasStatus`, `scored`, `ranks`, and `cites` encode the system's reasoning. `cites` is the audit
+   trail: any ranked position can be reconstructed by walking backwards from the `Decision` node to
+   the exact urgency and capacity evidence.
+6. **Urgency agent** — deterministic Python logic applies Manchester Triage System and NEWS2 scoring
+   to graph inputs, then writes scored evidence back through SPARQL. The same inputs produce the same
+   urgency score, which keeps the clinical scoring layer testable and auditable.
+7. **Capacity agent** — deterministic Python logic reads specialty, ward, and bed-status triples,
+   reasons over occupancy/resource pressure, and writes capacity scores plus cited evidence back into
+   the graph.
+8. **Coordinating agent** — SPARQL queries combine urgency and capacity scores into a ranked list with
+   deterministic tie-breaking by CPC, CRT breach status, and referral age. The coordinator materialises
+   `Decision` nodes and `cites` relationships rather than producing an untraceable list.
+9. **Rationale generation** — the LLM layer uses the Anthropic Python SDK to turn already-cited graph
+   evidence into short rationale text. It explains a decision it did not make; it cannot alter scores,
+   ranks, or cited facts.
+10. **Clinician interface** — FastAPI serves a server-rendered Jinja2 and HTMX interface. The ranked
+    list is the primary screen, with row expansion for evidence, visible accept/reorder/override
+    controls, CPC/CRT violation states, and JSON API endpoints for demo or integration use.
+11. **Override loop** — clinician accept, reorder, and override actions are logged back into the
+    graph as first-class events. Overrides are treated as human judgement, not system failures.
+12. **Compliance validation** — automated CPC/CRT checks flag urgent referrals outside the 28-day CRT,
+    semi-urgent referrals outside the 13-week CRT, and same-category ordering violations. Human
+    oversight, no-real-data boundaries, and non-diagnostic output are documented and enforced in UI
+    copy.
+13. **Developer workflow and quality gates** — `uv`, Docker Compose, pytest, pytest-cov, ruff, mypy,
+    and GitHub Actions support a one-week prototype build with tiered TDD and repeatable setup.
+
+## Implementation Stack
+
+| Area | Tools / Packages |
+|---|---|
+| Language | Python 3.12 |
+| Web service | FastAPI, Uvicorn |
+| Clinician UI | Jinja2, HTMX, HTML, CSS |
+| Triple store | Oxigraph in Docker |
+| Graph standards | RDF, OWL, SPARQL 1.1 |
+| Graph client/building | rdflib, httpx |
+| Data generation/calibration | pandas, numpy, Pydantic v2 |
+| Simulation | SimPy |
+| Rationale generation | Anthropic Python SDK, `claude-opus-5` |
+| Dependency management | uv |
+| Local orchestration | Docker Compose |
+| Testing | pytest, pytest-cov |
+| Static quality | ruff, mypy |
+| CI | GitHub Actions |
+
+## Frontend and Aesthetic Direction
+
+The clinician UI should feel like a focused hospital operations tool, not a marketing dashboard.
+The ranked list is the first screen and the dominant visual surface.
+
+- **Layout:** dense, scan-friendly ranked list with fixed columns for rank, CPC/CRT status, urgency
+  evidence, capacity evidence, rationale, and clinician action.
+- **Interaction:** row expansion reveals cited graph evidence in place; accept, reorder, and override
+  controls remain visible without a hidden menu.
+- **Visual tone:** calm clinical base using white, light grey, and restrained blue for structure;
+  amber/red reserved for CPC/CRT warnings and rule violations.
+- **Urgency display:** MTS colours may be shown as labelled badges, but colour is never the only
+  signal. Text labels such as `MTS Orange` and `NEWS2 aggregate 7` must appear beside visual marks.
+- **Evidence treatment:** every score or rationale has nearby cited evidence. A score without a graph
+  trail does not appear on screen.
+- **Override treatment:** overrides are styled as normal clinician actions, not error states.
+- **Accessibility:** WCAG 2.2 AA contrast, keyboard operation for accept/reorder/override, compact
+  typography, and no decorative elements that compete with clinical evidence.
 
 ## Non-Goals
 
