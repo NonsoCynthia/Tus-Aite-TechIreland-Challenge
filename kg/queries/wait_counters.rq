@@ -1,0 +1,106 @@
+# kg/queries/wait_counters.rq
+#
+# Shared fragment deriving the four wait counters for one (referral, as_of_date) pair, per
+# conductor/kg/requirements.md R2. These counters MUST NOT be materialised as triples —
+# every agent and the rule checker MUST use this fragment, unmodified, so they cannot
+# disagree about a wait.
+#
+# --- HOW TO USE ---
+# This file is a complete, standalone-runnable SELECT for testing it in isolation (see
+# kg/tests/test_wait_counters_sample.py). To embed it in a larger query, copy this file's
+# text into that query's WHERE clause and replace the empty `VALUES (?referral ?asOfDate)
+# { }` line with the actual binding for the referral(s) and date(s) in question — that VALUES
+# line is the fragment's one substitution point. Do not edit the fragment body itself when
+# embedding it: R2 depends on every consumer running byte-identical logic.
+#
+# --- WHY THE DAY-COUNT EXTRACTION LOOKS LIKE THIS ---
+# SPARQL 1.1 defines xsd:date subtraction as producing an xsd:duration, not an integer.
+# Oxigraph normalises that duration to a whole-day form when subtracting two xsd:date values
+# ("P<n>D", "PT0S" for zero, or "-P<n>D" for a negative span — verified empirically; a
+# date-date subtraction never produces month/year components). REPLACE(str, "[^0-9]", "")
+# strips everything but the digits, which is 0 (from "PT0S") or the day count; STRSTARTS
+# recovers the sign. This is the derivation requirements.md §6 called "the one real risk" —
+# it IS tractable in SPARQL, which is what this fragment demonstrates.
+#
+# --- WHY days_awaiting_triage USES eat:triageStatus, NOT "no eat:hasTriageEvent" ---
+# Measured against core.referral_daily (full profile): 13,117 of 70,012 rows with
+# triage_status = 'triaged' have NO linked triage_events row at all (their triage predates
+# the retained event history), yet their days_awaiting_triage is correctly NULL. So "no
+# triage event" is not a safe proxy for "awaiting triage" — eat:triageStatus (a
+# eat:ReferralState property) is, and was confirmed to match every one of 473 sampled rows.
+#
+# --- WHY adjusted_wait_days ONLY SUBTRACTS *CLOSED* SUSPENSIONS ---
+# Reverse-engineered against core.referral_daily, day by day, for suspensions that close
+# partway through the referral_daily extract window: a suspension contributes its full
+# length to the subtraction only once CLOSED as of as_of_date (its interval's time:hasEnd
+# date <= ?asOfDate). An open suspension contributes nothing until it closes, then
+# contributes its whole span at once — never a prorated partial amount while still open.
+# That is the behaviour actually stored in the source data, not an assumption. No
+# still-open suspension exists in the `full` profile to exercise this branch against real
+# data; it is implemented to the same rule, untested by data, exactly as eat:validTo's
+# removal branch is (see the ontology track's decisions.md).
+#
+# --- WHY THE ?daysAwaitingTriage BIND USES `IF(condition, value, 1/0)` ---
+# pyoxigraph 0.3.22 has a reproducible quirk: referencing an outer BIND-derived variable
+# (here, ?daysSinceReceived) inside a later OPTIONAL's own BIND, combined with GROUP BY,
+# silently fails to bind — confirmed in isolation, unrelated to this fragment's logic.
+# Working around it by projecting a plain 0/1 flag inside the OPTIONAL instead, then
+# computing the real value here with `IF(flag = 1, ?daysSinceReceived, 1/0)`: dividing by
+# zero on the false branch is a genuine runtime type error using only variables that ARE
+# bound somewhere (Oxigraph rejects, at parse time, a branch that references a variable that
+# is never bound anywhere) — and per SPARQL semantics, an error evaluating a SELECT
+# expression yields no binding for that variable, which is exactly "unbound", matching a SQL
+# NULL for a referral that is not currently awaiting triage.
+
+PREFIX eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#>
+PREFIX time: <http://www.w3.org/2006/time#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+SELECT ?referral ?asOfDate ?daysSinceReferral ?daysSinceReceived
+       (IF(COALESCE(SAMPLE(?awaitingTriageFlag), 0) = 1, ?daysSinceReceived, 1/0) AS ?daysAwaitingTriage)
+       (?daysSinceReceived - COALESCE(SUM(?closedSuspensionDaysOpt), 0) AS ?adjustedWaitDays)
+WHERE {
+  VALUES (?referral ?asOfDate) { }
+
+  ?referral eat:referralDate ?referralDate ;
+            eat:referralReceivedDate ?referralReceivedDate .
+
+  BIND(STR(?asOfDate - ?referralDate) AS ?srDiffStr)
+  BIND(REPLACE(?srDiffStr, "[^0-9]", "") AS ?srDigits)
+  BIND(IF(?srDigits = "", 0, xsd:integer(?srDigits)) AS ?srAbs)
+  BIND(IF(STRSTARTS(?srDiffStr, "-"), -?srAbs, ?srAbs) AS ?daysSinceReferral)
+
+  BIND(STR(?asOfDate - ?referralReceivedDate) AS ?rcDiffStr)
+  BIND(REPLACE(?rcDiffStr, "[^0-9]", "") AS ?rcDigits)
+  BIND(IF(?rcDigits = "", 0, xsd:integer(?rcDigits)) AS ?rcAbs)
+  BIND(IF(STRSTARTS(?rcDiffStr, "-"), -?rcAbs, ?rcAbs) AS ?daysSinceReceived)
+
+  # The ReferralState valid at ?asOfDate (half-open: validFrom <= asOfDate < validTo, or
+  # validTo absent for a still-current state). Under the Type-2 "no overlapping states"
+  # guard (decisions.md §1), at most one state matches.
+  OPTIONAL {
+    ?state eat:stateOf ?referral ;
+           eat:validFrom ?validFrom ;
+           eat:triageStatus ?triageStatus .
+    FILTER (?validFrom <= ?asOfDate)
+    OPTIONAL { ?state eat:validTo ?validTo }
+    FILTER (!BOUND(?validTo) || ?asOfDate < ?validTo)
+    FILTER (?triageStatus = "awaiting_triage")
+    BIND(1 AS ?awaitingTriageFlag)
+  }
+
+  # Every suspension of this referral that has closed by ?asOfDate. An open suspension
+  # (no time:hasEnd yet) does not match this pattern at all, so it contributes nothing —
+  # see the file header on adjusted_wait_days.
+  OPTIONAL {
+    ?referral eat:hasSuspension ?suspension .
+    ?suspension time:hasTime ?interval .
+    ?interval time:hasBeginning [ time:inXSDDate ?susBegin ] ;
+              time:hasEnd [ time:inXSDDate ?susEnd ] .
+    FILTER (?susEnd <= ?asOfDate)
+    BIND(STR(?susEnd - ?susBegin) AS ?susDiffStr)
+    BIND(REPLACE(?susDiffStr, "[^0-9]", "") AS ?susDigits)
+    BIND(IF(?susDigits = "", 0, xsd:integer(?susDigits)) AS ?closedSuspensionDaysOpt)
+  }
+}
+GROUP BY ?referral ?asOfDate ?daysSinceReferral ?daysSinceReceived

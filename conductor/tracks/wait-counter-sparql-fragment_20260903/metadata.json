@@ -1,7 +1,7 @@
 {
   "track_id": "wait-counter-sparql-fragment_20260903",
   "type": "chore",
-  "status": "blocked",
+  "status": "superseded",
   "description": "Wait-counter SPARQL fragment blocked on missing ontology properties",
   "created_at": "2026-09-03T00:00:00Z",
   "updated_at": "2026-09-03T00:00:00Z"

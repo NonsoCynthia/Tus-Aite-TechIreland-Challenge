@@ -1,0 +1,8 @@
+{
+  "track_id": "write-validate-queries-wait_20260903",
+  "type": "chore",
+  "status": "done",
+  "description": "Write and validate kg/queries/wait_counters.rq",
+  "created_at": "2026-09-03T00:00:00Z",
+  "updated_at": "2026-09-03T00:00:00Z"
+}
