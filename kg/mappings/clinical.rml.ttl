@@ -1,0 +1,343 @@
+@prefix rr:   <http://www.w3.org/ns/r2rml#> .
+@prefix eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# ================= Conditions =================
+
+<#ConditionMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.conditions" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/condition/{hospital_hipe}/{pathway_number}/{icd10am_code}" ;
+    rr:class eat:Condition ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:conditionLabel ; rr:objectMap [ rr:column "condition_label" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:isPrimary ;
+    rr:objectMap [ rr:column "is_primary" ; rr:datatype xsd:boolean ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:icd10amCode ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/icd10am/{icd10am_code}" ] ] .
+
+# snomed_ct_id is nullable -- own IS NOT NULL map. SNOMED IRIs are referenced under
+# http://snomed.info/id/, never minted under eatd: (namespaces.md §4).
+<#ConditionSnomedMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.conditions WHERE snomed_ct_id IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/condition/{hospital_hipe}/{pathway_number}/{icd10am_code}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:snomedCode ;
+    rr:objectMap [ rr:template "http://snomed.info/id/{snomed_ct_id}" ] ] .
+
+<#ReferralHasConditionMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.conditions" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral/{hospital_hipe}/{pathway_number}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:hasCondition ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/condition/{hospital_hipe}/{pathway_number}/{icd10am_code}" ] ] .
+
+# ================= Observations =================
+# core.observations has no patient_id column -- sosa:hasFeatureOfInterest needs the
+# patient, not the referral, so every observation-bearing query joins to core.referrals.
+
+<#ObservationEventMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.observations" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:class eat:ObservationEvent ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] .
+
+<#ReferralHasObservationEventMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.observations" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral/{hospital_hipe}/{pathway_number}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:hasObservationEvent ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ] ] .
+
+# One pair of triples maps per measured column: one asserts the sosa:Observation's own
+# properties (observedProperty/hasSimpleResult/resultTime/hasFeatureOfInterest), the other
+# links the parent ObservationEvent to it via sosa:hasMember. Both share one rr:LogicalTable
+# per column so the filtered SQL is written once. Every column is nullable (requirements.md
+# §4), so each pair is its own IS NOT NULL map -- a null column produces neither triples map
+# a row, so no dangling sosa:hasMember and no "None" literal.
+
+<#HrTable> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.hr, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.hr IS NOT NULL" .
+<#HrObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#HrTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/hr" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:heartRate ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "hr" ; rr:datatype xsd:integer ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#HrMemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#HrTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/hr" ] ] .
+
+<#SbpTable> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.sbp, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.sbp IS NOT NULL" .
+<#SbpObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#SbpTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/sbp" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:systolicBP ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "sbp" ; rr:datatype xsd:integer ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#SbpMemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#SbpTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/sbp" ] ] .
+
+<#DbpTable> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.dbp, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.dbp IS NOT NULL" .
+<#DbpObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#DbpTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/dbp" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:diastolicBP ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "dbp" ; rr:datatype xsd:integer ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#DbpMemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#DbpTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/dbp" ] ] .
+
+<#RrTable> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.rr, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.rr IS NOT NULL" .
+<#RrObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#RrTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/rr" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:respiratoryRate ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "rr" ; rr:datatype xsd:integer ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#RrMemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#RrTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/rr" ] ] .
+
+<#TempTable> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.temp, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.temp IS NOT NULL" .
+<#TempObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#TempTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/temp" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:temperature ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "temp" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#TempMemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#TempTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/temp" ] ] .
+
+<#Spo2Table> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.spo2, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.spo2 IS NOT NULL" .
+<#Spo2ObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#Spo2Table> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/spo2" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:oxygenSaturation ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "spo2" ; rr:datatype xsd:integer ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#Spo2MemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#Spo2Table> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/spo2" ] ] .
+
+<#PainTable> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.pain, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.pain IS NOT NULL" .
+<#PainObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#PainTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/pain" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:pain ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "pain" ; rr:datatype xsd:integer ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#PainMemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#PainTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/pain" ] ] .
+
+<#ChiefComplaintTable> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.chiefcomplaint, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.chiefcomplaint IS NOT NULL" .
+<#ChiefComplaintObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#ChiefComplaintTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/chiefcomplaint" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:chiefComplaint ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "chiefcomplaint" ; rr:datatype xsd:string ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#ChiefComplaintMemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#ChiefComplaintTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/chiefcomplaint" ] ] .
+
+<#AvpuTable> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.avpu, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.avpu IS NOT NULL" .
+<#AvpuObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#AvpuTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/avpu" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:avpu ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "avpu" ; rr:datatype xsd:string ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#AvpuMemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#AvpuTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/avpu" ] ] .
+
+<#News2Table> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.news2, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.news2 IS NOT NULL" .
+<#News2ObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#News2Table> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/news2" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:news2 ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "news2" ; rr:datatype xsd:integer ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#News2MemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#News2Table> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/news2" ] ] .
+
+<#MtsCategoryTable> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.mts_category, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.mts_category IS NOT NULL" .
+<#MtsCategoryObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#MtsCategoryTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/mts_category" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:mtsCategory ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "mts_category" ; rr:datatype xsd:string ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#MtsCategoryMemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#MtsCategoryTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/mts_category" ] ] .
+
+<#IctsCategoryTable> a rr:LogicalTable ;
+  rr:sqlQuery "SELECT o.hospital_hipe, o.pathway_number, o.obs_datetime, o.icts_category, r.patient_id FROM core.observations o JOIN core.referrals r ON o.hospital_hipe = r.hospital_hipe AND o.pathway_number = r.pathway_number WHERE o.icts_category IS NOT NULL" .
+<#IctsCategoryObservationMap> a rr:TriplesMap ;
+  rr:logicalTable <#IctsCategoryTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/icts_category" ;
+    rr:class sosa:Observation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:observedProperty ; rr:objectMap [ rr:constant eat:ictsCategory ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:hasSimpleResult ; rr:objectMap [ rr:column "icts_category" ; rr:datatype xsd:string ] ] ;
+  rr:predicateObjectMap [ rr:predicate sosa:resultTime ; rr:objectMap [ rr:column "obs_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasFeatureOfInterest ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+<#IctsCategoryMemberMap> a rr:TriplesMap ;
+  rr:logicalTable <#IctsCategoryTable> ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs-event/{hospital_hipe}/{pathway_number}/{obs_datetime}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate sosa:hasMember ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/obs/{hospital_hipe}/{pathway_number}/{obs_datetime}/icts_category" ] ] .
