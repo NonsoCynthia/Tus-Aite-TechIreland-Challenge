@@ -177,6 +177,16 @@ Without that it matches the default graph, finds nothing, and returns
 map-cancellation-events-suspension_20260903 when the fragment was first run
 against real mapping output rather than hand-built triples.
 
+**OWL-RL closure produces nothing application-level.** Running `owlrl` over the
+loaded graph yields 55 new triples, all RDF/XSD boilerplate — datatypes typed as
+`rdfs:Datatype`, `owl:Thing`/`owl:Nothing` axioms, annotation-property typing.
+Not one mentions an `eat:`, `sosa:` or `prov:` term. The three `eat:outranks`
+triples already form their own transitive closure, and no other axiom in the
+ontology generates entailments. So no query depends on inference at this stage,
+and the materialisation step in tech-stack.md Decision 5 is provision for a
+richer ontology later, not something today's correctness rests on. Measured
+2026-09-03 against the full profile.
+
 **`eat:hasTriageEvent`'s absence is not a safe proxy for "not yet triaged."** Measured
 against `core.referral_daily` on the `full` profile: 13,117 of 70,012 rows with
 `triage_status = 'triaged'` have no linked `triage_events` row at all — roughly one triaged
