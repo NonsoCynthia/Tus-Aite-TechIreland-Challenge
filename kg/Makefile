@@ -3,9 +3,10 @@
 # The loader password is not in SQL — set it from kg/.env afterwards:
 #   ALTER ROLE kg_loader PASSWORD '<KG_LOADER_PASSWORD>';
 
-DB := cd ../dataset && docker compose exec -T db psql -U triage_admin -d triage
+HERE := $(CURDIR)
+DB := cd $(CURDIR)/../dataset && docker compose exec -T db psql -U triage_admin -d triage
 
 .PHONY: kg-views
 kg-views:
-	$(DB) < sql/001_v_referral_state.sql
-	-$(DB) < sql/002_kg_loader_role.sql
+	$(DB) < $(HERE)/sql/001_v_referral_state.sql
+	-$(DB) < $(HERE)/sql/002_kg_loader_role.sql
