@@ -109,17 +109,33 @@ eat:isRecordOf a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:comment "0..1. No IHI -> no Person node, no placeholder. See decisions.md #4." .
 
 eat:atHospital a owl:ObjectProperty ;
-    rdfs:domain [ a owl:Class ; owl:unionOf ( eat:Patient eat:Referral ) ] ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( eat:Patient eat:Referral eat:Ward ) ] ;
     rdfs:range eat:Hospital ;
-    rdfs:comment "Cardinality 1. Source: hospital_hipe." .
+    rdfs:comment "Cardinality 1. Source: hospital_hipe. Domain widened (chore/ontology-literal-properties) to include eat:Ward, which was otherwise hospital-scoped only by IRI convention with no triple to show it." .
 
 eat:forPatient a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:Referral ; rdfs:range eat:Patient ;
     rdfs:comment "Cardinality 1. Source: referral_daily.patient_id." .
 
-eat:referredToService a owl:ObjectProperty, owl:FunctionalProperty ;
-    rdfs:domain eat:Referral ; rdfs:range eat:HospitalService ;
-    rdfs:comment "Cardinality 1. Source: hospital_hipe + specialty_hipe." .
+eat:referralDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Referral ; rdfs:range xsd:date ;
+    rdfs:comment "Cardinality 1. Source: referral_date (date on the GP's letter)." .
+
+eat:referralReceivedDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Referral ; rdfs:range xsd:date ;
+    rdfs:comment "Cardinality 1. Source: referral_received_date (date the hospital got it)." .
+
+eat:recordCreationDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Referral ; rdfs:range xsd:date ;
+    rdfs:comment "Cardinality 1. Source: record_creation_date. Verified constant per referral in Postgres, so it belongs on the enduring Referral, not ReferralState." .
+
+eat:gpPriority a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Referral ; rdfs:range skos:Concept ;
+    rdfs:comment "0..1. Source: priority_level_gp. Coded via ref_codes table gp_priority -- a skos:Concept reference, never a literal, per requirements.md R6." .
+
+eat:referralSource a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Referral ; rdfs:range skos:Concept ;
+    rdfs:comment "Cardinality 1. Source: referral_source. Coded via ref_codes table referral_source; see R6." .
 
 eat:stateOf a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:ReferralState ; rdfs:range eat:Referral .
@@ -132,9 +148,61 @@ eat:validTo a owl:DatatypeProperty, owl:FunctionalProperty ;
     rdfs:domain eat:ReferralState ; rdfs:range xsd:date ;
     rdfs:comment "0..1. Absent for a live referral's current state. Closed at removal_date where the referral was removed." .
 
+eat:referredToService a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range eat:HospitalService ;
+    rdfs:comment "Cardinality 1. Source: hospital_hipe + specialty_hipe. Moved here from eat:Referral (chore/ontology-literal-properties): specialty_hipe is an R1 material field, so under decisions.md #1 it is a per-period fact, not an enduring one." .
+
+eat:triageStatus a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: triage_status (OURS: awaiting_triage/triaged/redirected/rejected/removed). Not in ref_codes, stays a literal." .
+
+eat:appointmentDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range xsd:date ;
+    rdfs:comment "0..1. Source: appointment_date." .
+
+eat:arrivedDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range xsd:date ;
+    rdfs:comment "0..1. Source: arrived_date." .
+
+eat:hasHighClinicalOrSocialNeeds a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range xsd:boolean ;
+    rdfs:comment "Cardinality 1. Source: high_clinical_or_social_needs (0/1 in Postgres; xsd:boolean here per namespaces.md #6)." .
+
+eat:clinicCode a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range xsd:string ;
+    rdfs:comment "0..1. Source: clinic_code." .
+
+eat:clinicClassification a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range skos:Concept ;
+    rdfs:comment "0..1. Source: clinic_classification. Coded via ref_codes; see R6." .
+
+eat:removalReason a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range skos:Concept ;
+    rdfs:comment "0..1. Source: removal_reason. Coded via ref_codes; see R6. Present only on the closing state, alongside validTo." .
+
 eat:hasTriageEvent a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:Referral ; rdfs:range eat:TriageEvent ;
     rdfs:comment "0..1. Null until returned from triage." .
+
+eat:sentForTriageDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:TriageEvent ; rdfs:range xsd:date ;
+    rdfs:comment "Cardinality 1. Source: sent_for_triage_date." .
+
+eat:triageDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:TriageEvent ; rdfs:range xsd:date ;
+    rdfs:comment "0..1. Source: triage_date." .
+
+eat:dateReturnedFromTriage a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:TriageEvent ; rdfs:range xsd:date ;
+    rdfs:comment "0..1. Source: date_returned_from_triage." .
+
+eat:hasTriageOutcome a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:TriageEvent ; rdfs:range eat:TriageOutcome ;
+    rdfs:comment "0..1. Source: triage_outcome. Coded via ref_codes; range is the dedicated eat:TriageOutcome class, not generic skos:Concept." .
+
+eat:turnaroundDays a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:TriageEvent ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "0..1. Source: turnaround_days. Stored (OURS) so RULE-TRIAGE-TURNAROUND has a single number to test." .
 
 eat:assignedCategory a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:TriageEvent ; rdfs:range eat:CPC ;
@@ -156,6 +224,14 @@ eat:snomedCode a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:Condition ;
     rdfs:comment "0..1. Range is a sct: IRI, referenced only -- SNOMED CT is not imported." .
 
+eat:conditionLabel a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Condition ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: condition_label (plain-English description)." .
+
+eat:isPrimary a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Condition ; rdfs:range xsd:boolean ;
+    rdfs:comment "Cardinality 1. Source: is_primary. The main reason for the referral." .
+
 eat:hasObservationEvent a owl:ObjectProperty ;
     rdfs:domain eat:Referral ; rdfs:range eat:ObservationEvent ;
     rdfs:comment "0..n." .
@@ -170,34 +246,200 @@ sosa:observedProperty rdfs:domain sosa:Observation ; rdfs:range sosa:ObservableP
 sosa:hasFeatureOfInterest rdfs:domain sosa:Observation ; rdfs:range eat:Patient ;
     rdfs:comment "Cardinality 1. The patient, not the referral." .
 
+sosa:hasSimpleResult rdfs:domain sosa:Observation ;
+    rdfs:comment "Cardinality 1. Datatype matches the observed column: xsd:integer for hr/sbp/dbp/rr/spo2/pain/news2, xsd:decimal for temp, xsd:string for avpu/chiefcomplaint/mts_category/icts_category. Without this property no Observation individual can state the value it measured." .
+
+sosa:resultTime rdfs:domain sosa:Observation ; rdfs:range xsd:dateTime ;
+    rdfs:comment "Cardinality 1. Source: obs_datetime." .
+
 eat:providedBy a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:HospitalService ; rdfs:range eat:Hospital ;
     rdfs:comment "Cardinality 1. The unit that owns a waiting list." .
+
+eat:serviceName a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:HospitalService ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: service_name." .
+
+eat:active a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:HospitalService ; rdfs:range xsd:boolean ;
+    rdfs:comment "Cardinality 1. Source: active. Whether this hospital currently runs the service." .
 
 eat:forSpecialty a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain [ a owl:Class ; owl:unionOf ( eat:HospitalService eat:BedAllocation ) ] ;
     rdfs:range eat:Specialty ;
     rdfs:comment "Cardinality 1. Both schema-forced joins." .
 
+eat:isPaediatric a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Specialty ; rdfs:range xsd:boolean ;
+    rdfs:comment "Cardinality 1. Source: is_paediatric (OURS). specialty_name reuses skos:prefLabel; no separate eat: property for it." .
+
+eat:hospitalName a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Hospital ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: hospital_name." .
+
+eat:hseHealthRegion a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Hospital ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: hse_health_region." .
+
+eat:hospitalType a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Hospital ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: hospital_type (public/private). Not in ref_codes, stays a literal." .
+
+eat:totalInpatientBeds a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Hospital ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: total_inpatient_beds." .
+
+eat:wardName a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Ward ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: ward_name." .
+
+eat:totalBeds a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Ward ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: total_beds." .
+
+eat:wardType a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Ward ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: ward_type (inpatient/day_case/assessment/icu). Not in ref_codes, stays a literal." .
+
 eat:inWard a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:BedAllocation ; rdfs:range eat:Ward ;
     rdfs:comment "Cardinality 1. Source: ward_specialty + nominal_beds." .
+
+eat:nominalBeds a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedAllocation ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: nominal_beds. Beds notionally allocated to this specialty." .
+
+eat:isPrimaryWard a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedAllocation ; rdfs:range xsd:boolean ;
+    rdfs:comment "Cardinality 1. Source: is_primary (ward_specialty). Named distinctly from eat:Condition's eat:isPrimary -- same source column name, unrelated meaning." .
 
 eat:statusOf a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:BedStatus ; rdfs:range eat:Ward ;
     rdfs:comment "Cardinality 1." .
 
+eat:snapshotDatetime a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range xsd:dateTime ;
+    rdfs:comment "Cardinality 1. Source: snapshot_datetime." .
+
+eat:occupiedBeds a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: occupied." .
+
+eat:freeBeds a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: free. Beds actually available." .
+
+eat:occupancyPct a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range xsd:decimal ;
+    rdfs:comment "Cardinality 1. Source: occupancy_pct." .
+
+eat:outlierPatients a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: outliers. Patients here who belong to another specialty." .
+
+eat:surgeCapacityInUse a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: surge_capacity_in_use." .
+
+eat:delayedTransfersOfCare a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: delayed_transfers_of_care." .
+
+eat:awaitingAdmissionOver9h a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: awaiting_admission_over_9h." .
+
+eat:awaitingAdmissionOver24h a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: awaiting_admission_over_24h." .
+
+eat:garStatus a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: gar_status (G green / A amber / R red). Not in ref_codes, stays a literal." .
+
 eat:sessionOf a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:ClinicSession ; rdfs:range eat:HospitalService ;
     rdfs:comment "Cardinality 1. The real outpatient constraint." .
+
+eat:sessionDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ClinicSession ; rdfs:range xsd:date ;
+    rdfs:comment "Cardinality 1. Source: session_date. Mirrors eat:validFrom's precedent: an IRI-embedded date still gets a literal companion." .
+
+eat:clinicName a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ClinicSession ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: clinic_name." .
+
+eat:slotsTotal a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ClinicSession ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: slots_total." .
+
+eat:slotsBooked a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ClinicSession ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: slots_booked." .
+
+eat:slotsAvailable a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ClinicSession ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Cardinality 1. Source: slots_available (slots_total minus slots_booked, stored in the source rather than recomputed)." .
 
 eat:hasSuspension a owl:ObjectProperty ;
     rdfs:domain eat:Referral ; rdfs:range eat:SuspensionEvent ;
     rdfs:comment "0..n. First-class, own interval." .
 
+time:hasTime rdfs:domain eat:SuspensionEvent ; rdfs:range time:Interval ;
+    rdfs:comment "Cardinality 1. The interval's own time:hasBeginning/time:hasEnd carry suspension_start_date/suspension_end_date. Required for adjusted_wait_days (requirements.md R2) to be derivable at all." .
+
+eat:suspensionReason a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:SuspensionEvent ; rdfs:range skos:Concept ;
+    rdfs:comment "Cardinality 1. Source: suspension_reason. Coded via ref_codes; see R6." .
+
+eat:suspendedDays a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:SuspensionEvent ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "0..1. Source: suspended_days (OURS). Blank while the suspension is still open." .
+
 eat:hasCancellation a owl:ObjectProperty ;
     rdfs:domain eat:Referral ; rdfs:range eat:CancellationEvent ;
     rdfs:comment "0..n. All of them." .
+
+eat:cancellationDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:CancellationEvent ; rdfs:range xsd:date ;
+    rdfs:comment "Cardinality 1. Source: cancellation_date." .
+
+eat:cancellationReason a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:CancellationEvent ; rdfs:range skos:Concept ;
+    rdfs:comment "Cardinality 1. Source: cancellation_reason. Coded via ref_codes; see R6." .
+
+eat:initiatedBy a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:CancellationEvent ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: initiated_by (H hospital / P patient). Not in ref_codes, stays a literal." .
+
+eat:statement a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Rule ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: statement (the rule in plain English)." .
+
+eat:appliesTo a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Rule ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: applies_to." .
+
+eat:thresholdDays a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Rule ; rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "0..1. Source: threshold_days. Absent for RULE-ORDER and RULE-TIEBREAK." .
+
+# Shared between eat:Person and eat:Patient: both persons and patients carry sex,
+# date of birth and area of residence in the source tables.
+eat:sex a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( eat:Person eat:Patient ) ] ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: person_sex / patient_sex (M/F/U). Not in ref_codes, stays a literal." .
+
+eat:dateOfBirth a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( eat:Person eat:Patient ) ] ;
+    rdfs:range xsd:date ;
+    rdfs:comment "Cardinality 1. Source: person_date_of_birth / patient_date_of_birth." .
+
+eat:areaOfResidenceCode a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( eat:Person eat:Patient ) ] ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Source: area_of_residence_code. Not among the confirmed ref_codes tables, stays a literal." .
 
 #################################################################
 # §4 — Decision-layer properties

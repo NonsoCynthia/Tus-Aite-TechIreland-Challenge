@@ -59,32 +59,132 @@ number.
 
 ## 3. Data-layer properties
 
+**Amended (chore/ontology-literal-properties, 2026-09-03).** The original table below
+covered relationships between nodes almost exclusively — outside `validFrom`/`validTo`,
+almost no table's own attribute columns (names, dates, counts, flags) had a property at
+all, which meant the data layer could not state most of what each source table actually
+records. This amendment adds one property per such column, audited against
+`dataset/DATASET_README.md` §7 and the live Postgres schema. Two rules governed the audit:
+a column already covered by an existing relationship, a dedicated event node, or the Type-2
+change-detection view is not restated (e.g. `removal_date` stays `eat:validTo`, and
+`last_cancellation_date`/`suspension_start_date`/`suspension_end_date` on `referral_daily`
+are not restated on `eat:ReferralState` because `eat:CancellationEvent`/
+`eat:SuspensionEvent` already carry the authoritative values); a column present in
+`core.ref_codes` (confirmed live: `cancellation_reason`, `clinic_classification`,
+`gp_priority`, `referral_source`, `removal_reason`, `suspension_reason`, `triage_category`,
+`triage_outcome`) becomes an object property with range `skos:Concept` (or the dedicated
+class, e.g. `eat:CPC`/`eat:TriageOutcome`, where one already exists), never a literal, per
+requirements.md R6.
+
+**`eat:referredToService` moves from `eat:Referral` to `eat:ReferralState`.**
+`specialty_hipe` is one of requirements.md R1's material fields — it changes on redirect,
+which is exactly what mints a new `eat:ReferralState`. Under decisions.md §1, "never-changing
+fields sit on `eat:Referral`"; a field that can differ between one state and the next is not
+one of them. See the track's `decisions.md` for the full reasoning.
+
+**`eat:atHospital`'s domain is widened to include `eat:Ward`.** `eat:Ward` is
+hospital-scoped by IRI convention (`ward/{hospital_hipe}/{ward_id}`) exactly like
+`eat:Patient`, but had no triple stating which hospital it belongs to. Reusing the existing
+property closes the gap without minting a new predicate that would mean the same thing.
+
+**`sosa:hasSimpleResult` and `sosa:resultTime` were named as reused SOSA vocabulary in §1
+but never given a domain/range refinement.** Without `hasSimpleResult` in particular, no
+`sosa:Observation` individual has any way to state the value it measured — added here
+alongside the refinements already present for `hasMember`/`observedProperty`/
+`hasFeatureOfInterest`.
+
+**`eat:SuspensionEvent` gains `time:hasTime` (OWL-Time, reused) linking it to a
+`time:Interval`.** decisions.md is explicit that `adjusted_wait_days` is only derivable if
+suspended periods are real intervals in the graph; without a property connecting the event
+to a `time:Interval`, `suspension_start_date`/`suspension_end_date` would have nowhere to
+attach.
+
 | Property | Domain | Range | Card. | Source / why |
 |---|---|---|---|---|
 | `eat:isRecordOf` | `eat:Patient` | `eat:Person` | 0..1, functional | No IHI → no `Person` node, no placeholder |
-| `eat:atHospital` | `eat:Patient`, `eat:Referral` | `eat:Hospital` | 1 | `hospital_hipe` |
+| `eat:atHospital` | `eat:Patient`, `eat:Referral`, `eat:Ward` | `eat:Hospital` | 1 | `hospital_hipe` |
 | `eat:forPatient` | `eat:Referral` | `eat:Patient` | 1 | `referral_daily.patient_id` |
-| `eat:referredToService` | `eat:Referral` | `eat:HospitalService` | 1 | `hospital_hipe` + `specialty_hipe` |
+| `eat:referralDate` | `eat:Referral` | `xsd:date` | 1, functional | `referral_date` (GP's letter) |
+| `eat:referralReceivedDate` | `eat:Referral` | `xsd:date` | 1, functional | `referral_received_date` |
+| `eat:recordCreationDate` | `eat:Referral` | `xsd:date` | 1, functional | `record_creation_date`; verified constant per referral |
+| `eat:gpPriority` | `eat:Referral` | `skos:Concept` | 0..1, functional | `priority_level_gp`; `ref_codes` table `gp_priority`, R6 |
+| `eat:referralSource` | `eat:Referral` | `skos:Concept` | 1, functional | `referral_source`; `ref_codes` table `referral_source`, R6 |
 | `eat:stateOf` | `eat:ReferralState` | `eat:Referral` | 1, functional | Type 2 |
 | `eat:validFrom` | `eat:ReferralState` | `xsd:date` | 1 | |
 | `eat:validTo` | `eat:ReferralState` | `xsd:date` | 0..1 | Absent while current; `removal_date` where removed |
+| `eat:referredToService` | `eat:ReferralState` | `eat:HospitalService` | 1, functional | `specialty_hipe`; material field, moved from `eat:Referral` |
+| `eat:triageStatus` | `eat:ReferralState` | `xsd:string` | 1, functional | `triage_status`; `OURS`, not in `ref_codes`, stays literal |
+| `eat:appointmentDate` | `eat:ReferralState` | `xsd:date` | 0..1, functional | `appointment_date` |
+| `eat:arrivedDate` | `eat:ReferralState` | `xsd:date` | 0..1, functional | `arrived_date` |
+| `eat:hasHighClinicalOrSocialNeeds` | `eat:ReferralState` | `xsd:boolean` | 1, functional | `high_clinical_or_social_needs` |
+| `eat:clinicCode` | `eat:ReferralState` | `xsd:string` | 0..1, functional | `clinic_code` |
+| `eat:clinicClassification` | `eat:ReferralState` | `skos:Concept` | 0..1, functional | `clinic_classification`; `ref_codes`, R6 |
+| `eat:removalReason` | `eat:ReferralState` | `skos:Concept` | 0..1, functional | `removal_reason`; `ref_codes`, R6 |
 | `eat:hasTriageEvent` | `eat:Referral` | `eat:TriageEvent` | 0..1, functional | Null until returned from triage |
+| `eat:sentForTriageDate` | `eat:TriageEvent` | `xsd:date` | 1, functional | `sent_for_triage_date` |
+| `eat:triageDate` | `eat:TriageEvent` | `xsd:date` | 0..1, functional | `triage_date` |
+| `eat:dateReturnedFromTriage` | `eat:TriageEvent` | `xsd:date` | 0..1, functional | `date_returned_from_triage` |
+| `eat:hasTriageOutcome` | `eat:TriageEvent` | `eat:TriageOutcome` | 0..1, functional | `triage_outcome`; `ref_codes`, R6 |
+| `eat:turnaroundDays` | `eat:TriageEvent` | `xsd:nonNegativeInteger` | 0..1, functional | `turnaround_days`; stored for `RULE-TRIAGE-TURNAROUND` |
 | `eat:assignedCategory` | `eat:TriageEvent` | `eat:CPC` | 0..1 | `triage_category` |
 | `eat:outranks` | `eat:CPC` | `eat:CPC` | transitive | `severity_rank`, **never** `code_value` |
 | `eat:hasCondition` | `eat:Referral` | `eat:Condition` | 1..n | `is_primary` flags one |
 | `eat:icd10amCode` | `eat:Condition` | minted IRI | 1 | ICD-10-AM has no public IRI scheme |
 | `eat:snomedCode` | `eat:Condition` | `sct:` IRI | 0..1 | Reference only |
+| `eat:conditionLabel` | `eat:Condition` | `xsd:string` | 1, functional | `condition_label` |
+| `eat:isPrimary` | `eat:Condition` | `xsd:boolean` | 1, functional | `is_primary` |
 | `eat:hasObservationEvent` | `eat:Referral` | `eat:ObservationEvent` | 0..n | |
 | `sosa:hasMember` | `eat:ObservationEvent` | `sosa:Observation` | 1..n | One per non-null column |
 | `sosa:observedProperty` | `sosa:Observation` | `sosa:ObservableProperty` | 1 | |
 | `sosa:hasFeatureOfInterest` | `sosa:Observation` | `eat:Patient` | 1 | The patient, not the referral |
+| `sosa:hasSimpleResult` | `sosa:Observation` | literal, datatype per column | 1, functional | `xsd:integer` for `hr`/`sbp`/`dbp`/`rr`/`spo2`/`pain`/`news2`; `xsd:decimal` for `temp`; `xsd:string` for `avpu`/`chiefcomplaint`/`mts_category`/`icts_category` |
+| `sosa:resultTime` | `sosa:Observation` | `xsd:dateTime` | 1, functional | `obs_datetime` |
 | `eat:providedBy` | `eat:HospitalService` | `eat:Hospital` | 1 | The unit that owns a waiting list |
+| `eat:serviceName` | `eat:HospitalService` | `xsd:string` | 1, functional | `service_name` |
+| `eat:active` | `eat:HospitalService` | `xsd:boolean` | 1, functional | `active` |
 | `eat:forSpecialty` | `HospitalService`, `BedAllocation` | `eat:Specialty` | 1 | Both schema-forced joins |
+| `eat:isPaediatric` | `eat:Specialty` | `xsd:boolean` | 1, functional | `is_paediatric`; `specialty_name` reuses `skos:prefLabel`, no new property |
+| `eat:hospitalName` | `eat:Hospital` | `xsd:string` | 1, functional | `hospital_name` |
+| `eat:hseHealthRegion` | `eat:Hospital` | `xsd:string` | 1, functional | `hse_health_region` |
+| `eat:hospitalType` | `eat:Hospital` | `xsd:string` | 1, functional | `hospital_type`; `public`/`private`, not `ref_codes` |
+| `eat:totalInpatientBeds` | `eat:Hospital` | `xsd:nonNegativeInteger` | 1, functional | `total_inpatient_beds` |
+| `eat:wardName` | `eat:Ward` | `xsd:string` | 1, functional | `ward_name` |
+| `eat:totalBeds` | `eat:Ward` | `xsd:nonNegativeInteger` | 1, functional | `total_beds` |
+| `eat:wardType` | `eat:Ward` | `xsd:string` | 1, functional | `ward_type`; enumerated, not `ref_codes` |
 | `eat:inWard` | `eat:BedAllocation` | `eat:Ward` | 1 | `ward_specialty` + `nominal_beds` |
+| `eat:nominalBeds` | `eat:BedAllocation` | `xsd:nonNegativeInteger` | 1, functional | `nominal_beds` |
+| `eat:isPrimaryWard` | `eat:BedAllocation` | `xsd:boolean` | 1, functional | `is_primary`; named distinctly from `Condition`'s `isPrimary` |
 | `eat:statusOf` | `eat:BedStatus` | `eat:Ward` | 1 | |
+| `eat:snapshotDatetime` | `eat:BedStatus` | `xsd:dateTime` | 1, functional | `snapshot_datetime` |
+| `eat:occupiedBeds` | `eat:BedStatus` | `xsd:nonNegativeInteger` | 1, functional | `occupied` |
+| `eat:freeBeds` | `eat:BedStatus` | `xsd:nonNegativeInteger` | 1, functional | `free` |
+| `eat:occupancyPct` | `eat:BedStatus` | `xsd:decimal` | 1, functional | `occupancy_pct` |
+| `eat:outlierPatients` | `eat:BedStatus` | `xsd:nonNegativeInteger` | 1, functional | `outliers` |
+| `eat:surgeCapacityInUse` | `eat:BedStatus` | `xsd:nonNegativeInteger` | 1, functional | `surge_capacity_in_use` |
+| `eat:delayedTransfersOfCare` | `eat:BedStatus` | `xsd:nonNegativeInteger` | 1, functional | `delayed_transfers_of_care` |
+| `eat:awaitingAdmissionOver9h` | `eat:BedStatus` | `xsd:nonNegativeInteger` | 1, functional | `awaiting_admission_over_9h` |
+| `eat:awaitingAdmissionOver24h` | `eat:BedStatus` | `xsd:nonNegativeInteger` | 1, functional | `awaiting_admission_over_24h` |
+| `eat:garStatus` | `eat:BedStatus` | `xsd:string` | 1, functional | `gar_status`; G/A/R, not `ref_codes` |
 | `eat:sessionOf` | `eat:ClinicSession` | `eat:HospitalService` | 1 | The real outpatient constraint |
+| `eat:sessionDate` | `eat:ClinicSession` | `xsd:date` | 1, functional | `session_date`; mirrors `validFrom`'s precedent — an IRI-embedded date still gets a literal companion |
+| `eat:clinicName` | `eat:ClinicSession` | `xsd:string` | 1, functional | `clinic_name` |
+| `eat:slotsTotal` | `eat:ClinicSession` | `xsd:nonNegativeInteger` | 1, functional | `slots_total` |
+| `eat:slotsBooked` | `eat:ClinicSession` | `xsd:nonNegativeInteger` | 1, functional | `slots_booked` |
+| `eat:slotsAvailable` | `eat:ClinicSession` | `xsd:nonNegativeInteger` | 1, functional | `slots_available` |
 | `eat:hasSuspension` | `eat:Referral` | `eat:SuspensionEvent` | 0..n | First-class, own interval |
+| `time:hasTime` | `eat:SuspensionEvent` | `time:Interval` | 1, functional | Interval's `time:hasBeginning`/`time:hasEnd` carry `suspension_start_date`/`suspension_end_date` |
+| `eat:suspensionReason` | `eat:SuspensionEvent` | `skos:Concept` | 1, functional | `suspension_reason`; `ref_codes`, R6 |
+| `eat:suspendedDays` | `eat:SuspensionEvent` | `xsd:nonNegativeInteger` | 0..1, functional | `suspended_days` |
 | `eat:hasCancellation` | `eat:Referral` | `eat:CancellationEvent` | 0..n | All of them |
+| `eat:cancellationDate` | `eat:CancellationEvent` | `xsd:date` | 1, functional | `cancellation_date` |
+| `eat:cancellationReason` | `eat:CancellationEvent` | `skos:Concept` | 1, functional | `cancellation_reason`; `ref_codes`, R6 |
+| `eat:initiatedBy` | `eat:CancellationEvent` | `xsd:string` | 1, functional | `initiated_by`; H/P, not `ref_codes` |
+| `eat:statement` | `eat:Rule` | `xsd:string` | 1, functional | `statement` |
+| `eat:appliesTo` | `eat:Rule` | `xsd:string` | 1, functional | `applies_to` |
+| `eat:thresholdDays` | `eat:Rule` | `xsd:nonNegativeInteger` | 0..1, functional | `threshold_days` |
+| `eat:sex` | `eat:Person`, `eat:Patient` | `xsd:string` | 1, functional | `person_sex`/`patient_sex`; M/F/U, not `ref_codes` |
+| `eat:dateOfBirth` | `eat:Person`, `eat:Patient` | `xsd:date` | 1, functional | `person_date_of_birth`/`patient_date_of_birth` |
+| `eat:areaOfResidenceCode` | `eat:Person`, `eat:Patient` | `xsd:string` | 1, functional | `area_of_residence_code`; not in the confirmed `ref_codes` table list |
 
 ## 4. Decision-layer classes and properties
 
