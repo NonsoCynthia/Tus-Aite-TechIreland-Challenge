@@ -294,6 +294,31 @@ may rest on SNOMED interoperability. By contrast, MTS 5,119 + ICTS 81 = 5,200 ex
 every referral gets one triage instrument, ICTS for paediatric cases. That one is correct
 by design.
 
+### 4.10 `triage_status` has only two values, and one of them is almost absent
+
+`core.referral_daily` contains exactly two statuses: `triaged` (70,012 rows) and
+`awaiting_triage` (10). No `redirected`, `rejected` or `removed` status appears at
+all, despite the NTPF specification allowing them.
+
+Three consequences, none of them a data fault, all of them things a demo could be
+built on by mistake:
+
+- **`days_awaiting_triage` is derivable but barely exercised.** The branch of
+  `queries/wait_counters.rq` that computes it fires on 10 rows in the whole
+  profile. The sample validation found exactly one awaiting-triage case in 35
+  referrals, which is consistent.
+- **`RULE-TRIAGE-TURNAROUND` has almost nothing to fire on.** It is one of the
+  five rules in `ref_rules`. A rule checker run against this profile will report
+  it as passing while testing essentially nothing.
+- **`DATASET_README.md` §10.3** describes referrals with no urgency category as
+  the ones most likely to be forgotten, precisely because they have no timeframe
+  to breach. That population is 10 rows here, so the graph can represent the
+  case but cannot demonstrate it.
+
+Separately and unrelated: 13,117 of the 70,012 `triaged` rows have no linked
+`triage_events` row (§4.6). The two findings have different denominators and are
+easily confused.
+
 ## 5. Known limitations
 
 Each is on the record because a demo or an agent could otherwise be built on it.
@@ -334,9 +359,10 @@ one independently-run mapping, so closing any of them risks a false negative fro
 incomplete enumeration. `tests/test_column_coverage.py` catches missing properties;
 nothing catches extra ones.
 
-**5.8 The design deck's cost figures predate measurement.** Slides quoting a triple-count
-comparison were drafted before the change-detection query was run. The measured figures
-are in this document and in `requirements.md` §2; prefer those.
+**5.8 The awaiting-triage population is 10 rows.** `triage_status` takes only two
+values in the `full` profile, and `awaiting_triage` accounts for 0.014% of them.
+The urgency agent's handling of untriaged referrals, and any rule check on triage
+turnaround, are structurally supported but cannot be validated against this data.
 
 ## 6. What is verified, and how
 
