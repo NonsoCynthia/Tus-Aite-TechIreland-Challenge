@@ -1,0 +1,28 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+
+<https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/shapes>
+  a owl:Ontology ;
+  sh:declare [ sh:prefix "eat" ;
+               sh:namespace "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#"^^xsd:anyURI ] .
+
+eat:ReferralStateShape a sh:NodeShape ;
+  sh:targetClass eat:ReferralState ;
+  sh:property [ sh:path eat:stateOf ;
+                sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:validFrom ;
+                sh:datatype xsd:date ;
+                sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:validTo ;
+                sh:datatype xsd:date ; sh:maxCount 1 ] .
+
+eat:ReferralStateIntervalShape a sh:NodeShape ;
+  sh:targetClass eat:ReferralState ;
+  sh:sparql [
+    sh:message "validTo precedes validFrom" ;
+    sh:prefixes <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/shapes> ;
+    sh:select """SELECT $this WHERE {
+      $this eat:validFrom ?from ; eat:validTo ?to .
+      FILTER(?to < ?from) }""" ] .

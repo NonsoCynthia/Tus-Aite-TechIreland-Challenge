@@ -1,0 +1,20 @@
+@prefix eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+eat:Referral a owl:Class ;
+    rdfs:comment "The enduring pathway. Never per-day." .
+
+eat:ReferralState a owl:Class ;
+    rdfs:comment "A set of facts about a referral, valid over a period. Minted only on material change." .
+
+eat:stateOf a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range eat:Referral .
+
+eat:validFrom a owl:DatatypeProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range xsd:date .
+
+eat:validTo a owl:DatatypeProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range xsd:date ;
+    rdfs:comment "Absent for a live referral's current state. Closed at removal_date where the referral was removed." .

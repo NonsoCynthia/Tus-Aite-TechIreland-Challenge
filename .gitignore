@@ -6,3 +6,7 @@ __pycache__/
 .venv/
 venv/
 kg/.env
+kg/out/
+kg/mappings/*.ini
+kg/.env
+kg/.venv/

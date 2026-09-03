@@ -1,0 +1,23 @@
+@prefix rr:   <http://www.w3.org/ns/r2rml#> .
+@prefix eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+<#ReferralStateMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM kg.v_referral_state" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral-state/{hospital_hipe}/{pathway_number}/{valid_from}" ;
+    rr:class eat:ReferralState ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:stateOf ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral/{hospital_hipe}/{pathway_number}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:validFrom ;
+    rr:objectMap [ rr:column "valid_from" ; rr:datatype xsd:date ] ] .
+
+<#ReferralStateClosedMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM kg.v_referral_state WHERE valid_to IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral-state/{hospital_hipe}/{pathway_number}/{valid_from}" ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:validTo ;
+    rr:objectMap [ rr:column "valid_to" ; rr:datatype xsd:date ] ] .
