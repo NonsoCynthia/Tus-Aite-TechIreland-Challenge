@@ -1,0 +1,110 @@
+@prefix rr:   <http://www.w3.org/ns/r2rml#> .
+@prefix eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#> .
+@prefix time: <http://www.w3.org/2006/time#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# ================= Cancellation events =================
+# core.cancellation_events has no nullable columns -- one map covers everything.
+
+<#CancellationEventMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.cancellation_events" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cancellation/{hospital_hipe}/{pathway_number}/{cancellation_date}" ;
+    rr:class eat:CancellationEvent ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:cancellationDate ;
+    rr:objectMap [ rr:column "cancellation_date" ; rr:datatype xsd:date ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:cancellationReason ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cancellation_reason/{cancellation_reason}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:initiatedBy ;
+    rr:objectMap [ rr:column "initiated_by" ] ] .
+
+<#ReferralHasCancellationMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.cancellation_events" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral/{hospital_hipe}/{pathway_number}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:hasCancellation ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cancellation/{hospital_hipe}/{pathway_number}/{cancellation_date}" ] ] .
+
+# ================= Suspension events =================
+# suspension_end_date and suspended_days are nullable; each gets its own IS NOT NULL map
+# (requirements.md §4). The end instant must not exist at all while a suspension is open --
+# achieved simply by never running the end-instant maps for a null suspension_end_date row.
+
+<#SuspensionEventMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.suspension_events" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}" ;
+    rr:class eat:SuspensionEvent ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:suspensionReason ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension_reason/{suspension_reason}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate time:hasTime ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/interval" ] ] .
+
+<#SuspensionSuspendedDaysMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.suspension_events WHERE suspended_days IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:suspendedDays ;
+    rr:objectMap [ rr:column "suspended_days" ; rr:datatype xsd:nonNegativeInteger ] ] .
+
+<#ReferralHasSuspensionMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.suspension_events" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral/{hospital_hipe}/{pathway_number}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:hasSuspension ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}" ] ] .
+
+# The interval and its begin instant always exist (suspension_start_date is never null).
+<#SuspensionIntervalMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.suspension_events" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/interval" ;
+    rr:class time:Interval ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate time:hasBeginning ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/begin" ] ] .
+
+<#SuspensionBeginInstantMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.suspension_events" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/begin" ;
+    rr:class time:Instant ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate time:inXSDDate ;
+    rr:objectMap [ rr:column "suspension_start_date" ; rr:datatype xsd:date ] ] .
+
+# The end instant exists only when suspension_end_date is not null -- an open suspension
+# gets time:hasTime -> interval -> time:hasBeginning -> begin instant, and nothing else.
+<#SuspensionIntervalEndMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.suspension_events WHERE suspension_end_date IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/interval" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate time:hasEnd ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/end" ] ] .
+
+<#SuspensionEndInstantMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.suspension_events WHERE suspension_end_date IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/end" ;
+    rr:class time:Instant ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate time:inXSDDate ;
+    rr:objectMap [ rr:column "suspension_end_date" ; rr:datatype xsd:date ] ] .
