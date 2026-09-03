@@ -148,6 +148,27 @@ workspace, or copy `kg/.env.example` and fill it.
 **`kg/mappings/*.ini` holds the loader password and is git-ignored.** Do not commit one,
 and do not put a password in any `.sql` or `.ttl` file.
 
+**Property names are deliberately readable and do not match column names.** The
+source column for every property is in its `rdfs:comment` in `kg/ontology/eat.ttl`,
+and that comment is normative for mappings — read it rather than assuming the
+property name is the column. Known divergences:
+
+| Property | Column |
+|---|---|
+| `eat:occupiedBeds` / `eat:freeBeds` / `eat:outlierPatients` | `occupied` / `free` / `outliers` |
+| `eat:isPrimaryWard` | `is_primary` |
+| `eat:snomedCode` | `snomed_ct_id` |
+| `eat:gpPriority` | `priority_level_gp` |
+| `eat:assignedCategory` | `triage_category` |
+| `eat:hasHighClinicalOrSocialNeeds` | `high_clinical_or_social_needs` |
+| `eat:sex` / `eat:dateOfBirth` | `patient_sex` / `patient_date_of_birth`, and the `person_*` equivalents |
+
+**`sosa:hasSimpleResult` has no declared range**, because the datatype varies by
+observed property — integer for `hr`, decimal for `temp`, string for
+`mts_category`. Nothing in the ontology enforces it, so the shapes track must add
+a `sh:datatype` constraint per observable property or ill-typed results will pass
+validation.
+
 ## 5. Track order
 
 Sequential, because everything depends on them:
