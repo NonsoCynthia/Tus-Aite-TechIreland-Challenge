@@ -203,6 +203,15 @@ inside a later `OPTIONAL`'s `BIND`, combined with `GROUP BY`, silently fails to 
 bump the version without re-running that test and re-checking whether the quirk — and
 therefore the workaround — still applies.
 
+**Two clinical columns are empty in the published data.** `chiefcomplaint` is null
+for all 5,200 observation rows, and `snomed_ct_id` is null for all 6,977 condition
+rows. Both are modelled — `eat:ReportedSymptom` covers chief complaint,
+`eat:snomedCode` covers SNOMED — and both produce zero triples. The urgency agent
+has no free-text presenting-complaint signal available, and no demo may rest on
+SNOMED interoperability. Measured by map-conditions-observations-rdf_20260903.
+MTS 5,119 + ICTS 81 = 5,200 is correct by contrast: every referral gets exactly
+one triage instrument, ICTS for paediatric cases.
+
 ## 5. Track order
 
 Sequential, because everything depends on them:
