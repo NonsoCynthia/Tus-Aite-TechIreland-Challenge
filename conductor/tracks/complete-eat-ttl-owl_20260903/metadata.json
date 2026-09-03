@@ -1,7 +1,7 @@
 {
   "track_id": "complete-eat-ttl-owl_20260903",
   "type": "chore",
-  "status": "pending",
+  "status": "done",
   "description": "Complete the eat.ttl OWL ontology",
   "created_at": "2026-09-03T00:00:00Z",
   "updated_at": "2026-09-03T00:00:00Z"

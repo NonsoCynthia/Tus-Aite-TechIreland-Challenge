@@ -17,6 +17,7 @@
       take one, per decisions.md §3.
 - [x] Task: Add the §6 CPC scheme (`CPCScheme`, three concepts, `severityRank`, `crtDays`,
       `outranks` instance triples) with full bracketed IRIs.
-- [ ] Task: Conductor - User Manual Verification 'Ontology complete' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Ontology complete' (Protocol in workflow.md)
       — re-read `eat.ttl` end-to-end against the ontology.md checklist (§2/§3/§4/§5/§6), confirm
-      nothing outside `kg/ontology/eat.ttl` changed.
+      nothing outside `kg/ontology/eat.ttl` changed. Verified: parses clean (361 triples via
+      rdflib), only `kg/ontology/eat.ttl` and track files touched.
