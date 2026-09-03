@@ -169,6 +169,14 @@ observed property — integer for `hr`, decimal for `temp`, string for
 a `sh:datatype` constraint per observable property or ill-typed results will pass
 validation.
 
+**`kg/queries/wait_counters.rq` contains no GRAPH clause by design**, since it is
+spliced into a consuming query. Any consumer must wrap it in
+`GRAPH <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> { … }`.
+Without that it matches the default graph, finds nothing, and returns
+`adjustedWaitDays` equal to the unadjusted wait — wrong, with no error. Found by
+map-cancellation-events-suspension_20260903 when the fragment was first run
+against real mapping output rather than hand-built triples.
+
 **`eat:hasTriageEvent`'s absence is not a safe proxy for "not yet triaged."** Measured
 against `core.referral_daily` on the `full` profile: 13,117 of 70,012 rows with
 `triage_status = 'triaged'` have no linked `triage_events` row at all — roughly one triaged
