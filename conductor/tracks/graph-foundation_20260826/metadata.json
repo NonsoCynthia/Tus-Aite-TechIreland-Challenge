@@ -1,8 +1,8 @@
 {
   "track_id": "graph-foundation_20260826",
   "type": "feature",
-  "status": "pending",
-  "description": "Knowledge graph foundation: OWL ontology, Oxigraph bootstrap, HIPE/NTPF-calibrated synthetic referral generator, and SimPy bed occupancy simulation",
+  "status": "done",
+  "description": "Knowledge graph foundation: OWL ontology, Oxigraph bootstrap, and an RDF projection over the dataset/ Postgres pipeline",
   "created_at": "2026-08-26T09:21:36Z",
-  "updated_at": "2026-08-26T09:21:36Z"
+  "updated_at": "2026-09-03T00:00:00Z"
 }
