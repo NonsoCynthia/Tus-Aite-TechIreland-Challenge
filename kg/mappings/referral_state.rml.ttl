@@ -1,0 +1,248 @@
+@prefix rr:   <http://www.w3.org/ns/r2rml#> .
+@prefix eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# ================= eat:ReferralState (kg.v_referral_state) =================
+# Corrected (map-referral-daily-triage-patients-persons_20260903): this mapping predated the
+# named-graph decision and emitted N-Triples with no graph. Every predicateObjectMap below
+# now carries the same constant …/kg/graph/inputs graph map as every other input-layer
+# mapping (namespaces.md §5); the .ini switches to N-QUADS to match.
+
+<#ReferralStateMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM kg.v_referral_state" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral-state/{hospital_hipe}/{pathway_number}/{valid_from}" ;
+    rr:class eat:ReferralState ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:stateOf ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral/{hospital_hipe}/{pathway_number}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:validFrom ;
+    rr:objectMap [ rr:column "valid_from" ; rr:datatype xsd:date ] ] ;
+  # triage_status, high_clinical_or_social_needs and specialty_hipe are NOT NULL on
+  # referral_daily (verified live), so the view can never produce a null here -- no
+  # separate IS NOT NULL map needed for these three, unlike the columns below.
+  rr:predicateObjectMap [
+    rr:predicate eat:triageStatus ;
+    rr:objectMap [ rr:column "triage_status" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:hasHighClinicalOrSocialNeeds ;
+    rr:objectMap [ rr:column "high_clinical_or_social_needs" ; rr:datatype xsd:boolean ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:referredToService ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/service/{hospital_hipe}/{specialty_hipe}" ] ] .
+
+<#ReferralStateClosedMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM kg.v_referral_state WHERE valid_to IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral-state/{hospital_hipe}/{pathway_number}/{valid_from}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:validTo ;
+    rr:objectMap [ rr:column "valid_to" ; rr:datatype xsd:date ] ] .
+
+<#ReferralStateAppointmentDateMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM kg.v_referral_state WHERE appointment_date IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral-state/{hospital_hipe}/{pathway_number}/{valid_from}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:appointmentDate ;
+    rr:objectMap [ rr:column "appointment_date" ; rr:datatype xsd:date ] ] .
+
+<#ReferralStateArrivedDateMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM kg.v_referral_state WHERE arrived_date IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral-state/{hospital_hipe}/{pathway_number}/{valid_from}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:arrivedDate ;
+    rr:objectMap [ rr:column "arrived_date" ; rr:datatype xsd:date ] ] .
+
+# kg.v_referral_state does not carry clinic_code, clinic_classification or removal_reason --
+# they are not R1 material fields, so the change-detection view correctly excludes them.
+# Joined back to referral_daily for the specific day each applies to: clinic_code/
+# clinic_classification track appointment_date (itself material, so fixed for the whole
+# state once set) and are read as of the state's own valid_from; removal_reason is read as
+# of valid_to, the day the referral was actually removed. Both joins are data lookups, not
+# change-detection logic -- the logic itself stays in the SQL view, per requirements.md §4.
+
+<#ReferralStateClinicCodeMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT vs.hospital_hipe, vs.pathway_number, vs.valid_from, rd.clinic_code FROM kg.v_referral_state vs JOIN core.referral_daily rd ON rd.hospital_hipe = vs.hospital_hipe AND rd.pathway_number = vs.pathway_number AND rd.as_of_date = vs.valid_from WHERE rd.clinic_code IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral-state/{hospital_hipe}/{pathway_number}/{valid_from}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:clinicCode ;
+    rr:objectMap [ rr:column "clinic_code" ] ] .
+
+<#ReferralStateClinicClassificationMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT vs.hospital_hipe, vs.pathway_number, vs.valid_from, rd.clinic_classification FROM kg.v_referral_state vs JOIN core.referral_daily rd ON rd.hospital_hipe = vs.hospital_hipe AND rd.pathway_number = vs.pathway_number AND rd.as_of_date = vs.valid_from WHERE rd.clinic_classification IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral-state/{hospital_hipe}/{pathway_number}/{valid_from}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:clinicClassification ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/clinic_classification/{clinic_classification}" ] ] .
+
+<#ReferralStateRemovalReasonMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT vs.hospital_hipe, vs.pathway_number, vs.valid_from, rd.removal_reason FROM kg.v_referral_state vs JOIN core.referral_daily rd ON rd.hospital_hipe = vs.hospital_hipe AND rd.pathway_number = vs.pathway_number AND rd.as_of_date = vs.valid_to WHERE vs.valid_to IS NOT NULL AND rd.removal_reason IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral-state/{hospital_hipe}/{pathway_number}/{valid_from}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:removalReason ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/removal_reason/{removal_reason}" ] ] .
+
+# ================= eat:Referral (core.referrals, enduring fields) =================
+# record_creation_date is not a column of core.referrals (only referral_daily carries it);
+# it was verified constant per referral in the ontology-literal-properties track, so a
+# correlated MIN() per (hospital_hipe, pathway_number) is exact, not an approximation.
+
+<#ReferralMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT r.*, (SELECT MIN(rd.record_creation_date) FROM core.referral_daily rd WHERE rd.hospital_hipe = r.hospital_hipe AND rd.pathway_number = r.pathway_number) AS record_creation_date FROM core.referrals r" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral/{hospital_hipe}/{pathway_number}" ;
+    rr:class eat:Referral ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:referralDate ;
+    rr:objectMap [ rr:column "referral_date" ; rr:datatype xsd:date ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:referralReceivedDate ;
+    rr:objectMap [ rr:column "referral_received_date" ; rr:datatype xsd:date ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:recordCreationDate ;
+    rr:objectMap [ rr:column "record_creation_date" ; rr:datatype xsd:date ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:referralSource ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral_source/{referral_source}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:atHospital ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/hospital/{hospital_hipe}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:forPatient ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ] ] .
+
+# priority_level_gp is nullable -- own IS NOT NULL map.
+<#ReferralGpPriorityMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.referrals WHERE priority_level_gp IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral/{hospital_hipe}/{pathway_number}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:gpPriority ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/gp_priority/{priority_level_gp}" ] ] .
+
+# ================= eat:TriageEvent (core.triage_events) =================
+# sent_for_triage_date is NOT NULL; every other column is schema-nullable (even though every
+# row in this profile happens to have them all populated) and gets its own IS NOT NULL map.
+
+<#TriageEventMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.triage_events" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/triage-event/{triage_event_id}" ;
+    rr:class eat:TriageEvent ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:sentForTriageDate ;
+    rr:objectMap [ rr:column "sent_for_triage_date" ; rr:datatype xsd:date ] ] .
+
+<#ReferralHasTriageEventMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.triage_events" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/referral/{hospital_hipe}/{pathway_number}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:hasTriageEvent ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/triage-event/{triage_event_id}" ] ] .
+
+<#TriageEventTriageDateMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.triage_events WHERE triage_date IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/triage-event/{triage_event_id}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:triageDate ;
+    rr:objectMap [ rr:column "triage_date" ; rr:datatype xsd:date ] ] .
+
+<#TriageEventDateReturnedMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.triage_events WHERE date_returned_from_triage IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/triage-event/{triage_event_id}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:dateReturnedFromTriage ;
+    rr:objectMap [ rr:column "date_returned_from_triage" ; rr:datatype xsd:date ] ] .
+
+<#TriageEventOutcomeMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.triage_events WHERE triage_outcome IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/triage-event/{triage_event_id}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:hasTriageOutcome ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/triage_outcome/{triage_outcome}" ] ] .
+
+<#TriageEventCategoryMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.triage_events WHERE triage_category IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/triage-event/{triage_event_id}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:assignedCategory ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cpc/{triage_category}" ] ] .
+
+<#TriageEventTurnaroundMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.triage_events WHERE turnaround_days IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/triage-event/{triage_event_id}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:turnaroundDays ;
+    rr:objectMap [ rr:column "turnaround_days" ; rr:datatype xsd:nonNegativeInteger ] ] .
+
+# ================= eat:Patient / eat:Person (core.patients, core.persons) =================
+# eat:isRecordOf is only asserted where ihi_number is present -- no Person node, no
+# placeholder, no blank node where it is null (decisions.md §4).
+
+<#PatientMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.patients" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ;
+    rr:class eat:Patient ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:atHospital ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/hospital/{hospital_hipe}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:sex ; rr:objectMap [ rr:column "patient_sex" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:dateOfBirth ;
+    rr:objectMap [ rr:column "patient_date_of_birth" ; rr:datatype xsd:date ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:areaOfResidenceCode ;
+    rr:objectMap [ rr:column "area_of_residence_code" ] ] .
+
+<#PatientIsRecordOfMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.patients WHERE ihi_number IS NOT NULL" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/patient/{hospital_hipe}/{patient_id}" ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:isRecordOf ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/person/{ihi_number}" ] ] .
+
+<#PersonMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.persons" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/person/{ihi_number}" ;
+    rr:class eat:Person ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:sex ; rr:objectMap [ rr:column "person_sex" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:dateOfBirth ;
+    rr:objectMap [ rr:column "person_date_of_birth" ; rr:datatype xsd:date ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:areaOfResidenceCode ;
+    rr:objectMap [ rr:column "area_of_residence_code" ] ] .
