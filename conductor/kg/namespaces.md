@@ -98,8 +98,8 @@ pathway numbers. **Every instance IRI for a hospital-scoped entity begins with
 | Specialty | `specialty/{specialty_hipe}` | `ref_specialty` |
 | Ward | `ward/{hospital_hipe}/{ward_id}` | `wards` |
 | BedAllocation | `bed-allocation/{hospital_hipe}/{ward_id}/{specialty_hipe}` | `ward_specialty` |
-| BedStatus | `bed-status/{hospital_hipe}/{ward_id}/{status_datetime}` | `bed_status` |
-| ClinicSession | `clinic-session/{hospital_hipe}/{clinic_code}/{session_date}` | `clinic_sessions` — **confirm column names against the live schema before use** |
+| BedStatus | `bed-status/{hospital_hipe}/{ward_id}/{snapshot_datetime}` | `bed_status` — corrected from `{status_datetime}`, which is not a column in the live schema (`map-six-capacity-tables_20260903`) |
+| ClinicSession | `clinic-session/{hospital_hipe}/{clinic_code}/{session_date}` | `clinic_sessions` — confirmed against the live schema by `map-six-capacity-tables_20260903`; both columns exist as written |
 | CancellationEvent | `cancellation/{hospital_hipe}/{pathway_number}/{cancellation_date}` | `cancellation_events` |
 | SuspensionEvent | `suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}` | `suspension_events` |
 | SuspensionEvent interval | `suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/interval` | `time:Interval`, one per `eat:SuspensionEvent` — minted, not blank, per this section's rule |

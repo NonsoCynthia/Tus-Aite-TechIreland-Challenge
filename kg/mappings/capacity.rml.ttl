@@ -1,0 +1,131 @@
+@prefix rr:   <http://www.w3.org/ns/r2rml#> .
+@prefix eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Every column across all six tables is NOT NULL (checked live), so none of the maps below
+# need an IS NOT NULL companion -- unlike referral_state/reference_layer/events.
+
+<#HospitalMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.hospitals" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/hospital/{hospital_hipe}" ;
+    rr:class eat:Hospital ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:hospitalName ; rr:objectMap [ rr:column "hospital_name" ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:hseHealthRegion ; rr:objectMap [ rr:column "hse_health_region" ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:hospitalType ; rr:objectMap [ rr:column "hospital_type" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:totalInpatientBeds ;
+    rr:objectMap [ rr:column "total_inpatient_beds" ; rr:datatype xsd:nonNegativeInteger ] ] .
+
+<#HospitalServiceMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.hospital_specialty" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/service/{hospital_hipe}/{specialty_hipe}" ;
+    rr:class eat:HospitalService ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:providedBy ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/hospital/{hospital_hipe}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:forSpecialty ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/specialty/{specialty_hipe}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:serviceName ; rr:objectMap [ rr:column "service_name" ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:active ; rr:objectMap [ rr:column "active" ; rr:datatype xsd:boolean ] ] .
+
+<#WardMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.wards" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/ward/{hospital_hipe}/{ward_id}" ;
+    rr:class eat:Ward ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:atHospital ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/hospital/{hospital_hipe}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:wardName ; rr:objectMap [ rr:column "ward_name" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:totalBeds ;
+    rr:objectMap [ rr:column "total_beds" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:wardType ; rr:objectMap [ rr:column "ward_type" ] ] .
+
+<#BedAllocationMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.ward_specialty" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/bed-allocation/{hospital_hipe}/{ward_id}/{specialty_hipe}" ;
+    rr:class eat:BedAllocation ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:inWard ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/ward/{hospital_hipe}/{ward_id}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:forSpecialty ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/specialty/{specialty_hipe}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:nominalBeds ;
+    rr:objectMap [ rr:column "nominal_beds" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:isPrimaryWard ;
+    rr:objectMap [ rr:column "is_primary" ; rr:datatype xsd:boolean ] ] .
+
+# Note: namespaces.md §4's BedStatus template said {status_datetime}; the live column is
+# snapshot_datetime. Corrected in namespaces.md as part of this track -- see decisions.md.
+<#BedStatusMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.bed_status" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/bed-status/{hospital_hipe}/{ward_id}/{snapshot_datetime}" ;
+    rr:class eat:BedStatus ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:statusOf ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/ward/{hospital_hipe}/{ward_id}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:snapshotDatetime ;
+    rr:objectMap [ rr:column "snapshot_datetime" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:occupiedBeds ;
+    rr:objectMap [ rr:column "occupied" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:freeBeds ;
+    rr:objectMap [ rr:column "free" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:occupancyPct ;
+    rr:objectMap [ rr:column "occupancy_pct" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:outlierPatients ;
+    rr:objectMap [ rr:column "outliers" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:surgeCapacityInUse ;
+    rr:objectMap [ rr:column "surge_capacity_in_use" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:delayedTransfersOfCare ;
+    rr:objectMap [ rr:column "delayed_transfers_of_care" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:awaitingAdmissionOver9h ;
+    rr:objectMap [ rr:column "awaiting_admission_over_9h" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:awaitingAdmissionOver24h ;
+    rr:objectMap [ rr:column "awaiting_admission_over_24h" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:garStatus ; rr:objectMap [ rr:column "gar_status" ] ] .
+
+<#ClinicSessionMap> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery "SELECT * FROM core.clinic_sessions" ] ;
+  rr:subjectMap [
+    rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/clinic-session/{hospital_hipe}/{clinic_code}/{session_date}" ;
+    rr:class eat:ClinicSession ;
+    rr:graphMap [ rr:constant <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs> ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:sessionOf ;
+    rr:objectMap [ rr:template "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/service/{hospital_hipe}/{specialty_hipe}" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:sessionDate ;
+    rr:objectMap [ rr:column "session_date" ; rr:datatype xsd:date ] ] ;
+  rr:predicateObjectMap [ rr:predicate eat:clinicName ; rr:objectMap [ rr:column "clinic_name" ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:slotsTotal ;
+    rr:objectMap [ rr:column "slots_total" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:slotsBooked ;
+    rr:objectMap [ rr:column "slots_booked" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [
+    rr:predicate eat:slotsAvailable ;
+    rr:objectMap [ rr:column "slots_available" ; rr:datatype xsd:nonNegativeInteger ] ] .
