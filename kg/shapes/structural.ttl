@@ -2,6 +2,8 @@
 @prefix eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix time: <http://www.w3.org/2006/time#> .
 
 <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/shapes>
   a owl:Ontology ;
@@ -26,3 +28,181 @@ eat:ReferralStateIntervalShape a sh:NodeShape ;
     sh:select """SELECT $this WHERE {
       $this eat:validFrom ?from ; eat:validTo ?to .
       FILTER(?to < ?from) }""" ] .
+
+#################################################################
+# Below: structural shapes for every remaining class in the graph, added by
+# extend-structural-shapes_20260903. Domain/range/cardinality taken from
+# ontology.md §3. No sh:closed anywhere -- every one of these classes accumulates
+# properties from more than one independently-run mapping (e.g. eat:Referral gets
+# hasCondition/hasObservationEvent/hasSuspension/hasCancellation from four different
+# mapping files, none of which is this one), so closing risks a false negative from
+# an incomplete enumeration for no corresponding benefit -- test_column_coverage.py
+# already catches missing properties; sh:closed would only catch extra ones, and
+# nothing in this project's design adds properties it shouldn't.
+# 0..n and 1..n object properties with no further constraint (e.g. eat:hasCondition,
+# eat:hasObservationEvent) are omitted below where there is nothing to check beyond a
+# minCount already implied by the data (never worth a shape that always passes).
+#################################################################
+
+eat:ReferralShape a sh:NodeShape ;
+  sh:targetClass eat:Referral ;
+  sh:property [ sh:path eat:atHospital ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:forPatient ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:referralDate ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:referralReceivedDate ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:recordCreationDate ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:gpPriority ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:referralSource ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:hasTriageEvent ; sh:maxCount 1 ] .
+  # eat:hasCondition (1..n per ontology.md) is deliberately not checked here: the triple is
+  # produced by clinical.rml.ttl, a different mapping from the one that mints eat:Referral
+  # and its other properties (referral_state.rml.ttl). Each mapping is validated against its
+  # own output file independently (requirements.md §7); a cardinality constraint spanning
+  # two mapping files would fail every single Referral node in referral_state.nq even on
+  # correct data, since that file never carries hasCondition triples by construction. This
+  # becomes checkable once integration produces a combined graph.
+
+eat:PatientShape a sh:NodeShape ;
+  sh:targetClass eat:Patient ;
+  sh:property [ sh:path eat:atHospital ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:isRecordOf ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:sex ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:dateOfBirth ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:areaOfResidenceCode ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:PersonShape a sh:NodeShape ;
+  sh:targetClass eat:Person ;
+  sh:property [ sh:path eat:sex ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:dateOfBirth ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:areaOfResidenceCode ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:TriageEventShape a sh:NodeShape ;
+  sh:targetClass eat:TriageEvent ;
+  sh:property [ sh:path eat:sentForTriageDate ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:triageDate ; sh:datatype xsd:date ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:dateReturnedFromTriage ; sh:datatype xsd:date ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:hasTriageOutcome ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:turnaroundDays ; sh:datatype xsd:nonNegativeInteger ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:assignedCategory ; sh:maxCount 1 ] .
+
+eat:ConditionShape a sh:NodeShape ;
+  sh:targetClass eat:Condition ;
+  sh:property [ sh:path eat:icd10amCode ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:snomedCode ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:conditionLabel ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:isPrimary ; sh:datatype xsd:boolean ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:ObservationEventShape a sh:NodeShape ;
+  sh:targetClass eat:ObservationEvent ;
+  sh:property [ sh:path sosa:hasMember ; sh:minCount 1 ] .
+
+eat:ObservationShape a sh:NodeShape ;
+  sh:targetClass sosa:Observation ;
+  sh:property [ sh:path sosa:observedProperty ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path sosa:hasFeatureOfInterest ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path sosa:hasSimpleResult ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path sosa:resultTime ; sh:datatype xsd:dateTime ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+# sosa:hasSimpleResult has no declared range in the ontology, because the datatype varies by
+# observed property (requirements.md §4) -- nothing else enforces it. Expressed as sh:or of
+# 12 branch shapes rather than sh:sparql: each branch pins one observable-property individual
+# to its required datatype, and exactly the matching branch can pass for any given node.
+# This keeps the constraint in plain sh:property terms, per the task's own guidance to avoid
+# sh:sparql where a property constraint suffices.
+eat:ObservationResultDatatypeShape a sh:NodeShape ;
+  sh:targetClass sosa:Observation ;
+  sh:or (
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:heartRate ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:integer ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:systolicBP ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:integer ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:diastolicBP ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:integer ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:respiratoryRate ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:integer ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:oxygenSaturation ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:integer ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:pain ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:integer ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:news2 ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:integer ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:temperature ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:decimal ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:avpu ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:string ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:chiefComplaint ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:string ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:mtsCategory ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:string ] ]
+    [ sh:property [ sh:path sosa:observedProperty ; sh:hasValue eat:ictsCategory ] ;
+      sh:property [ sh:path sosa:hasSimpleResult ; sh:datatype xsd:string ] ]
+  ) .
+
+eat:SuspensionEventShape a sh:NodeShape ;
+  sh:targetClass eat:SuspensionEvent ;
+  sh:property [ sh:path time:hasTime ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:suspensionReason ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:suspendedDays ; sh:datatype xsd:nonNegativeInteger ; sh:maxCount 1 ] .
+
+eat:CancellationEventShape a sh:NodeShape ;
+  sh:targetClass eat:CancellationEvent ;
+  sh:property [ sh:path eat:cancellationDate ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:cancellationReason ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:initiatedBy ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:HospitalShape a sh:NodeShape ;
+  sh:targetClass eat:Hospital ;
+  sh:property [ sh:path eat:hospitalName ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:hseHealthRegion ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:hospitalType ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:totalInpatientBeds ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:HospitalServiceShape a sh:NodeShape ;
+  sh:targetClass eat:HospitalService ;
+  sh:property [ sh:path eat:providedBy ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:serviceName ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:active ; sh:datatype xsd:boolean ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:forSpecialty ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:WardShape a sh:NodeShape ;
+  sh:targetClass eat:Ward ;
+  sh:property [ sh:path eat:atHospital ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:wardName ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:totalBeds ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:wardType ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:BedAllocationShape a sh:NodeShape ;
+  sh:targetClass eat:BedAllocation ;
+  sh:property [ sh:path eat:inWard ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:forSpecialty ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:nominalBeds ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:isPrimaryWard ; sh:datatype xsd:boolean ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:BedStatusShape a sh:NodeShape ;
+  sh:targetClass eat:BedStatus ;
+  sh:property [ sh:path eat:statusOf ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:snapshotDatetime ; sh:datatype xsd:dateTime ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:occupiedBeds ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:freeBeds ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:occupancyPct ; sh:datatype xsd:decimal ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:outlierPatients ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:surgeCapacityInUse ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:delayedTransfersOfCare ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:awaitingAdmissionOver9h ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:awaitingAdmissionOver24h ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:garStatus ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:ClinicSessionShape a sh:NodeShape ;
+  sh:targetClass eat:ClinicSession ;
+  sh:property [ sh:path eat:sessionOf ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:sessionDate ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:clinicName ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:slotsTotal ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:slotsBooked ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:slotsAvailable ; sh:datatype xsd:nonNegativeInteger ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:RuleShape a sh:NodeShape ;
+  sh:targetClass eat:Rule ;
+  sh:property [ sh:path eat:statement ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:appliesTo ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:thresholdDays ; sh:datatype xsd:nonNegativeInteger ; sh:maxCount 1 ] .
