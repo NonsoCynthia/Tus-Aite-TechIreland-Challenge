@@ -4,7 +4,7 @@ Five decisions taken before any triples were written. Each changes what triples 
 
 This file records the **reasoning**, not just the outcome, because an agent that hits an
 edge case should extend the decision the way it was meant rather than invent a local fix.
-`spec.md` states the same decisions as testable requirements.
+`requirements.md` states the same decisions as testable requirements.
 
 ---
 
@@ -60,7 +60,7 @@ needs the second.
 
 **Why now rather than later.** Structural shapes catch mapping bugs on the day the mapping
 is written, which is when they are cheapest. They have already earned this: the `"None"`
-literal bug (§Gotchas in `spec.md`) is exactly what `sh:datatype xsd:date` rejects.
+literal bug (§Gotchas in `requirements.md`) is exactly what `sh:datatype xsd:date` rejects.
 
 **The deeper reason.** SHACL validation reports are themselves RDF — `sh:ValidationReport`,
 `sh:focusNode`, `sh:resultPath`, `sh:sourceShape`. That structure converts almost directly
