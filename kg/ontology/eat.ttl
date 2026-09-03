@@ -388,6 +388,15 @@ eat:hasSuspension a owl:ObjectProperty ;
 time:hasTime rdfs:domain eat:SuspensionEvent ; rdfs:range time:Interval ;
     rdfs:comment "Cardinality 1. The interval's own time:hasBeginning/time:hasEnd carry suspension_start_date/suspension_end_date. Required for adjusted_wait_days (requirements.md R2) to be derivable at all." .
 
+time:hasBeginning rdfs:domain time:Interval ; rdfs:range time:Instant ;
+    rdfs:comment "Cardinality 1. Carries suspension_start_date via the instant's time:inXSDDate. Declared by write-validate-queries-wait_20260903, which found time:hasTime's own comment referenced this structure without it existing." .
+
+time:hasEnd rdfs:domain time:Interval ; rdfs:range time:Instant ;
+    rdfs:comment "0..1. Carries suspension_end_date; absent while the suspension is still open." .
+
+time:inXSDDate rdfs:domain time:Instant ; rdfs:range xsd:date ;
+    rdfs:comment "Cardinality 1. The instant's date value." .
+
 eat:suspensionReason a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:SuspensionEvent ; rdfs:range skos:Concept ;
     rdfs:comment "Cardinality 1. Source: suspension_reason. Coded via ref_codes; see R6." .

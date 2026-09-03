@@ -169,6 +169,7 @@ natural-language explainability the challenge is about. An LLM that produced the
 | `sqlalchemy` (**≥ 2.0**) | Required by Morph-KGC; older versions have no `postgresql+psycopg` dialect |
 | `rdflib` | RDF serialisation, SPARQL client helpers |
 | `SPARQLWrapper` or `httpx` | Talking to Oxigraph's SPARQL endpoints |
+| `pyoxigraph` (**==0.3.22, pinned**) | In-memory RDF store for `kg/tests/test_wait_counters_sample.py`. `kg/queries/wait_counters.rq` documents a workaround for a version-specific engine quirk — don't bump without re-verifying it still applies |
 | `simpy` | Discrete-event bed occupancy and arrivals queue |
 | `pandas`, `numpy` | HIPE/NTPF calibration and synthetic generation |
 | `pydantic` | Config and API models |

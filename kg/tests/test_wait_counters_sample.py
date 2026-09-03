@@ -152,6 +152,24 @@ def main():
                         v = row[name]
                         return int(v.value) if v is not None else None
 
+                    # Explicit bound/unbound check for ?daysAwaitingTriage, kept separate
+                    # from the value comparison below. wait_counters.rq deliberately leaves
+                    # this variable unbound (via IF(cond, value, 1/0)) rather than binding 0
+                    # when a referral is not awaiting triage, to match days_awaiting_triage's
+                    # source-side NULL. A future edit that binds 0 instead of leaving it
+                    # unbound would slip past a bare value comparison in some cases; this
+                    # check exists so that regression is always caught and named for what it
+                    # is, per requirements.md §4. See write-validate-queries-wait_20260903.
+                    expected_bound = dat is not None
+                    got_bound = row["daysAwaitingTriage"] is not None
+                    if got_bound != expected_bound:
+                        mismatches.append((
+                            h, p, str(as_of),
+                            f"daysAwaitingTriage boundness mismatch: got_bound={got_bound}, "
+                            f"expected_bound={expected_bound} (source days_awaiting_triage={dat})",
+                        ))
+                        continue
+
                     expected = (dsr, dsc, int(dat) if dat is not None else None, awd)
                     got = (
                         val("daysSinceReferral"),

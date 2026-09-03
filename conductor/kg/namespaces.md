@@ -102,6 +102,9 @@ pathway numbers. **Every instance IRI for a hospital-scoped entity begins with
 | ClinicSession | `clinic-session/{hospital_hipe}/{clinic_code}/{session_date}` | `clinic_sessions` — **confirm column names against the live schema before use** |
 | CancellationEvent | `cancellation/{hospital_hipe}/{pathway_number}/{cancellation_date}` | `cancellation_events` |
 | SuspensionEvent | `suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}` | `suspension_events` |
+| SuspensionEvent interval | `suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/interval` | `time:Interval`, one per `eat:SuspensionEvent` — minted, not blank, per this section's rule |
+| SuspensionEvent begin instant | `suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/begin` | `time:Instant` carrying `suspension_start_date`; sibling of the interval, not nested under it |
+| SuspensionEvent end instant | `suspension/{hospital_hipe}/{pathway_number}/{suspension_start_date}/end` | `time:Instant` carrying `suspension_end_date`; absent while still open |
 | CPC concept | `cpc/{code_value}` | `ref_codes` where `code_table='triage_category'` |
 | Other code concepts | `{code_table}/{code_value}` | `ref_codes`, one scheme per `code_table` |
 | Rule | `rule/{rule_id}` | `ref_rules` |

@@ -169,6 +169,32 @@ observed property — integer for `hr`, decimal for `temp`, string for
 a `sh:datatype` constraint per observable property or ill-typed results will pass
 validation.
 
+**`eat:hasTriageEvent`'s absence is not a safe proxy for "not yet triaged."** Measured
+against `core.referral_daily` on the `full` profile: 13,117 of 70,012 rows with
+`triage_status = 'triaged'` have no linked `triage_events` row at all — roughly one triaged
+referral in five predates the retained event history. Any mapping or query that means "has
+this referral been triaged" **MUST** read `eat:triageStatus`, never infer it from whether
+`eat:hasTriageEvent` is bound. `kg/queries/wait_counters.rq`'s `days_awaiting_triage` got this
+wrong in an early draft and was corrected before being validated; see
+`write-validate-queries-wait_20260903`.
+
+**`wait_counters.rq`'s `?daysAwaitingTriage` must stay genuinely unbound, never `0`.** The
+fragment produces it via `IF(condition, value, 1/0)` — a deliberate runtime error on the
+false branch, which SPARQL leaves unbound rather than erroring the whole query. This matches
+`days_awaiting_triage`'s source-side `NULL` for every triaged referral. Any future edit to
+the fragment must preserve *unbound*, not substitute `0` or another sentinel — a rule
+checker or agent that reads `0` where the source has `NULL` would treat "not currently
+awaiting triage" as "zero days awaiting triage," which is a different and wrong claim.
+`kg/tests/test_wait_counters_sample.py` asserts this with a dedicated bound/unbound check,
+not just a value comparison.
+
+**`pyoxigraph==0.3.22` is pinned, not just used.** `kg/tests/test_wait_counters_sample.py`
+materialises its test graph with it, and `wait_counters.rq`'s header comments document a
+workaround for a version-specific engine quirk (referencing an outer `BIND`-derived variable
+inside a later `OPTIONAL`'s `BIND`, combined with `GROUP BY`, silently fails to bind). Do not
+bump the version without re-running that test and re-checking whether the quirk — and
+therefore the workaround — still applies.
+
 ## 5. Track order
 
 Sequential, because everything depends on them:

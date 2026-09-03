@@ -173,6 +173,9 @@ attach.
 | `eat:slotsAvailable` | `eat:ClinicSession` | `xsd:nonNegativeInteger` | 1, functional | `slots_available` |
 | `eat:hasSuspension` | `eat:Referral` | `eat:SuspensionEvent` | 0..n | First-class, own interval |
 | `time:hasTime` | `eat:SuspensionEvent` | `time:Interval` | 1, functional | Interval's `time:hasBeginning`/`time:hasEnd` carry `suspension_start_date`/`suspension_end_date` |
+| `time:hasBeginning` | `time:Interval` | `time:Instant` | 1, functional | Carries `suspension_start_date` via the instant's `time:inXSDDate`. Found while building `kg/queries/wait_counters.rq` (`write-validate-queries-wait_20260903`) — `time:hasTime`'s own comment referenced this without it being declared |
+| `time:hasEnd` | `time:Interval` | `time:Instant` | 0..1, functional | Carries `suspension_end_date`; absent while the suspension is still open |
+| `time:inXSDDate` | `time:Instant` | `xsd:date` | 1, functional | The instant's date value |
 | `eat:suspensionReason` | `eat:SuspensionEvent` | `skos:Concept` | 1, functional | `suspension_reason`; `ref_codes`, R6 |
 | `eat:suspendedDays` | `eat:SuspensionEvent` | `xsd:nonNegativeInteger` | 0..1, functional | `suspended_days` |
 | `eat:hasCancellation` | `eat:Referral` | `eat:CancellationEvent` | 0..n | All of them |
