@@ -1,7 +1,28 @@
 @prefix eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#> .
+@prefix eatd: <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/> .
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix time: <http://www.w3.org/2006/time#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix void: <http://rdfs.org/ns/void#> .
+@prefix sct:  <http://snomed.info/id/> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+
+#################################################################
+# §2 — Data-layer classes
+#################################################################
+
+eat:Person a owl:Class ;
+    rdfs:comment "A nationally identified individual. Minted only where ihi_number is present. See decisions.md #4." .
+
+eat:Patient a owl:Class ;
+    rdfs:comment "Hospital-scoped patient. Always exists, unlike eat:Person." .
 
 eat:Referral a owl:Class ;
     rdfs:comment "The enduring pathway. Never per-day." .
@@ -9,12 +30,380 @@ eat:Referral a owl:Class ;
 eat:ReferralState a owl:Class ;
     rdfs:comment "A set of facts about a referral, valid over a period. Minted only on material change." .
 
+eat:TriageEvent a owl:Class ;
+    rdfs:comment "Once per referral, never per day." .
+
+eat:CPC a owl:Class ;
+    rdfs:subClassOf skos:Concept ;
+    rdfs:comment "Clinical Prioritisation Category. Ordered by eat:severityRank, never code_value. See §6." .
+
+eat:TriageOutcome a owl:Class ;
+    rdfs:subClassOf skos:Concept ;
+    rdfs:comment "Sourced from ref_codes." .
+
+eat:Condition a owl:Class ;
+    rdfs:comment "Plus external code IRIs (ICD-10-AM minted, SNOMED referenced)." .
+
+eat:ObservationEvent a owl:Class ;
+    rdfs:subClassOf sosa:Sampling ;
+    rdfs:comment "One per row of observations." .
+
+eat:SuspensionEvent a owl:Class ;
+    rdfs:comment "First-class, with a time:Interval. Required for adjustedWaitDays to be derivable." .
+
+eat:CancellationEvent a owl:Class ;
+    rdfs:comment "All of them, not just the latest." .
+
+eat:Hospital a owl:Class ;
+    rdfs:comment "Six sites." .
+
+eat:HospitalService a owl:Class ;
+    rdfs:comment "n-ary node. The join the graph must keep: cardiology at one hospital is not cardiology at another." .
+
+eat:Specialty a owl:Class ;
+    rdfs:subClassOf skos:Concept ;
+    rdfs:comment "HIPE specialty." .
+
+eat:Ward a owl:Class .
+
+eat:BedAllocation a owl:Class ;
+    rdfs:comment "n-ary node; gives nominal_beds somewhere to live." .
+
+eat:BedStatus a owl:Class ;
+    rdfs:comment "Time-stamped, three a day." .
+
+eat:ClinicSession a owl:Class ;
+    rdfs:comment "Slots, not beds." .
+
+eat:Rule a owl:Class ;
+    rdfs:comment "Also a sh:NodeShape where applicable." .
+
+#################################################################
+# §4 — Decision-layer classes (implied by the property table)
+#################################################################
+
+eat:Score a owl:Class ;
+    rdfs:comment "Never a bare number: has prov:wasGeneratedBy, an agent, and eat:cites edges." .
+
+eat:Decision a owl:Class ;
+    rdfs:comment "One per hospital per day; carries eat:hasPlacement edges." .
+
+eat:RankedPlacement a owl:Class ;
+    rdfs:comment "One ranked position of a referral within a decision." .
+
+eat:RuleCheck a owl:Class ;
+    rdfs:comment "Pass and fail both stored." .
+
+eat:Override a owl:Class ;
+    rdfs:comment "A clinician's revision of a placement. No override without eat:reason." .
+
+eat:Rationale a owl:Class ;
+    rdfs:comment "Generated rationale text, write-once, in its own graph. See decisions.md #5." .
+
+#################################################################
+# §3 — Data-layer properties
+#################################################################
+
+eat:isRecordOf a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Patient ; rdfs:range eat:Person ;
+    rdfs:comment "0..1. No IHI -> no Person node, no placeholder. See decisions.md #4." .
+
+eat:atHospital a owl:ObjectProperty ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( eat:Patient eat:Referral ) ] ;
+    rdfs:range eat:Hospital ;
+    rdfs:comment "Cardinality 1. Source: hospital_hipe." .
+
+eat:forPatient a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Referral ; rdfs:range eat:Patient ;
+    rdfs:comment "Cardinality 1. Source: referral_daily.patient_id." .
+
+eat:referredToService a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Referral ; rdfs:range eat:HospitalService ;
+    rdfs:comment "Cardinality 1. Source: hospital_hipe + specialty_hipe." .
+
 eat:stateOf a owl:ObjectProperty, owl:FunctionalProperty ;
     rdfs:domain eat:ReferralState ; rdfs:range eat:Referral .
 
-eat:validFrom a owl:DatatypeProperty ;
-    rdfs:domain eat:ReferralState ; rdfs:range xsd:date .
-
-eat:validTo a owl:DatatypeProperty ;
+eat:validFrom a owl:DatatypeProperty, owl:FunctionalProperty ;
     rdfs:domain eat:ReferralState ; rdfs:range xsd:date ;
-    rdfs:comment "Absent for a live referral's current state. Closed at removal_date where the referral was removed." .
+    rdfs:comment "Cardinality 1." .
+
+eat:validTo a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ReferralState ; rdfs:range xsd:date ;
+    rdfs:comment "0..1. Absent for a live referral's current state. Closed at removal_date where the referral was removed." .
+
+eat:hasTriageEvent a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Referral ; rdfs:range eat:TriageEvent ;
+    rdfs:comment "0..1. Null until returned from triage." .
+
+eat:assignedCategory a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:TriageEvent ; rdfs:range eat:CPC ;
+    rdfs:comment "0..1. Source: triage_category." .
+
+eat:outranks a owl:ObjectProperty, owl:TransitiveProperty ;
+    rdfs:domain eat:CPC ; rdfs:range eat:CPC ;
+    rdfs:comment "Derived from severity_rank, never code_value. See §6." .
+
+eat:hasCondition a owl:ObjectProperty ;
+    rdfs:domain eat:Referral ; rdfs:range eat:Condition ;
+    rdfs:comment "1..n. is_primary flags one." .
+
+eat:icd10amCode a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Condition ;
+    rdfs:comment "Cardinality 1. Range is a minted IRI (icd10am/{code}) -- ICD-10-AM has no public IRI scheme." .
+
+eat:snomedCode a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Condition ;
+    rdfs:comment "0..1. Range is a sct: IRI, referenced only -- SNOMED CT is not imported." .
+
+eat:hasObservationEvent a owl:ObjectProperty ;
+    rdfs:domain eat:Referral ; rdfs:range eat:ObservationEvent ;
+    rdfs:comment "0..n." .
+
+# Reused SOSA terms, locally scoped with domain/range (not locally-defined properties).
+sosa:hasMember rdfs:domain eat:ObservationEvent ; rdfs:range sosa:Observation ;
+    rdfs:comment "1..n. One sosa:Observation per non-null measured column." .
+
+sosa:observedProperty rdfs:domain sosa:Observation ; rdfs:range sosa:ObservableProperty ;
+    rdfs:comment "Cardinality 1." .
+
+sosa:hasFeatureOfInterest rdfs:domain sosa:Observation ; rdfs:range eat:Patient ;
+    rdfs:comment "Cardinality 1. The patient, not the referral." .
+
+eat:providedBy a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:HospitalService ; rdfs:range eat:Hospital ;
+    rdfs:comment "Cardinality 1. The unit that owns a waiting list." .
+
+eat:forSpecialty a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( eat:HospitalService eat:BedAllocation ) ] ;
+    rdfs:range eat:Specialty ;
+    rdfs:comment "Cardinality 1. Both schema-forced joins." .
+
+eat:inWard a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedAllocation ; rdfs:range eat:Ward ;
+    rdfs:comment "Cardinality 1. Source: ward_specialty + nominal_beds." .
+
+eat:statusOf a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:BedStatus ; rdfs:range eat:Ward ;
+    rdfs:comment "Cardinality 1." .
+
+eat:sessionOf a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:ClinicSession ; rdfs:range eat:HospitalService ;
+    rdfs:comment "Cardinality 1. The real outpatient constraint." .
+
+eat:hasSuspension a owl:ObjectProperty ;
+    rdfs:domain eat:Referral ; rdfs:range eat:SuspensionEvent ;
+    rdfs:comment "0..n. First-class, own interval." .
+
+eat:hasCancellation a owl:ObjectProperty ;
+    rdfs:domain eat:Referral ; rdfs:range eat:CancellationEvent ;
+    rdfs:comment "0..n. All of them." .
+
+#################################################################
+# §4 — Decision-layer properties
+#################################################################
+
+eat:scored a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Score ; rdfs:range eat:Referral ;
+    rdfs:comment "Cardinality 1. Source: agent_scores." .
+
+eat:scoreValue a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Score ; rdfs:range xsd:decimal ;
+    rdfs:comment "Cardinality 1. Value in [0,1]. Never stored without method + version." .
+
+eat:method a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Score ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Reproducibility, not decoration." .
+
+eat:agentVersion a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Score ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Reproducibility, not decoration." .
+
+eat:cites a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:used ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( eat:Score eat:RankedPlacement ) ] ;
+    rdfs:comment "1..n. Range is whichever evidence node was cited; see the four role-specific sub-properties below." .
+
+eat:citesUrgencyEvidence a owl:ObjectProperty ;
+    rdfs:subPropertyOf eat:cites ;
+    rdfs:comment "0..n. role = urgency." .
+
+eat:citesCapacityEvidence a owl:ObjectProperty ;
+    rdfs:subPropertyOf eat:cites ;
+    rdfs:comment "0..n. role = capacity." .
+
+eat:citesTimeframeEvidence a owl:ObjectProperty ;
+    rdfs:subPropertyOf eat:cites ;
+    rdfs:range [ a owl:Class ; owl:unionOf ( eat:ReferralState eat:Rule ) ] ;
+    rdfs:comment "0..n. role = timeframe." .
+
+eat:citesMultiListEvidence a owl:ObjectProperty ;
+    rdfs:subPropertyOf eat:cites ;
+    rdfs:range eat:Referral ;
+    rdfs:comment "0..n. role = multi_list; needs an IHI." .
+
+eat:hasPlacement a owl:ObjectProperty ;
+    rdfs:domain eat:Decision ; rdfs:range eat:RankedPlacement ;
+    rdfs:comment "1..n. Source: decision_rankings." .
+
+eat:position a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:RankedPlacement ; rdfs:range xsd:positiveInteger ;
+    rdfs:comment "Cardinality 1. Unique per decision + category." .
+
+eat:ranks a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:RankedPlacement ; rdfs:range eat:Referral ;
+    rdfs:comment "Cardinality 1." .
+
+eat:withinCategory a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:RankedPlacement ; rdfs:range eat:CPC ;
+    rdfs:comment "0..1. Stored so RULE-ORDER is checkable directly." .
+
+eat:testedRule a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:RuleCheck ; rdfs:range eat:Rule ;
+    rdfs:comment "Cardinality 1." .
+
+eat:passed a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:RuleCheck ; rdfs:range xsd:boolean ;
+    rdfs:comment "Cardinality 1. A violation becomes a fact, not a log line." .
+
+eat:revises a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Override ; rdfs:range eat:RankedPlacement ;
+    rdfs:comment "Cardinality 1. from_position -> to_position." .
+
+eat:reason a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Override ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. No override without one." .
+
+eat:acceptedWarning a owl:ObjectProperty ;
+    rdfs:domain eat:Override ; rdfs:range eat:RuleCheck ;
+    rdfs:comment "0..n. Warning and the decision to proceed, both kept." .
+
+# Reused PROV terms, locally scoped with domain/range (not locally-defined properties).
+prov:wasGeneratedBy
+    rdfs:domain [ a owl:Class ; owl:unionOf ( eat:Score eat:Decision eat:RuleCheck ) ] ;
+    rdfs:range prov:Activity ;
+    rdfs:comment "Cardinality 1. Every written node has one." .
+
+prov:wasAssociatedWith
+    rdfs:domain prov:Activity ; rdfs:range prov:Agent ;
+    rdfs:comment "Cardinality 1. Agent or clinician, never anonymous." .
+
+prov:wasDerivedFrom
+    rdfs:domain eat:Rationale ; rdfs:range eat:RankedPlacement ;
+    rdfs:comment "Cardinality 1. Text may cite nothing the placement did not." .
+
+eat:rationaleText a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Rationale ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. Chosen over overloading prov:value." .
+
+prov:used
+    rdfs:domain eat:Rationale ;
+    rdfs:comment "1..n. Exactly what was in the prompt; range is the citation set." .
+
+prov:wasAttributedTo
+    rdfs:domain eat:Rationale ; rdfs:range prov:SoftwareAgent ;
+    rdfs:comment "Cardinality 1. The model, by version string." .
+
+eat:promptHash a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:Rationale ; rdfs:range xsd:string ;
+    rdfs:comment "Cardinality 1. sha256." .
+
+# CPC ordering properties, required by §6.
+eat:severityRank a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:CPC ; rdfs:range xsd:positiveInteger ;
+    rdfs:comment "Cardinality 1. Ordering must use this, never code_value: the real codes are Urgent 1, Routine 2, Semi-Urgent 3." .
+
+eat:crtDays a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain eat:CPC ; rdfs:range xsd:integer ;
+    rdfs:comment "0..1. Present for Urgent and Semi-Urgent; absent for Routine." .
+
+#################################################################
+# §5 — Observation subclasses
+#################################################################
+
+eat:MeasuredVital a owl:Class ;
+    rdfs:subClassOf sosa:ObservableProperty ;
+    rdfs:comment "Columns: hr, sbp, dbp, rr, temp, spo2. Produced by a machine or a nurse." .
+
+eat:ReportedSymptom a owl:Class ;
+    rdfs:subClassOf sosa:ObservableProperty ;
+    rdfs:comment "Columns: pain, chiefcomplaint. Produced by the patient." .
+
+eat:ClinicalAssessment a owl:Class ;
+    rdfs:subClassOf sosa:ObservableProperty ;
+    rdfs:comment "Columns: avpu, news2, mts_category, icts_category. Produced by a clinician, or arithmetic." .
+
+# Observable-property individuals. Units per decisions.md §3: a unit belongs to the
+# measurement type, declared once here, never on the individual sosa:Observation.
+eat:heartRate a eat:MeasuredVital ;
+    qudt:hasUnit unit:PER-MIN .
+
+eat:respiratoryRate a eat:MeasuredVital ;
+    qudt:hasUnit unit:PER-MIN .
+
+eat:systolicBP a eat:MeasuredVital ;
+    qudt:hasUnit unit:MilliM_HG .
+
+eat:diastolicBP a eat:MeasuredVital ;
+    qudt:hasUnit unit:MilliM_HG .
+
+eat:temperature a eat:MeasuredVital ;
+    qudt:hasUnit unit:DEG_C .
+
+eat:oxygenSaturation a eat:MeasuredVital ;
+    qudt:hasUnit unit:PERCENT .
+
+eat:pain a eat:ReportedSymptom ;
+    rdfs:comment "No unit: a 0-10 rating, not a measured quantity." .
+
+eat:chiefComplaint a eat:ReportedSymptom ;
+    rdfs:comment "No unit: free text." .
+
+eat:avpu a eat:ClinicalAssessment ;
+    rdfs:comment "No unit: a four-level code." .
+
+eat:news2 a eat:ClinicalAssessment ;
+    rdfs:comment "No unit: a composite score, not 5 of anything." .
+
+eat:mtsCategory a eat:ClinicalAssessment ;
+    rdfs:comment "No unit: a colour code." .
+
+eat:ictsCategory a eat:ClinicalAssessment ;
+    rdfs:comment "No unit: a colour code." .
+
+#################################################################
+# §6 — CPC ordering
+#################################################################
+
+eat:CPCScheme a skos:ConceptScheme ;
+    skos:prefLabel "Clinical Prioritisation Category" .
+
+<https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cpc/1>
+    a eat:CPC ;
+    skos:inScheme eat:CPCScheme ;
+    skos:notation "1" ;
+    eat:severityRank 1 ;
+    eat:crtDays 28 ;
+    rdfs:comment "Urgent." .
+
+<https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cpc/3>
+    a eat:CPC ;
+    skos:inScheme eat:CPCScheme ;
+    skos:notation "3" ;
+    eat:severityRank 2 ;
+    eat:crtDays 91 ;
+    rdfs:comment "Semi-Urgent." .
+
+<https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cpc/2>
+    a eat:CPC ;
+    skos:inScheme eat:CPCScheme ;
+    skos:notation "2" ;
+    eat:severityRank 3 ;
+    rdfs:comment "Routine. No crtDays." .
+
+<https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cpc/1>
+    eat:outranks <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cpc/3> ,
+                 <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cpc/2> .
+
+<https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cpc/3>
+    eat:outranks <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/cpc/2> .
