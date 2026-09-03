@@ -6,7 +6,7 @@
 > **Updated 2026-09-03** for the knowledge graph build. Decisions 4 and 5 below supersede parts of
 > this file that predate them; superseded passages are marked in place. The normative source for
 > classes, properties, IRIs and shapes is
-> `conductor/tracks/knowledge-graph_20260903/` — where that directory and this file disagree, the
+> `conductor/kg/` — where that directory and this file disagree, the
 > track files win.
 
 ## Languages
@@ -87,7 +87,7 @@ Jena specifically, that swap is a sub-day task.
 predates the ontology work. It named `UrgencySignal`, `presentsWith` and `hasSignal`, none of which
 exist, and described `scored` as an **edge property** — RDF has no edge properties.
 
-**The normative schema is `conductor/tracks/knowledge-graph_20260903/ontology.md`**, which gives
+**The normative schema is `conductor/kg/ontology.md`**, which gives
 every class and property with domain, range and cardinality.
 
 Two points from it that contradict what was here before, and matter most:

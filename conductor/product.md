@@ -14,7 +14,7 @@ without the reasoning ever being a black box.
 
 > **Updated 2026-09-03.** Features 4 and 5 previously named an entity and relationship set taken
 > from proposal §10. That set predates the ontology work and does not match what is being built.
-> The normative schema is `conductor/tracks/knowledge-graph_20260903/ontology.md`.
+> The normative schema is `conductor/kg/ontology.md`.
 
 ---
 
@@ -90,7 +90,7 @@ explainable shortlist that a human still signs off on.
    referrals and their dated states, triage events, conditions, observations, hospitals, services,
    wards, bed status, clinic sessions, agents, decisions, rule checks, rationales, and clinician
    overrides. **The normative class and property list, with domains, ranges and cardinalities, is
-   `conductor/tracks/knowledge-graph_20260903/ontology.md`** — not this file.
+   `conductor/kg/ontology.md`** — not this file.
 5. **Audit-first graph relationships** — `eat:cites`, a sub-property of `prov:used`, encodes the
    system's reasoning and is the audit trail: any ranked position can be reconstructed by walking
    backwards from the `Decision` node to the exact urgency and capacity evidence. Four sub-properties
