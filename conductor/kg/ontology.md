@@ -253,12 +253,24 @@ eat:CPCScheme a skos:ConceptScheme ;
     eat:severityRank 2 ; eat:crtDays 91 .
 <…/kg/id/cpc/2> a skos:Concept ;      # Routine
     eat:severityRank 3 .              # no crtDays
+<…/kg/id/cpc/4> a skos:Concept ;      # Excluded
+    skos:inScheme eat:CPCScheme ; skos:notation "4" .
+# No eat:severityRank, no eat:crtDays, no eat:outranks in either direction for cpc/4.
+# Excluded participates in no ordering; giving it a rank would let RULE-ORDER compare
+# an excluded referral against a real category, which means nothing.
 
 eat:outranks a owl:ObjectProperty, owl:TransitiveProperty ;
     rdfs:domain eat:CPC ; rdfs:range eat:CPC .
 <…/kg/id/cpc/1> eat:outranks <…/kg/id/cpc/3> , <…/kg/id/cpc/2> .
 <…/kg/id/cpc/3> eat:outranks <…/kg/id/cpc/2> .
 ```
+
+**`ref_codes` has four `triage_category` rows, not three.** The example above originally
+showed only Urgent/Semi-Urgent/Routine; code 4 ("Excluded") was missing. It is a real scheme
+member — minted, `skos:notation`ed, `skos:prefLabel`ed — but carries no ordering information
+at all, by design: `severity_rank` and `crt_days` are both `NULL` for it in `ref_codes`, and
+`eat:outranks` never mentions it in either direction. See
+`map-reference-layer-rdf_20260903`'s `decisions.md` for the mapping that materialises this.
 
 Note the code values: Urgent 1, Routine 2, Semi-Urgent **3**. Anything that sorts by
 `code_value` puts Routine ahead of Semi-Urgent, silently. Use `eat:severityRank`.
