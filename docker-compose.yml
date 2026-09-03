@@ -1,0 +1,16 @@
+# Application services. The dataset stack (Postgres + pgAdmin) is separate,
+# in dataset/docker-compose.yml, and runs on port 5433.
+# The FastAPI `app` service described in conductor/tech-stack.md is not yet
+# built; only oxigraph runs here for now.
+
+services:
+  oxigraph:
+    image: oxigraph/oxigraph:latest
+    ports:
+      - "7878:7878"
+    volumes:
+      - oxigraph_data:/data
+    command: serve --location /data --bind 0.0.0.0:7878
+
+volumes:
+  oxigraph_data:

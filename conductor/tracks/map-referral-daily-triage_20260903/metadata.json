@@ -1,0 +1,8 @@
+{
+  "track_id": "map-referral-daily-triage_20260903",
+  "type": "feature",
+  "status": "done",
+  "description": "Map referral_daily, triage_events, patients and persons to RDF",
+  "created_at": "2026-09-03T00:00:00Z",
+  "updated_at": "2026-09-03T00:00:00Z"
+}
