@@ -49,18 +49,18 @@ eat:ReferralShape a sh:NodeShape ;
   sh:property [ sh:path eat:atHospital ; sh:minCount 1 ; sh:maxCount 1 ] ;
   sh:property [ sh:path eat:forPatient ; sh:minCount 1 ; sh:maxCount 1 ] ;
   sh:property [ sh:path eat:referralDate ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:hasCondition ; sh:class eat:Condition ; sh:minCount 1 ] ;
   sh:property [ sh:path eat:referralReceivedDate ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
   sh:property [ sh:path eat:recordCreationDate ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
   sh:property [ sh:path eat:gpPriority ; sh:maxCount 1 ] ;
   sh:property [ sh:path eat:referralSource ; sh:minCount 1 ; sh:maxCount 1 ] ;
   sh:property [ sh:path eat:hasTriageEvent ; sh:maxCount 1 ] .
-  # eat:hasCondition (1..n per ontology.md) is deliberately not checked here: the triple is
-  # produced by clinical.rml.ttl, a different mapping from the one that mints eat:Referral
-  # and its other properties (referral_state.rml.ttl). Each mapping is validated against its
-  # own output file independently (requirements.md §7); a cardinality constraint spanning
-  # two mapping files would fail every single Referral node in referral_state.nq even on
-  # correct data, since that file never carries hasCondition triples by construction. This
-  # becomes checkable once integration produces a combined graph.
+  # eat:hasCondition was originally omitted here: the triple comes from clinical.rml.ttl,
+  # a different mapping from the one that mints eat:Referral (referral_state.rml.ttl), so
+  # a 1..n cardinality failed every Referral node when each .nq file was validated alone --
+  # an artefact of per-file validation, not a data fault. Restored 2026-09-03 once
+  # combined-graph validation became the standard (requirements.md §7): the union of all
+  # five output files conforms with this constraint in place.
 
 eat:PatientShape a sh:NodeShape ;
   sh:targetClass eat:Patient ;

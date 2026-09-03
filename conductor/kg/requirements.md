@@ -287,6 +287,13 @@ Must return **false**.
 
 - The same seed produces byte-identical output across two runs.
 
+**Validate the union, not individual files.** `cat kg/out/*.nq > /tmp/all.nq`, then
+`pyshacl -s kg/shapes/structural.ttl -df auto /tmp/all.nq`. Per-file validation gives
+false negatives for any constraint spanning two mappings — `eat:Referral` is minted by
+`referral_state.rml.ttl` but its conditions come from `clinical.rml.ttl`, so
+`eat:hasCondition`'s cardinality fails per-file and passes on the union. Roughly 20
+minutes on the full profile; run it at integration, not per track.
+
 ## 8. Loading and inference
 
 Materialise to files first, not straight into the store. The output is diffable,
