@@ -204,7 +204,7 @@ At integration:
 ```sparql
 ASK {
   GRAPH ?g { ?s ?p ?o }
-  FILTER(STRSTARTS(STR(?g), "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs/"))
+  FILTER(STRSTARTS(STR(?g), "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/inputs"))
   FILTER(?p IN (eat:cites, eat:position, eat:scoreValue, eat:passed))
 }
 ```
@@ -230,15 +230,23 @@ which suits this project: it keeps inference inspectable and deterministic.
 
 Settle these before the parallel tracks start.
 
-1. **Named graphs in the input layer.** `referral_state.rml.ttl` currently emits
-   N-Triples with no graph. `namespaces.md` §5 specifies
-   `…/graph/inputs/{as_of_date}`, which needs N-Quads output and a graph map. But a
-   `ReferralState` spans a date *range*, not a single `as_of_date` — so which input graph
-   does it belong in? Options: put states in a single `…/graph/inputs/states` graph, key
-   the graph on `valid_from`, or drop per-date input graphs entirely. **Unresolved.**
-2. **Verify `002` on a clean database** — needs one `make reset` cycle.
-3. **Pin the QUDT version** in `versions.yml`.
-4. **Confirm `clinic_sessions` column names** against schema 008; the IRI template in
+1. **Verify `002` on a clean database** — needs one `make reset` cycle.
+2. **Pin the QUDT version** in `versions.yml`.
+3. **Confirm `clinic_sessions` column names** against schema 008; the IRI template in
    `namespaces.md` is inferred from documentation, not from the live schema.
-5. **`sh:closed true` on shapes** — catches loader typos but rejects any property not
+4. **`sh:closed true` on shapes** — catches loader typos but rejects any property not
    explicitly listed. Decide per class rather than globally.
+
+## 10. Resolved — do not relitigate
+
+**Named graphs in the input layer** (resolved 2026-09-03). The design deck specified
+`…/graph/inputs/{as_of_date}`. That split was written for a node-per-day model, which
+Decision 1 replaced. Under Type 2 a `ReferralState` spans a date range and has no single
+`as_of_date`, so it has no per-date graph to belong in; and replay is already a range
+query over `validFrom`/`validTo`, so the graph name carries nothing the triples do not.
+**The input layer is a single `…/kg/graph/inputs` graph.** Every input-layer mapping emits
+N-Quads with a constant graph map. The run graphs stay per-run, so View 4's "drop one
+graph and re-run" promise is unaffected.
+
+`referral_state.rml.ttl` predates this and emits N-Triples with no graph. Updating it is
+part of the A/B track.

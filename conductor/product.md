@@ -12,6 +12,10 @@ A multi-agent system turns fragmented referral, bed flow, and urgency data into 
 explainable, auditable prioritisation — one a clinician can trust, interrogate, and override,
 without the reasoning ever being a black box.
 
+> **Updated 2026-09-03.** Features 4 and 5 previously named an entity and relationship set taken
+> from proposal §10. That set predates the ontology work and does not match what is being built.
+> The normative schema is `conductor/tracks/knowledge-graph_20260903/ontology.md`.
+
 ---
 
 ## Vision
@@ -80,14 +84,21 @@ explainable shortlist that a human still signs off on.
 3. **Bed occupancy simulation** — a SimPy discrete-event model simulates arrivals, admissions, length
    of stay, discharge, ward capacity, and sustained overcrowding. It produces ward-level `BedStatus`
    time series calibrated to HSE/INMO trolley and occupancy figures.
-4. **Knowledge graph foundation** — Oxigraph stores RDF/OWL triples and is bootstrapped through
-   Docker Compose. The graph represents `Patient`, `Referral`, `Condition`, `UrgencySignal`,
-   `ClinicalPrioritisationCategory`, `Specialty`, `Hospital`, `Ward`, `BedStatus`, `Agent`,
-   `Decision`, `Clinician`, and override events.
-5. **Audit-first graph relationships** — `presentsWith`, `hasSignal`, `assignedTo`, `locatedAt`,
-   `hasStatus`, `scored`, `ranks`, and `cites` encode the system's reasoning. `cites` is the audit
-   trail: any ranked position can be reconstructed by walking backwards from the `Decision` node to
-   the exact urgency and capacity evidence.
+4. **Knowledge graph foundation** — the published dataset is loaded into Postgres, and RDF/OWL
+   triples are produced from it by committed R2RML mappings. Oxigraph stores the result and is
+   bootstrapped through Docker Compose. The graph represents patients and their national identity,
+   referrals and their dated states, triage events, conditions, observations, hospitals, services,
+   wards, bed status, clinic sessions, agents, decisions, rule checks, rationales, and clinician
+   overrides. **The normative class and property list, with domains, ranges and cardinalities, is
+   `conductor/tracks/knowledge-graph_20260903/ontology.md`** — not this file.
+5. **Audit-first graph relationships** — `eat:cites`, a sub-property of `prov:used`, encodes the
+   system's reasoning and is the audit trail: any ranked position can be reconstructed by walking
+   backwards from the `Decision` node to the exact urgency and capacity evidence. Four sub-properties
+   separate urgency, capacity, timeframe and multi-list evidence, so one query returns the whole
+   explanation and the same query narrowed returns one section of the clinician's expander.
+   **A score is a node with its own IRI**, carrying its value, method, agent version and the activity
+   that generated it — never a bare number and never an edge property, which RDF does not have.
+   Reused vocabularies are PROV-O, SOSA, OWL-Time, SKOS and QUDT; constraints are SHACL, not OWL.
 6. **Urgency agent** — deterministic Python logic applies Manchester Triage System and NEWS2 scoring
    to graph inputs, then writes scored evidence back through SPARQL. The same inputs produce the same
    urgency score, which keeps the clinical scoring layer testable and auditable.
@@ -99,7 +110,9 @@ explainable shortlist that a human still signs off on.
    `Decision` nodes and `cites` relationships rather than producing an untraceable list.
 9. **Rationale generation** — the LLM layer uses the Anthropic Python SDK to turn already-cited graph
    evidence into short rationale text. It explains a decision it did not make; it cannot alter scores,
-   ranks, or cited facts.
+   ranks, or cited facts. Rationales are stored write-once in their own named graph that no agent
+   reads, each recording the exact citation set that was in its prompt, so the no-unsupported-facts
+   claim is a test rather than an assertion.
 10. **Clinician interface** — FastAPI serves a server-rendered Jinja2 and HTMX interface. The ranked
     list is the primary screen, with row expansion for evidence, visible accept/reorder/override
     controls, CPC/CRT violation states, and JSON API endpoints for demo or integration use.
@@ -119,9 +132,11 @@ explainable shortlist that a human still signs off on.
 | Language | Python 3.12 |
 | Web service | FastAPI, Uvicorn |
 | Clinician UI | Jinja2, HTMX, HTML, CSS |
+| Input data store | Postgres in Docker, loaded from the gated Hugging Face release |
 | Triple store | Oxigraph in Docker |
-| Graph standards | RDF, OWL, SPARQL 1.1 |
-| Graph client/building | rdflib, httpx |
+| Graph standards | RDF, OWL, SPARQL 1.1, R2RML, SHACL |
+| Graph construction | Morph-KGC over R2RML mappings; rdflib and httpx for client-side work |
+| Validation and inference | pySHACL, owlrl |
 | Data generation/calibration | pandas, numpy, Pydantic v2 |
 | Simulation | SimPy |
 | Rationale generation | Anthropic Python SDK, `claude-opus-5` |
@@ -162,6 +177,8 @@ Hard implementation boundary — the coordinating agent may **only rank and expl
 - No integration with live HSE systems, Shared Care Record, or National EHR — the graph is designed
   to make that plausible later, not to do it now.
 - No production deployment, multi-tenancy, or authentication hardening.
+- **No triple derived from the held-out answer key.** `eval.ground_truth` records which patients
+  actually deteriorated; it never enters the graph, and the loader role has no permission to read it.
 
 ## Constraints
 

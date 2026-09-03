@@ -122,16 +122,26 @@ from the dataset documentation, which is not always current with schema 008.
 |---|---|---|
 | `…/kg/graph/ontology` | TBox, SKOS schemes, SHACL shapes | build only |
 | `…/kg/graph/reference` | `ref_specialty`, `ref_codes`, `ref_rules` | build only |
-| `…/kg/graph/inputs/{as_of_date}` | referrals, states, clinical, capacity | loader only, immutable after load |
+| `…/kg/graph/inputs` | referrals, states, clinical, capacity | loader only, immutable after load |
 | `…/kg/graph/provenance` | `dcat:Dataset`, `void:` counts, seed, HF release tag | build only |
 | `…/kg/graph/run/{run_id}` | scores, citations, decisions, placements, rule checks | agents |
 | `…/kg/graph/rationale` | generated rationale text | rationale generator only; **no agent reads it** |
 | `…/kg/graph/overrides` | clinician actions, append-only | UI only |
 
-**Known gap.** The `referral_state` mapping currently emits N-Triples with no graph.
-Moving the input layer into `…/graph/inputs/{as_of_date}` requires N-Quads output and a
-graph map in the mapping. This is unresolved and must be settled before the input-layer
-mappings are considered complete — see `spec.md` §Open questions.
+**The input layer is one graph, not one per `as_of_date`.** The per-date split in the
+design deck was written for a node-per-day model, which Decision 1 replaced. Under Type 2
+a `ReferralState` spans a date *range* and has no single `as_of_date`, so there is no
+per-date graph it belongs in; and "what did the system see on the 9th" is already a range
+query over `validFrom`/`validTo`, so the graph name would add nothing the triples do not
+already carry. Reload-one-day would not work under Type 2 either, since a state can span
+days.
+
+**The replay promise is unaffected.** "Drop one graph and re-run" refers to
+`…/kg/graph/run/{run_id}`, which stays per-run. Only the input graphs lose their split.
+
+**Emit N-Quads, not N-Triples.** Every input-layer mapping sets a constant graph map to
+`…/kg/graph/inputs`. `referral_state.rml.ttl` currently emits N-Triples with no graph and
+must be updated when the A/B track extends it.
 
 ## 6. Literals and datatypes
 
