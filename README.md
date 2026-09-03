@@ -185,15 +185,14 @@ Clinician accept/reorder/override, logged back to graph
 
 ## Current Build Track
 
-The active track is the knowledge graph foundation:
+The dataset pipeline and the knowledge graph foundation are both done: a synthetic Irish outpatient
+waiting list loaded in Postgres, and an OWL ontology plus RDF projection (Morph-KGC/R2RML) over it in
+Oxigraph — 590,814 triples, 19 SHACL shapes. See `kg/README.md` and `dataset/README.md`.
 
-- Python project skeleton
-- Oxigraph bootstrap
-- OWL ontology
-- calibration config
-- synthetic referral generator
-- SimPy bed occupancy simulation
-- seeded graph handoff for the urgency, capacity, and coordinating agents
+The active track is `explainable-agent-based-triage_20260828`: the urgency agent, capacity agent,
+coordinating agent, rationale layer, clinician UI, and CPC/CRT compliance validation built on top of
+the graph. It is blocked on ADR-002 — where agent outputs (scores, citations, rankings) get written:
+Postgres `agent.*`, the graph, or both — which should be resolved first.
 
 See `conductor/product.md`, `conductor/tech-stack.md`, and
-`conductor/tracks/graph-foundation_20260826/spec.md` for the detailed project plan.
+`conductor/tracks/explainable-agent-based-triage_20260828/spec.md` for the detailed project plan.

@@ -4,6 +4,14 @@
 **Workflow:** tiered TDD per `conductor/workflow.md`. Tier 1 = strict TDD, 80%. Tier 2 = tests
 required, 60%. Tier 3 = smoke tests only.
 **Revised:** 2026-08-31 against [ADR-001](./decisions.md).
+**Status: done, 2026-09-03.** This checklist is kept as the historical record of what was scoped, not
+what shipped. The delivered build replaced the Phase 1 Python skeleton and the Phase 3 custom
+projection framework with five declarative R2RML mappings run through Morph-KGC — no `triage` Python
+package, no bespoke graph client, no CI pipeline was built, because the mapping files themselves are
+the reviewable artifact. What actually exists, with measured counts, is documented in
+[`kg/README.md`](../../../kg/README.md) and the normative [`conductor/kg/`](../../kg/) docs. Do not
+use the checkboxes below to judge what remains — the one real open item is ADR-002 (see this track's
+[`index.md`](./index.md)), which belongs to the next track, not this one.
 
 ## Phases Closed by ADR-001
 

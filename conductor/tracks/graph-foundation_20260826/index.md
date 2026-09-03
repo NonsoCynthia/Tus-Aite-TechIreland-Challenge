@@ -2,8 +2,9 @@
 
 **ID:** `graph-foundation_20260826`
 **Type:** feature
-**Status:** pending
+**Status:** done
 **Created:** 2026-08-26
+**Completed:** 2026-09-03 (merged to `main` in [PR #2](https://github.com/NonsoCynthia/Tus-Aite-TechIreland-Challenge/pull/2))
 
 ## Summary
 
@@ -17,6 +18,20 @@ developers simultaneously.
 **Revised 2026-08-31** against [ADR-001](./decisions.md): the cohort generator and bed simulation
 originally planned here are delivered by the `dataset/` pipeline. Postgres is the source of record;
 the graph is a derived projection.
+
+**Delivered 2026-09-03.** The projection layer shipped as five declarative R2RML mapping files run
+through Morph-KGC, not the custom Python projection framework Phase 3 of `plan.md` originally
+scoped — see [kg/README.md](../../../kg/README.md) for what actually exists: **590,814 triples**
+across the input and reference graphs, 19 SHACL shapes, the shared wait-counter SPARQL fragment, and
+a `kg_loader` role with no grant on `eval`. The normative spec, namespaces, decisions and ontology
+docs live in [`conductor/kg/`](../../kg/). `plan.md`'s phase checklist is kept as a historical record
+of what was scoped, not a checklist of what shipped — the two diverged once Morph-KGC replaced the
+planned Python client.
+
+One item from Phase 4 remains genuinely open, not just superseded: **ADR-002**, where agent outputs
+(scores, citations, rankings) get written — Postgres `agent.*`, the graph, or both. This blocks
+`explainable-agent-based-triage_20260828` and should be the first thing that track resolves. See
+[decisions.md](./decisions.md) and `spec.md`'s "Unresolved" section.
 
 ## Documents
 
