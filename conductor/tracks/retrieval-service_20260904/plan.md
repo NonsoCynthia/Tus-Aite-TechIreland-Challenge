@@ -513,3 +513,57 @@ referral X," and the user asked for one, explicitly adding it to this track's sc
         (turnaround 1 day), and capacity data for 2 wards serving specialty `1800` (primary ward
         `W-9001-04` at 83.52% occupancy) plus 5 recent clinic sessions for that specialty. `404`
         confirmed for a nonexistent referral.
+
+---
+
+## Phase 8: Coordinator input — cohort + already-written scores (Tier 2, reopened again 2026-09-04)
+
+**Why reopened:** explaining Phase 7's endpoint to the user prompted the natural next question — what
+does the *coordinator* need? Its job (`tech-stack.md`'s Agent Reasoning Model) is purely combinatorial:
+gather the urgency + capacity scores the other two agents already wrote, plus tie-break data, and rank.
+Nothing built so far told it *which* referrals to gather scores for, or gave it a way to *read back*
+scores already written via `POST /scores` — a `GET /scores` never existed. FR10 in spec.md.
+
+- [x] Task: `GET /hospitals/{hospital_hipe}/cohort/{as_of_date}`
+  - [x] Checked the schema before designing: `core.referral_daily.removal_date IS NULL` is "still on
+        the list"; CPC comes from a `LEFT JOIN` to `core.triage_events` via `triage_event_id` (`null`
+        pre-triage, not a missing join); wait counters (`days_since_referral`, `adjusted_wait_days`,
+        etc.) are already columns on `referral_daily` itself — no need to call `wait_counters`
+        per-referral, or reimplement its logic
+  - [x] Deliberately did **not** compute a CRT-breach boolean here, even though `core.ref_rules`'
+        thresholds (28/91 days) would make it easy — that's the rule-checking layer's job
+        (`tech-stack.md` Decision 5), not this service's; exposing raw ingredients (CPC, wait days)
+        and leaving the threshold comparison to whoever owns that layer keeps the boundary honest
+  - [x] Write a test that an empty cohort returns `200` with `referrals: []`, not `404`
+  - [x] Write a test that the endpoint requires auth
+  - [x] Write tests against real, currently-loaded data: expected fields present, referrals ordered
+        oldest-referral-first (the documented tie-break rule), no full `https://` IRIs in the response
+        — same skip-if-dataset-not-loaded pattern as Phase 7 (same `core.*` read-only boundary)
+  - [x] Implement `db.get_cohort` and the route in `reads.py`
+
+- [x] Task: `GET /runs/{run_id}/hospitals/{hospital_hipe}/scores`
+  - [x] Write a test that no scores yet returns `200` with `scores: {}`, not `404`
+  - [x] Write a test that the endpoint requires auth
+  - [x] Write a test: `POST /scores` for both agents on the same referral (same seed -> same
+        hospital_hipe/pathway_number before the agent_name branch runs, confirmed rather than assumed
+        — see the test's own assertion of this), then `GET .../scores` returns both, correctly grouped
+        by pathway then agent, citations intact
+  - [x] Write a test that a referral with only one agent's score written so far appears with just that
+        one key present, not a placeholder for the missing agent
+  - [x] Implement `db.get_scores_for_run` (joins `agent.agent_scores` + `agent.agent_citations` in
+        Python after two queries, not a SQL join, since citations are one-to-many per score) and the
+        route in `reads.py`. Unlike the cohort endpoint, this doesn't need the skip-if-not-loaded
+        pattern: `agent.*` is written by this service's own `POST /scores`, so its tests are
+        self-contained.
+
+- [x] Task: Verify coverage stays ≥ 60% on the read path; `ruff`/`mypy` clean
+
+  401 tests total (up from 393), 97% coverage on `app/`, `ruff`/`mypy` clean, stable across repeated
+  runs.
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+  - [x] Confirmed live against real hospital `9001`: cohort for `2026-08-30` returned real referrals
+        (e.g. `PW-9001-001685`, CPC 2, 881 adjusted wait days), oldest-first. Posted real urgency
+        (0.72) and capacity (0.45) scores for that same referral under one `run_id`, then confirmed
+        `GET .../scores` returned both, correctly grouped, with their citations intact — the full
+        write-then-coordinator-read loop working end to end against real data.

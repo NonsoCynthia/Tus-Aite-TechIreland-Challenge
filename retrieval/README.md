@@ -51,6 +51,8 @@ so Docker/a load balancer/an uptime monitor can use it without holding a credent
 | `GET` | `/decisions/{hospital_hipe}/{as_of_date}` | Every ranked position for that day, with its cited evidence resolved to real values (FR8) -- reconstructed by walking `eat:cites` |
 | `GET` | `/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}?role=` | One placement's cited evidence, resolved (FR8); omit `role` for all four, or narrow to `urgency`/`capacity`/`timeframe`/`multi_list` |
 | `GET` | `/referrals/{hospital_hipe}/{pathway_number}/context` | Everything an urgency/capacity agent needs to judge one referral (FR9) -- observations, conditions, triage events, plus capacity data for its specialty (wards + latest bed status, recent clinic sessions). Reads Postgres `core.*` directly, not the graph |
+| `GET` | `/hospitals/{hospital_hipe}/cohort/{as_of_date}` | Which referrals the coordinator needs to rank (FR10) -- every referral still on the list that day, oldest-first, with CPC and wait counters. Empty list, not 404, if nothing's on the list |
+| `GET` | `/runs/{run_id}/hospitals/{hospital_hipe}/scores` | The urgency/capacity scores already written for this run+hospital (FR10), grouped by pathway then agent, citations included. Empty `scores` object, not 404, if nothing's been scored yet |
 
 Every write endpoint follows the same contract: `200 {"status": "ok"}` on full success; `207
 {"status": "postgres_committed_graph_projection_failed", "detail": ...}` if Postgres committed but
@@ -60,11 +62,18 @@ validation before either store is touched.
 
 **Two directions of data flow through this service.** `POST /scores`/`/decisions`/`/overrides` and
 `GET /decisions`/`/evidence`/`/wait-counters` are all about agent *output* -- what an agent already
-decided, written through and read back with its audit trail. `GET /referrals/.../context` (FR9) is the
-other direction: agent *input* -- the raw clinical and capacity data an agent needs to gather before it
-can compute a score at all. It reads Postgres `core.*` directly rather than the graph, since that's
-where the input data actually lives relationally, and returns `404` for a referral that doesn't exist
-rather than an empty body.
+decided, written through and read back with its audit trail. `GET /referrals/.../context`,
+`/hospitals/.../cohort/...` and `/runs/.../scores` (FR9/FR10) are the other direction: agent *input* --
+the raw clinical/capacity data an agent needs before it can score a referral, which referrals need
+ranking, and what the other agents already decided about them. All three read Postgres `core.*`/
+`agent.*` directly rather than the graph, since that's where this data actually lives relationally,
+and return an empty result (`404` for a single referral that doesn't exist, otherwise an empty
+list/object) rather than erroring when there's simply nothing there yet.
+
+The full picture: an urgency agent calls `GET /referrals/.../context` to gather one referral's vitals,
+then `POST /scores`. A coordinator calls `GET /hospitals/.../cohort/...` to find its cohort, then
+`GET /runs/{run_id}/hospitals/.../scores` to gather every score already written for it, then
+`POST /decisions` once it's ranked them.
 
 Every read endpoint's evidence is **resolved inline** (FR8, Phase 6) -- each citation comes back as
 `{"role": ..., "iri": ..., "type": ..., "properties": {...}}`, the node's actual data (e.g. a

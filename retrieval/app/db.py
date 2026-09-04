@@ -285,3 +285,81 @@ def get_referral_context(hospital_hipe: str, pathway_number: str) -> dict[str, A
             "clinic_sessions": clinic_sessions,
         },
     }
+
+
+def get_cohort(hospital_hipe: str, as_of_date: date) -> list[dict[str, Any]]:
+    """Every referral still on the waiting list for one hospital on one day
+    -- the coordinator's cohort to rank -- spec.md FR10. "Still on the list"
+    means core.referral_daily.removal_date IS NULL; `currently_suspended` is
+    exposed as a raw flag, not acted on here (whether to rank a suspended
+    referral is the coordinator's judgement, not this service's -- matching
+    the project's own separation of data access from decision logic, e.g.
+    tech-stack.md Decision 5 keeping SHACL rule-checking a separate layer
+    from the ontology it validates against).
+    """
+    with psycopg.connect(settings.retrieval_db_url, row_factory=dict_row) as conn:
+        return conn.execute(
+            """
+            SELECT
+                rd.hospital_hipe, rd.pathway_number, rd.specialty_hipe,
+                rd.referral_date, rd.referral_received_date, rd.triage_status,
+                rd.days_since_referral, rd.days_since_received,
+                rd.days_awaiting_triage, rd.adjusted_wait_days,
+                te.triage_category AS cpc,
+                (rd.suspension_start_date IS NOT NULL
+                    AND rd.suspension_start_date <= rd.as_of_date
+                    AND (rd.suspension_end_date IS NULL OR rd.suspension_end_date > rd.as_of_date)
+                ) AS currently_suspended
+            FROM core.referral_daily rd
+            LEFT JOIN core.triage_events te ON te.triage_event_id = rd.triage_event_id
+            WHERE rd.hospital_hipe = %s AND rd.as_of_date = %s AND rd.removal_date IS NULL
+            ORDER BY rd.referral_date, rd.pathway_number
+            """,
+            (hospital_hipe, as_of_date),
+        ).fetchall()
+
+
+def get_scores_for_run(run_id: str, hospital_hipe: str) -> dict[str, dict[str, Any]]:
+    """Every score an agent has already written for this run and hospital,
+    grouped by pathway_number then agent_name -- spec.md FR10. This is what
+    lets the coordinator gather urgency + capacity scores (and their
+    citations) for its whole cohort in one call, instead of guessing at
+    agent.agent_scores/agent_citations directly.
+    """
+    with psycopg.connect(settings.retrieval_db_url, row_factory=dict_row) as conn:
+        scores = conn.execute(
+            """
+            SELECT pathway_number, agent_name, score, method, agent_version, as_of_date
+            FROM agent.agent_scores
+            WHERE run_id = %s AND hospital_hipe = %s
+            """,
+            (run_id, hospital_hipe),
+        ).fetchall()
+        citations = conn.execute(
+            """
+            SELECT pathway_number, agent_name, evidence_type, evidence_key
+            FROM agent.agent_citations
+            WHERE run_id = %s AND hospital_hipe = %s
+            """,
+            (run_id, hospital_hipe),
+        ).fetchall()
+
+    citations_by_key: dict[tuple[str, str], list[dict[str, str]]] = {}
+    for citation in citations:
+        key = (citation["pathway_number"], citation["agent_name"])
+        citations_by_key.setdefault(key, []).append(
+            {"evidence_type": citation["evidence_type"], "evidence_key": citation["evidence_key"]}
+        )
+
+    result: dict[str, dict[str, Any]] = {}
+    for score_row in scores:
+        pathway = score_row["pathway_number"]
+        agent = score_row["agent_name"]
+        result.setdefault(pathway, {})[agent] = {
+            "score": score_row["score"],
+            "method": score_row["method"],
+            "agent_version": score_row["agent_version"],
+            "as_of_date": score_row["as_of_date"],
+            "citations": citations_by_key.get((pathway, agent), []),
+        }
+    return result

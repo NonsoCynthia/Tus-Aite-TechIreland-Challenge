@@ -138,6 +138,52 @@ async def referral_context(hospital_hipe: str, pathway_number: str) -> dict[str,
     return context
 
 
+@router.get(
+    "/hospitals/{hospital_hipe}/cohort/{as_of_date}",
+    summary="Get the coordinator's cohort for one hospital-day (agent input)",
+    description=(
+        "Built for the coordinating agent (spec.md FR10, added by user request): which "
+        "referrals need ranking at this hospital, on this day. Every referral still on the "
+        "waiting list (`removal_date IS NULL`) as of that date, with its specialty, referral/"
+        "received dates, wait counters (`days_since_referral`, `adjusted_wait_days`, etc. -- "
+        "the same numbers `wait-counters` computes, denormalised onto this row already so "
+        "there's no need to call that endpoint per referral), CPC (`cpc`, from its triage "
+        "event, `null` if not yet triaged), and a `currently_suspended` flag. That flag is "
+        "informational only -- whether to rank a suspended referral is the coordinator's "
+        "judgement, not decided here. Empty list (not 404) if the hospital exists but nothing "
+        "is on the list that day."
+    ),
+)
+async def cohort(hospital_hipe: str, as_of_date: date) -> dict[str, Any]:
+    return {
+        "hospital_hipe": hospital_hipe,
+        "as_of_date": as_of_date.isoformat(),
+        "referrals": db.get_cohort(hospital_hipe, as_of_date),
+    }
+
+
+@router.get(
+    "/runs/{run_id}/hospitals/{hospital_hipe}/scores",
+    summary="Get already-written agent scores for one run (agent input)",
+    description=(
+        "Built for the coordinating agent (spec.md FR10, added by user request): the urgency "
+        "and capacity scores the other two agents already wrote via POST /scores for this run "
+        "and hospital, with their citations -- so the coordinator can gather its whole "
+        "cohort's scores in one call instead of guessing at agent.agent_scores directly. "
+        "Response is keyed by pathway_number, then by agent_name ('urgency'/'capacity') -- a "
+        "referral only appears if at least one agent has scored it; a referral with only one "
+        "of the two agents' scores written so far still appears, with just that one key. "
+        "Empty `scores` object (not 404) if nothing has been scored yet for this run/hospital."
+    ),
+)
+async def scores_for_run(run_id: str, hospital_hipe: str) -> dict[str, Any]:
+    return {
+        "run_id": run_id,
+        "hospital_hipe": hospital_hipe,
+        "scores": db.get_scores_for_run(run_id, hospital_hipe),
+    }
+
+
 def _evidence_query(placement_iri: str, role: CitationRole | None) -> str:
     """The one shared, role-parameterised evidence query (spec.md FR3) --
     every branch is the same shape, built from _ROLE_SUBPROPERTY, not four

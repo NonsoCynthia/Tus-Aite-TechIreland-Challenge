@@ -185,6 +185,29 @@ skipping cleanly rather than failing when it isn't.
 `404` if the referral itself doesn't exist. Unlike FR3/FR8, there's no `eat:cites` walk here and
 nothing to resolve — this is raw input, not an audit trail of agent output.
 
+### FR10 — Coordinator input: cohort and already-written scores (added Phase 8, reopened again)
+
+FR9 gives one agent input for one referral. The coordinating agent needs two more things FR9 doesn't
+cover: **which** referrals need ranking, and **what the other two agents already decided** for them.
+
+- `GET /hospitals/{hospital_hipe}/cohort/{as_of_date}` — every referral still on the waiting list
+  (`core.referral_daily.removal_date IS NULL`) for that hospital and day, with specialty, referral/
+  received dates, the same wait counters `wait_counters.rq` computes (denormalised onto the row
+  already, no per-referral call needed), CPC (from its triage event, `null` if not yet triaged), and a
+  `currently_suspended` flag. That flag is informational only — whether to rank a suspended referral is
+  the coordinator's judgement, not decided here (this service does data access, not rule logic; CPC/CRT
+  rule-checking is its own separate layer per `tech-stack.md` Decision 5). Empty list, not `404`, if
+  the hospital exists but nothing is on the list that day.
+- `GET /runs/{run_id}/hospitals/{hospital_hipe}/scores` — every urgency/capacity score already written
+  via `POST /scores` for that run and hospital, with citations, keyed by `pathway_number` then
+  `agent_name`. A referral with only one agent's score written so far still appears, with just that
+  key present. Empty `scores` object, not `404`, if nothing has been scored yet.
+
+Both read Postgres directly, same reasoning as FR9. The cohort endpoint hits the same `core.*`
+read-only boundary as FR9 (tests skip cleanly without the full dataset loaded); the scores endpoint
+reads `agent.agent_scores`/`agent_citations`, which this service's own `POST /scores` writes, so its
+tests use the write path directly and need no such skip.
+
 ## Non-Functional Requirements
 
 - **NFR1** — Tier 2 (`workflow.md`): tests required, TDD encouraged not enforced, round-trip tests
@@ -241,6 +264,12 @@ nothing to resolve — this is raw input, not an audit trail of agent output.
     returns its observations, conditions, and triage events, plus capacity data (wards serving its
     specialty with latest bed status, recent clinic sessions for that specialty). `404` on a referral
     that doesn't exist.
+16. `GET /hospitals/{hospital_hipe}/cohort/{as_of_date}` on a real hospital/day returns every referral
+    still on the list, oldest referral first, each with CPC and wait counters. Empty list, not `404`,
+    when nothing is on the list.
+17. A score written via `POST /scores` is retrievable via `GET /runs/{run_id}/hospitals/{hospital_hipe}
+    /scores`, grouped by `pathway_number` then `agent_name`, with its citations intact. Empty `scores`
+    object, not `404`, when nothing has been scored yet for that run/hospital.
 
 ## Out of Scope
 
