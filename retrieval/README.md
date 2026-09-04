@@ -47,7 +47,7 @@ so Docker/a load balancer/an uptime monitor can use it without holding a credent
 | `POST` | `/scores` | Write an agent score + its citations (FR2, the ADR-002 projector) |
 | `POST` | `/decisions` | Write a decision: rankings, citations, rule checks, atomically |
 | `POST` | `/overrides` | Write a clinician override |
-| `POST` | `/referrals` | Intake a brand-new referral (FR11) -- patient (+ demographics if new), specialty, dates. Generates and returns `pathway_number`; does NOT recompute scores or re-rank (that's the agents' job) |
+| `POST` | `/referrals` | Called by the clinician/hospital UI, not an agent: intake a brand-new referral (FR11) -- patient (+ demographics if new), specialty, dates. Generates and returns `pathway_number`; does NOT recompute scores or re-rank (that's the agents' job) |
 | `GET` | `/referrals/{hospital_hipe}/{pathway_number}/wait-counters?as_of_date=` | The four wait counters, via `kg/queries/wait_counters.rq` unmodified (FR3) |
 | `GET` | `/decisions/{hospital_hipe}/{as_of_date}` | Every ranked position for that day, with its cited evidence resolved to real values (FR8) -- reconstructed by walking `eat:cites` |
 | `GET` | `/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}?role=` | One placement's cited evidence, resolved (FR8); omit `role` for all four, or narrow to `urgency`/`capacity`/`timeframe`/`multi_list` |
@@ -72,15 +72,17 @@ ranking, and what the other agents already decided about them. All three read Po
 and return an empty result (`404` for a single referral that doesn't exist, otherwise an empty
 list/object) rather than erroring when there's simply nothing there yet.
 
-`POST /referrals` (FR11) is a third case: a write into `core.*` itself, not `agent.*` -- the one path
-that puts new *input* data into the system, rather than reading it or writing an agent's output. It
-does not recompute anything; it only makes a referral exist so the input-side endpoints above (and,
-eventually, an agent) can pick it up.
+`POST /referrals` (FR11) is a third case, different in kind from the other two: a write into `core.*`
+itself, not `agent.*`, and called by the **clinician/hospital UI**, not an agent -- it's how a new
+patient's referral enters the system in the first place, upstream of anything any agent does. It does
+not recompute anything; it only makes the referral exist so the input-side endpoints above (and,
+eventually, an agent watching them) can pick it up.
 
-The full picture: an urgency agent calls `GET /referrals/.../context` to gather one referral's vitals,
-then `POST /scores`. A coordinator calls `GET /hospitals/.../cohort/...` to find its cohort, then
-`GET /runs/{run_id}/hospitals/.../scores` to gather every score already written for it, then
-`POST /decisions` once it's ranked them.
+The full picture: the clinician/hospital UI calls `POST /referrals` when a new patient's referral
+arrives, putting it on the waiting list. An urgency agent calls `GET /referrals/.../context` to gather
+one referral's vitals, then `POST /scores`. A coordinator calls `GET /hospitals/.../cohort/...` to find
+its cohort (which now includes that new referral), then `GET /runs/{run_id}/hospitals/.../scores` to
+gather every score already written for it, then `POST /decisions` once it's ranked them.
 
 Every read endpoint's evidence is **resolved inline** (FR8, Phase 6) -- each citation comes back as
 `{"role": ..., "iri": ..., "type": ..., "properties": {...}}`, the node's actual data (e.g. a

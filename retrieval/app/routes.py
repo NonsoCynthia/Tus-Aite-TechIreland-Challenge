@@ -146,21 +146,25 @@ async def create_override(payload: OverrideIn) -> JSONResponse | dict[str, str]:
 @router.post(
     "/referrals",
     response_model=None,
-    summary="Intake a new referral (agent input)",
+    summary="Intake a new referral (clinician/hospital UI input)",
     description=(
         "A new referral arriving at a hospital -- spec.md FR11, user request (\"input new "
-        "patients\"). Writes `core.patients`/`core.persons` (only if `new_patient` is given), "
-        "`core.referrals`, and today's initial `core.referral_daily` row (`triage_status="
-        "'awaiting_triage'`), then projects `eat:Referral` (+ `eat:Patient`/`eat:Person` if new, "
-        "+ an initial `eat:ReferralState`) into the graph's `inputs` named graph -- the same one "
-        "the batch pipeline uses, so this referral reads back identically to a batch-loaded one "
-        "everywhere else in this API. `pathway_number` is generated server-side (never supplied "
-        "by the caller) and returned in the response so the caller can address this referral "
-        "afterwards.\n\nThis endpoint does NOT recompute any score or re-run the coordinator's "
-        "ranking -- that is the urgency/capacity/coordinator agents' job (a separate track), not "
-        "a judgement this data-access service makes for itself. Call `GET /hospitals/.../cohort/"
-        "...` afterwards (it will now include this referral) to trigger whatever re-scoring an "
-        "agent or orchestrator wants to do." + _RESPONSE_CONTRACT
+        "patients\"). Called by the clinician/hospital UI (once built) when staff enter a new "
+        "patient's referral directly, NOT by an agent -- this is how a referral enters the system "
+        "in the first place, upstream of everything the urgency/capacity/coordinator agents do. "
+        "Writes `core.patients`/`core.persons` (only if `new_patient` is given), `core.referrals`, "
+        "and today's initial `core.referral_daily` row (`triage_status='awaiting_triage'`), then "
+        "projects `eat:Referral` (+ `eat:Patient`/`eat:Person` if new, + an initial "
+        "`eat:ReferralState`) into the graph's `inputs` named graph -- the same one the batch "
+        "pipeline uses, so this referral reads back identically to a batch-loaded one everywhere "
+        "else in this API. `pathway_number` is generated server-side (never supplied by the "
+        "caller) and returned in the response so the caller can address this referral afterwards."
+        "\n\nThis endpoint does NOT recompute any score or re-run the coordinator's ranking -- "
+        "that is the urgency/capacity/coordinator agents' job (a separate track), not a judgement "
+        "this data-access service makes for itself. Once this referral is stored, it shows up in "
+        "`GET /hospitals/.../cohort/...` like any other, which is how an agent or orchestrator "
+        "watching that endpoint would notice it and trigger whatever re-scoring it wants to do."
+        + _RESPONSE_CONTRACT
     ),
 )
 async def create_referral(payload: ReferralIn) -> JSONResponse | dict[str, str]:

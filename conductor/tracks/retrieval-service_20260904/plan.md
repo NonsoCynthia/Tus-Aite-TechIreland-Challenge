@@ -724,3 +724,19 @@ only the intake write-path itself is in scope) and confirmed it follows the same
   - [x] `spec.md` FR11 added (with an explicit NFR3 amendment for the narrowed core.* INSERT grant)
         and acceptance criterion 19 added; `README.md`'s endpoint table and write/read-direction
         explanation updated.
+
+- [x] Task: Correct FR11's caller — clinician/hospital UI, not agent input (user correction)
+  - [x] Initial framing mislabeled `POST /referrals` as "agent input" (route `summary`, README's
+        "three cases" paragraph) — grouping it with FR9/FR10, which really are agent input (an agent
+        reading data before it judges something). User corrected: this endpoint is called by the
+        clinician/hospital UI when staff enter a new patient's referral, not by an agent. The
+        underlying implementation (Postgres-first write, then graph projection, no score/re-rank
+        triggered) was already correct — this was purely a mischaracterisation of *who calls it*, not
+        a functional bug.
+  - [x] Fixed everywhere the mislabel appeared: `routes.py`'s route `summary`/`description`
+        (`app/routes.py`), `spec.md` FR11's intro paragraph (now explicitly distinguishes this from
+        FR2's agent-output writes and FR9/FR10's agent-input reads), `README.md`'s endpoint table row,
+        "three cases" paragraph, and the "full picture" consumer walkthrough (now opens with the UI
+        calling `POST /referrals`, not the agents).
+  - [x] `ruff`/`mypy`/`pytest` re-run clean after the doc/description-only changes (no functional code
+        changed, so no new test needed).

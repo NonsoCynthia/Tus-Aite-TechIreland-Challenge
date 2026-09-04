@@ -218,13 +218,15 @@ tests use the write path directly and need no such skip.
 ### FR11 — New-referral intake (added, reopened again; user request: "input new patients")
 
 The user observed a real gap: nothing in this service could add a brand-new referral to `core.*` at
-all — every write endpoint (FR2) only writes agent *output* (scores/decisions/overrides). Since "the
-scores need to be updated and the patients need to be reordered accordingly" when new patient
-information arrives, and the current system had no way for new patients to enter it in the first
-place, this FR adds the intake write-path itself. Recomputing scores and re-ranking is explicitly
-**not** this FR's job — that is the urgency/capacity/coordinator agents' own judgement (a separate
-track); this only gets a referral onto the list so an agent or orchestrator can act on it, the same
-way it would for any other referral in `GET /hospitals/.../cohort/...`.
+all — every write endpoint (FR2) only writes agent *output* (scores/decisions/overrides). This one is
+different in kind from FR2/FR9/FR10: it is not an agent's write, and not agent input either — it is
+**clinician/hospital UI input**, the point where a new patient's referral first enters the system,
+upstream of anything any agent does. Since "the scores need to be updated and the patients need to be
+reordered accordingly" when new patient information arrives, and the current system had no way for new
+patients to enter it in the first place, this FR adds that intake write-path. Recomputing scores and
+re-ranking is explicitly **not** this FR's job — that is the urgency/capacity/coordinator agents' own
+judgement (a separate track); this only gets a referral onto the list so an agent or orchestrator can
+notice and act on it, the same way it would for any other referral in `GET /hospitals/.../cohort/...`.
 
 - `POST /referrals` — same ADR-002 flow as every other write endpoint (Postgres commit, then graph
   projection, confirmed with the user before implementing). Accepts `hospital_hipe`, `patient_id`,
