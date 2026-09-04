@@ -355,3 +355,33 @@ auth or connection error) with the token now sourced from the consolidated root 
    real infrastructure, not just mocks, by actually stopping the `oxigraph` container mid-session —
    `/health` correctly went to `503 {"oxigraph": "unreachable"}` and recovered to `200` once it was
    started again. 381 tests total, `ruff`/`mypy` clean.
+
+---
+
+## Phase 6: Evidence resolution (Tier 2, reopened 2026-09-04)
+
+**Why reopened:** walking `eat:cites` (Phases 3-4) tells the UI *which* evidence node was cited, as an
+IRI. It does not tell it *what that node says*. `product-guidelines.md` requires rationale to name
+`"NEWS2 aggregate 7"`, `"Ward B occupancy 104%"` — actual values, not opaque identifiers. Rendering
+that requires a second hop: dereferencing the evidence IRI into its own properties. FR8 in spec.md.
+
+- [ ] Task: `GET /evidence/resolve?iri=`
+  - [ ] Write a test: insert a synthetic `ClinicSession` node (real ontology properties —
+        `eat:clinicName`, `eat:slotsTotal`, `eat:slotsBooked`, `eat:slotsAvailable`, `eat:sessionDate`)
+        directly into the graph, call the endpoint, assert every property comes back correctly typed
+        and keyed by its short name (not the full predicate IRI)
+  - [ ] Write a test that `rdf:type` is pulled out into the response's `type` field, not left sitting
+        in `properties` alongside everything else
+  - [ ] Write a test that an IRI with no triples at all returns `404`
+  - [ ] Write a test against a *real* evidence IRI produced by this service's own write path: `POST
+        /scores` with a fixture citation, then resolve that exact citation's `evidence_key`-derived
+        IRI — proving the two hops (`cites` walk, then resolve) actually compose end to end, not just
+        that each works in isolation
+  - [ ] Implement the endpoint: `SELECT ?p ?o WHERE { GRAPH ?g { <iri> ?p ?o } }`, split `rdf:type`
+        out, shorten every other predicate/object-class IRI by stripping the `eat:`/`prov:`/`rdf:`
+        namespace prefix
+
+- [ ] Task: Verify coverage stays ≥ 60% on the read path; `ruff`/`mypy` clean
+
+- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+  - [ ] Rebuild, run the full suite, confirm live against the running container from the host

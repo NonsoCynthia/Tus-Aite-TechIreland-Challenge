@@ -2,9 +2,9 @@
 
 **ID:** `retrieval-service_20260904`
 **Type:** feature
-**Status:** done
+**Status:** in progress (reopened)
 **Created:** 2026-09-04
-**Completed:** 2026-09-04
+**First completed:** 2026-09-04 — reopened same day for Phase 6 (evidence resolution)
 
 ## Summary
 
@@ -42,6 +42,9 @@ than writing to Postgres or the graph directly.
 3. Write endpoints — the ADR-002 projector
 4. Read endpoints
 5. Integration and acceptance pass
+6. Evidence resolution (reopened) — `GET /evidence/resolve`, the second hop a UI needs to turn a
+   cited evidence IRI into the actual data behind it (e.g. a `ClinicSession`'s slot counts), since
+   walking `eat:cites` only gets you *which* node was cited, not *what it says*
 
 ## Project Context
 

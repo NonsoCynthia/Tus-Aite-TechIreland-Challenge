@@ -109,6 +109,11 @@ Shared, single-implementation query helpers — never reimplemented per caller, 
   criterion, made queryable over HTTP.
 - Evidence-by-role lookups (urgency / capacity / timeframe / multi-list) for the UI's row-expansion.
 
+**Note (added Phase 6):** the above gets the UI *which* evidence node was cited, as an IRI — not what
+that node actually says. Rendering `product-guidelines.md`'s required rationale shape (`"NEWS2
+aggregate 7"`, `"Ward B occupancy 104%"`) needs a second hop dereferencing that IRI into its own
+properties. That's FR8.
+
 ### FR4 — Fixture decision generator
 
 A seeded, reproducible synthetic generator producing valid `agent.*` payloads (respecting every SQL
@@ -125,6 +130,21 @@ that track's blocker), pointing at this track as the implementation.
 
 All graph writes strictly follow `conductor/kg/namespaces.md`'s IRI-minting conventions and named-graph
 table. No ad hoc graph or IRI scheme is invented by this service.
+
+### FR8 — Evidence resolution (added Phase 6, reopened)
+
+`GET /evidence/resolve?iri=<evidence IRI>` dereferences any IRI (an evidence node returned by FR3's
+decision/evidence lookups, but not restricted to those — any graph node works) into its own
+properties: every `?p ?o` triple with that IRI as subject, across any named graph. Response shape:
+`{"iri": ..., "type": <short class name, from rdf:type>, "properties": {<short predicate name>:
+<value>, ...}}`. Predicate/class names are shortened by stripping the `eat:`/`prov:`/`rdf:` namespace
+prefix (matching how a UI would actually want to key into the response), not returned as full IRIs.
+`404` if the IRI has no triples at all (nothing to resolve, not an empty-but-valid result).
+
+This is deliberately generic — a single dereference endpoint, not five per-evidence-type endpoints —
+because the citation tables already carry `evidence_type` (so a caller who needs to branch on type
+already has it from the FR3 response that gave them the IRI in the first place); this endpoint's only
+job is "what does this specific node say," which is the same question regardless of type.
 
 ## Non-Functional Requirements
 
@@ -170,6 +190,9 @@ table. No ad hoc graph or IRI scheme is invented by this service.
 11. Any request without a valid `Authorization: Bearer` token returns `401` on every endpoint except
     `/health`, including writes; a request with a valid token succeeds. `/health` itself returns `200`
     regardless of whether a token is present.
+12. `GET /evidence/resolve?iri=` on a real evidence IRI (e.g. one returned by the decision/evidence
+    endpoints) returns that node's actual properties, not just its IRI — e.g. a `ClinicSession`'s
+    `slotsAvailable`/`slotsTotal`, not only the fact that it was cited. `404` on an IRI with no triples.
 
 ## Out of Scope
 
