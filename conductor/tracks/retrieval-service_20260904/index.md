@@ -63,5 +63,3 @@ than writing to Postgres or the graph directly.
 - [Product Definition](../../product.md)
 - [Tech Stack](../../tech-stack.md)
 - [Workflow](../../workflow.md)
-- [Retrieval service reference index](../../retrieval-service-references.md)
-- [Retrieval/database onboarding briefing](../../retrieval-database-onboarding.md)

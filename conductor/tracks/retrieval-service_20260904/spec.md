@@ -3,8 +3,9 @@
 **Track:** `retrieval-service_20260904`
 **Type:** feature
 **Maps to:** implements ADR-002 (agent-output write path) and the read-side retrieval layer named as
-"database and retrieval" work in `conductor/retrieval-service-references.md` /
-`conductor/retrieval-database-onboarding.md`.
+"database and retrieval" work in the pre-build briefing docs this track was scoped from (since
+removed post-completion as no longer necessary — their content is superseded by this spec and
+`retrieval/README.md`).
 
 ## Overview
 
@@ -21,7 +22,7 @@ Two of three build phases are merged to `main`: the synthetic dataset (`dataset/
 graph (`kg/`, 590,814 triples). The third phase — `explainable-agent-based-triage_20260828` (the
 agents + clinician UI) — is written but blocked on ADR-002, which was previously unrecorded. It is now
 confirmed: **Postgres is the system of record; the graph gets a synchronous, single-writer projection**
-on successful Postgres commit (per the proposal in `conductor/retrieval-database-onboarding.md`).
+on successful Postgres commit.
 
 The Postgres side is already provisioned and unblocks this work immediately:
 

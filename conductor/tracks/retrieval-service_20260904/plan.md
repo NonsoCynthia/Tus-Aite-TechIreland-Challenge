@@ -274,6 +274,12 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
   corrected Running section. Both root-level docs updated: their "ADR-002 still open" framing replaced
   with "resolved and built," pointing at this track and `retrieval/README.md`.
 
+  **Later removed by user request** (2026-09-04, post-completion): `retrieval-database-onboarding.md`
+  and `conductor/retrieval-service-references.md` were deleted outright as unnecessary for the final
+  repo — they were pre-build briefing/reference-index documents whose purpose ended once the service
+  they were briefing toward existed and was documented in `retrieval/README.md` and this track. Links
+  to them removed from this track's `index.md`.
+
 - [x] Task: Full acceptance-criteria pass
   - [x] Walk `spec.md`'s Acceptance Criteria 1–11 one by one against the running system and record the
         result
