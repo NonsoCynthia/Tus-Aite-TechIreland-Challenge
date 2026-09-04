@@ -63,21 +63,29 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
 
 ## Phase 2: Fixture decision generator (Tier 2)
 
-- [ ] Task: Write tests for the fixture generator
-  - [ ] Same seed produces identical payloads across two runs (determinism)
-  - [ ] Generated `agent.agent_scores` / `agent.decisions` / `agent.decision_rankings` /
+- [x] Task: Write tests for the fixture generator
+  - [x] Same seed produces identical payloads across two runs (determinism)
+  - [x] Generated `agent.agent_scores` / `agent.decisions` / `agent.decision_rankings` /
         `agent.decision_citations` / `agent.rule_checks` / `agent.overrides` payloads satisfy every
         SQL CHECK constraint from `dataset/db/migrations/006_outputs.sql` (score range, valid
         `agent_name`, valid citation `role`, non-blank override reason, positive `cohort_size`,
         positive/unique `position`)
 
-- [ ] Task: Implement the fixture generator
-  - [ ] Seeded, reproducible generator producing one coherent decision (rankings + citations + rule
-        checks) plus standalone score/citation and override payloads
-  - [ ] Generator lives where other tests can import it directly (test fixtures/helpers, not
-        production request-handling code)
+  `agent.rule_checks.rule_id` also carries a hard FK to `core.ref_rules` — queried the live table
+  (`RULE-CRT-URGENT`, `RULE-CRT-SEMI`, `RULE-TRIAGE-TURNAROUND`, `RULE-ORDER`, `RULE-TIEBREAK`) rather
+  than inventing IDs, so fixture decisions will actually insert once Phase 3 exercises them against
+  the real database, not just pass isolated unit tests.
 
-- [ ] Task: Verify coverage ≥ 60% on the generator module; `ruff`/`mypy` clean
+- [x] Task: Implement the fixture generator
+  - [x] Seeded, reproducible generator producing one coherent decision (rankings + citations + rule
+        checks) plus standalone score/citation and override payloads
+  - [x] Generator lives where other tests can import it directly (test fixtures/helpers, not
+        production request-handling code) — `retrieval/tests/fixtures.py`
+
+- [x] Task: Verify coverage ≥ 60% on the generator module; `ruff`/`mypy` clean
+
+  100% line coverage on `tests/fixtures.py` (25 seeds × constraint checks + determinism tests, 334
+  total tests in the suite); `ruff check .` and `mypy app tests` both clean.
 
 - [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
