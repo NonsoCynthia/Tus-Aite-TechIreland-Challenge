@@ -357,10 +357,10 @@ python -m morph_kgc mappings/<track>.ini
 pyshacl -s shapes/structural.ttl -df nt out/<track>.nt
 cd ..
 
-# 4. Retrieval service (Decision 6) -- ADR-002's implementation, already built
-cp retrieval/.env.example retrieval/.env   # bearer token + retrieval_rw password
+# 4. Retrieval service (Decision 6) -- ADR-002's implementation, already built.
+#    Its bearer token and DB password live in the same root .env from step 1.
 docker compose exec db psql -U triage_admin -d triage \
-  -c "ALTER ROLE retrieval_rw PASSWORD '<value from retrieval/.env>';"
+  -c "ALTER ROLE retrieval_rw PASSWORD '<value from .env>';"
 make retrieval-build && docker compose up -d retrieval
 make retrieval-test
 
@@ -375,13 +375,13 @@ make retrieval-test
 | Variable | Purpose |
 |---|---|
 | `ANTHROPIC_API_KEY` | Rationale generation (or use `ant auth login`) |
-| `HF_TOKEN` | Your own read token for the gated dataset. `dataset/.env` |
-| `KG_LOADER_PASSWORD` | Password for the read-only `kg_loader` role. `kg/.env` |
+| `HF_TOKEN` | Your own read token for the gated dataset. Root `.env` — one file is authoritative for the whole docker-compose stack (Decision 6's note in Infrastructure above) |
+| `KG_LOADER_PASSWORD` | Password for the read-only `kg_loader` role. `kg/.env` (Morph-KGC runs on the host, outside the compose stack, so it keeps its own file) |
 | `KG_DB_URL` | `postgresql+psycopg://kg_loader:…@localhost:5433/triage`. `kg/.env` |
 | `OXIGRAPH_QUERY_URL` | Defaults to `http://localhost:7878/query` |
 | `OXIGRAPH_UPDATE_URL` | Defaults to `http://localhost:7878/update` |
-| `RETRIEVAL_DB_URL` | `postgresql://retrieval_rw:…@db:5432/triage`. `retrieval/.env` |
-| `RETRIEVAL_BEARER_TOKENS` | Comma-separated shared bearer token(s), Decision 6. `retrieval/.env` |
+| `RETRIEVAL_DB_URL` | `postgresql://retrieval_rw:…@db:5432/triage`. Root `.env` |
+| `RETRIEVAL_BEARER_TOKENS` | Comma-separated shared bearer token(s), checked on every retrieval-service endpoint except `/health`. Root `.env` |
 | `RETRIEVAL_PORT` | Host port the retrieval service is published on. Defaults to `8000` |
 
 `kg/mappings/*.ini` carries the loader password and is git-ignored. No password belongs in a `.sql`

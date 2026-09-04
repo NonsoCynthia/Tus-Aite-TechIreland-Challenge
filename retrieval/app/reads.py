@@ -11,13 +11,14 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from . import iri
+from .auth import require_bearer_token
 from .config import settings
 from .schemas import CitationRole
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_bearer_token)])
 
 # Two directories up from app/reads.py (/app/app/reads.py -> /app), where the
 # Dockerfile COPYs the real file (see retrieval/Dockerfile and

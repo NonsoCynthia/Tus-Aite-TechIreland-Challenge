@@ -297,3 +297,38 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
 - [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
   Confirmed by user 2026-09-04. Track complete.
+
+---
+
+## Post-completion fixes (2026-09-04)
+
+Two corrections raised after the track was marked done, both fixed and re-verified live:
+
+1. **`/health` was behind auth.** The original design (Phase 1) put `/health` behind the same
+   app-level auth dependency as every other route, specifically to prove auth was wired correctly.
+   User correction: a health check that itself requires a credential can't be used by infra that has
+   no reason to hold one (Docker `HEALTHCHECK`, a load balancer, an uptime monitor). Fixed by moving
+   the auth dependency from app-level (`main.py`) to per-router (`routes.py`'s and `reads.py`'s own
+   `APIRouter(dependencies=[...])`), so `/health` — defined directly on `app`, not through either
+   router — is structurally outside the auth boundary rather than special-cased inside the auth check.
+   `test_health.py` rewritten for the new behaviour; a new `test_auth.py` proves every other endpoint
+   (across both routers) still requires the token, replacing the coverage `/health` used to provide.
+   `spec.md` FR7 and AC 11 updated to state the carve-out explicitly.
+
+2. **`retrieval/.env` was a second, un-consolidated env file.** The docker-compose consolidation
+   (Phase 1 addendum) established "one root `.env` is authoritative for the whole stack" for
+   `db`/`pgadmin`/`loader`, explicitly to avoid a second file drifting out of sync — but the retrieval
+   service's own secrets (`RETRIEVAL_BEARER_TOKENS`, `RETRIEVAL_DB_URL`) were left in a separate
+   `retrieval/.env`, inconsistent with that stated principle. Fixed: both moved into the root
+   `.env`/`.env.example`, passed to the container via explicit `environment:` entries in
+   `docker-compose.yml` (same pattern as the `loader` service) instead of `env_file:
+   ./retrieval/.env`. `retrieval/.env.example` deleted as superseded (same treatment
+   `dataset/.env.example` got earlier). `retrieval/README.md` and `conductor/tech-stack.md`'s
+   Environment Variables table updated accordingly; the latter's `HF_TOKEN` row was also still saying
+   `dataset/.env` from before the consolidation — fixed in the same pass since it's the same class of
+   staleness.
+
+Verified: rebuilt the image, 379 tests pass, `ruff`/`mypy` clean, recreated the running container to
+pick up the new env wiring, and confirmed live from the host — `/health` returns `200` with no token
+and with a bogus one; `/decisions` still `401`s with no token and resolves correctly (`404`, not an
+auth or connection error) with the token now sourced from the consolidated root `.env`.

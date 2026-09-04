@@ -13,34 +13,35 @@ This service is built and run from the **repo root** `docker-compose.yml` -- Pos
 loader, Oxigraph and this service are all one compose project there (see the root `Makefile`).
 
 ```bash
-# 1. From the repo root: dataset up + loaded, migrations included (009 creates retrieval_rw).
-cp .env.example .env       # repo root -- edit HF_TOKEN etc.
+# 1. From the repo root: one .env is authoritative for the whole stack,
+#    including this service's bearer token and DB password.
+cp .env.example .env       # edit HF_TOKEN, RETRIEVAL_BEARER_TOKENS, etc.
 make up
 make load
 
-# 2. Set the retrieval_rw password, the same way kg_loader's is set:
+# 2. Set the retrieval_rw password to match RETRIEVAL_DB_URL in .env, the
+#    same way kg_loader's is set:
 docker compose exec db psql -U triage_admin -d triage \
-  -c "ALTER ROLE retrieval_rw PASSWORD '<value from retrieval/.env>';"
+  -c "ALTER ROLE retrieval_rw PASSWORD '<value from .env>';"
 
-# 3. Configure this service.
-cp retrieval/.env.example retrieval/.env   # edit RETRIEVAL_BEARER_TOKENS and the DB password
-
-# 4. Build and run (already included in `make up` once retrieval/.env exists).
+# 3. Build and run (already included in `make up`; rebuild after code changes).
 make retrieval-build
 docker compose up -d retrieval
 ```
 
 The service is reachable on the host at `http://localhost:${RETRIEVAL_PORT:-8000}` (published, not
-internal-only -- see spec.md FR1/NFR4). Every endpoint requires `Authorization: Bearer <token>`,
-checked against one of the comma-separated values in `RETRIEVAL_BEARER_TOKENS` (`retrieval/.env`).
+internal-only -- see spec.md FR1/NFR4). Every endpoint except `/health` requires `Authorization:
+Bearer <token>`, checked against one of the comma-separated values in `RETRIEVAL_BEARER_TOKENS`
+(repo-root `.env`).
 
 ## Endpoints
 
-All require `Authorization: Bearer <token>`.
+All require `Authorization: Bearer <token>` except `/health`, which is deliberately unauthenticated
+so Docker/a load balancer/an uptime monitor can use it without holding a credential.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/health` | No DB/graph dependency -- proves the app is up and auth is enforced |
+| `GET` | `/health` | No auth, no DB/graph dependency -- proves the app process is up |
 | `POST` | `/scores` | Write an agent score + its citations (FR2, the ADR-002 projector) |
 | `POST` | `/decisions` | Write a decision: rankings, citations, rule checks, atomically |
 | `POST` | `/overrides` | Write a clinician override |

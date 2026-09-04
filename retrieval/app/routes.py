@@ -13,14 +13,15 @@ from __future__ import annotations
 import logging
 
 import psycopg
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from . import db, graph, iri
+from .auth import require_bearer_token
 from .schemas import DecisionIn, OverrideIn, ScoreIn
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_bearer_token)])
 
 
 def _projection_failed_response(detail: str) -> JSONResponse:

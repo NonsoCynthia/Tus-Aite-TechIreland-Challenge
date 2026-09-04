@@ -62,9 +62,14 @@ rather than being blocked further on this.
 ### FR7 — Bearer-token authentication
 
 - Every endpoint (read and write) requires `Authorization: Bearer <token>`, checked against one or
-  more static, out-of-band-issued secrets (env-configured, never committed).
+  more static, out-of-band-issued secrets (env-configured, never committed) — **except `/health`**,
+  deliberately unauthenticated so Docker's own `HEALTHCHECK`, a load balancer, or an uptime monitor
+  can use it without holding a credential; it does no DB/graph access either, so there is nothing
+  sensitive behind it to protect.
 - A missing or invalid token returns `401` before any handler logic runs, including before any
-  Postgres or Oxigraph access.
+  Postgres or Oxigraph access. Applied per-router (write and read routers each carry the auth
+  dependency), not at the app level, which is what keeps `/health` outside it structurally rather
+  than via a special-cased exemption inside the auth check itself.
 - The token is opaque and shared across callers (agents, coordinator, UI) — not per-caller identity.
   Attribution of *who* made a write (which agent, which clinician) continues to come from the
   payload's own fields (`agent_name`, `clinician_id`), not from the token.
@@ -162,8 +167,9 @@ table. No ad hoc graph or IRI scheme is invented by this service.
 9. The fixture generator is seeded and reproducible — same seed, same payloads.
 10. The `retrieval` service's port is reachable from the host machine (not just from inside the
     compose network), e.g. via `curl http://localhost:<port>/...` from outside any container.
-11. Any request without a valid `Authorization: Bearer` token returns `401` on every endpoint,
-    including writes; a request with a valid token succeeds.
+11. Any request without a valid `Authorization: Bearer` token returns `401` on every endpoint except
+    `/health`, including writes; a request with a valid token succeeds. `/health` itself returns `200`
+    regardless of whether a token is present.
 
 ## Out of Scope
 

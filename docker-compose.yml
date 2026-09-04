@@ -93,10 +93,13 @@ services:
       context: .
       dockerfile: retrieval/Dockerfile
     container_name: triage_retrieval
-    env_file: ./retrieval/.env
+    # One .env (root) is authoritative for the whole stack -- same reasoning
+    # as the loader service above, no second file to keep in sync.
     environment:
       OXIGRAPH_QUERY_URL: http://oxigraph:7878/query
       OXIGRAPH_UPDATE_URL: http://oxigraph:7878/update
+      RETRIEVAL_BEARER_TOKENS: ${RETRIEVAL_BEARER_TOKENS}
+      RETRIEVAL_DB_URL: ${RETRIEVAL_DB_URL}
     ports:
       - "${RETRIEVAL_PORT:-8000}:8000"
     depends_on:
