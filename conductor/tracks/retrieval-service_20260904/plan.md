@@ -244,7 +244,9 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
   372 tests total, 97% coverage across `app/` (lowest single file 92%), `ruff check .` and
   `mypy app tests` both clean.
 
-- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+
+  Confirmed by user 2026-09-04.
 
 ---
 
