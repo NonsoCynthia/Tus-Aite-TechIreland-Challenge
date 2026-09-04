@@ -86,7 +86,12 @@ services:
   # not-yet-built agents and the clinician UI. Implements ADR-002. Port is
   # published to the host (not internal-only) -- see that track's spec.md FR1.
   retrieval:
-    build: ./retrieval
+    # Context is the repo root, not ./retrieval -- FR3's wait-counters
+    # endpoint wraps kg/queries/wait_counters.rq unmodified, so the build
+    # needs that file too (see retrieval/Dockerfile).
+    build:
+      context: .
+      dockerfile: retrieval/Dockerfile
     container_name: triage_retrieval
     env_file: ./retrieval/.env
     environment:

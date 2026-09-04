@@ -1,10 +1,13 @@
 """Request models for the write endpoints (spec.md FR2).
 
 Validation mirrors the SQL CHECK constraints in
-dataset/db/migrations/006_outputs.sql exactly, plus one constraint the SQL
-doesn't carry but the ontology does: eat:cites is "1..n" on eat:Score (every
-score node must cite at least one evidence node) -- enforced here since
-Postgres has no way to.
+dataset/db/migrations/006_outputs.sql exactly, plus a constraint the SQL
+doesn't carry but the ontology does: eat:cites is "1..n" on both eat:Score
+and eat:RankedPlacement (every score and every ranked placement must cite at
+least one evidence node) -- enforced here since Postgres has no way to. This
+is also what backs spec.md NFR2 on the read side: a read endpoint can only
+ever return evidence-free placements/scores if one somehow got written
+without going through this validation.
 """
 
 from __future__ import annotations
@@ -58,7 +61,9 @@ class RankingIn(BaseModel):
     urgency_score: float = Field(ge=0, le=1)
     capacity_score: float = Field(ge=0, le=1)
     rationale_summary: str
-    citations: list[DecisionCitationIn] = Field(default_factory=list)
+    # eat:cites is 1..n on eat:RankedPlacement too (same cardinality as
+    # eat:Score) -- not a SQL CHECK, enforced here (spec.md NFR2).
+    citations: list[DecisionCitationIn] = Field(min_length=1)
     rule_checks: list[RuleCheckIn] = Field(default_factory=list)
 
 

@@ -1,16 +1,18 @@
 """Retrieval service -- FastAPI app.
 
 The write endpoints (FR2, the ADR-002 projector) live in routes.py. Read
-endpoints (FR3) land in Phase 4.
+endpoints (FR3) live in reads.py.
 """
 
 from fastapi import Depends, FastAPI
 
 from .auth import require_bearer_token
-from .routes import router
+from .reads import router as reads_router
+from .routes import router as writes_router
 
 app = FastAPI(title="Retrieval Service", dependencies=[Depends(require_bearer_token)])
-app.include_router(router)
+app.include_router(writes_router)
+app.include_router(reads_router)
 
 
 @app.get("/health")

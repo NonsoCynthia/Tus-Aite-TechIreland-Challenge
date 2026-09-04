@@ -187,29 +187,62 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
 
 ## Phase 4: Read endpoints (Tier 2)
 
-- [ ] Task: Wait-counters endpoint
-  - [ ] Write a test asserting the endpoint's output matches running `kg/queries/wait_counters.rq`
+- [x] Task: Wait-counters endpoint
+  - [x] Write a test asserting the endpoint's output matches running `kg/queries/wait_counters.rq`
         directly against the same graph state
-  - [ ] Implement the endpoint, including the `GRAPH` clause the fragment's header notes must be
+  - [x] Implement the endpoint, including the `GRAPH` clause the fragment's header notes must be
         added by the includer
 
-- [ ] Task: Decision / ranked-position lookup
-  - [ ] Write a test that the endpoint reconstructs the full cited-evidence set for a ranked position
+  The test builds its own independent `GRAPH`-wrapped copy of the fragment (different code path from
+  `app/reads.py`'s wrapper) as ground truth, so a wrapper-specific bug would surface as a mismatch
+  rather than the test tautologically agreeing with itself. To wrap the actual file unmodified rather
+  than re-typing its contents, the retrieval image's build context moved from `./retrieval` to the
+  repo root (`docker-compose.yml` + `retrieval/Dockerfile` updated) so it can `COPY
+  kg/queries/wait_counters.rq` verbatim.
+
+- [x] Task: Decision / ranked-position lookup
+  - [x] Write a test that the endpoint reconstructs the full cited-evidence set for a ranked position
         purely by walking `eat:cites` (and role subproperties) backward from the `Decision` node —
         against data written by Phase 3's endpoints, not hand-inserted fixtures
-  - [ ] Implement the endpoint
+  - [x] Implement the endpoint
 
-- [ ] Task: Evidence-by-role lookups
-  - [ ] Write tests for urgency / capacity / timeframe / multi-list evidence retrieval, one shared
+  **Finding, not a bug:** `decision_iri` is keyed only by `(hospital_hipe, as_of_date)` —
+  `namespaces.md` #4 says "one per hospital per day" deliberately. Two different `POST /decisions`
+  calls (different `run_id`, different Postgres `decision_id`) that land on the same hospital+day
+  accumulate their placements onto the *same* graph node rather than creating independent ones — this
+  read endpoint therefore returns the union of every run's placements for that day, not just the
+  latest run's. That's almost certainly the right behaviour for a real re-run of the coordinator
+  (this day's decision *is* one entity), but it's worth the coordinator-agent developer knowing before
+  they're surprised by it. Caught because repeated test runs in this session, reusing the fixture
+  generator's small deterministic `(hospital_hipe, as_of_date)` space, briefly accumulated placements
+  from earlier unrelated test runs onto one node — fixed in the tests with a wide random `as_of_date`
+  offset per test, not in the endpoint (the accumulation is correct behaviour).
+
+- [x] Task: Evidence-by-role lookups
+  - [x] Write tests for urgency / capacity / timeframe / multi-list evidence retrieval, one shared
         query parameterised by role rather than four separate implementations
-  - [ ] Implement the endpoint(s)
+  - [x] Implement the endpoint(s)
 
-- [ ] Task: Evidence-completeness guard (NFR2)
-  - [ ] Write a test proving no read endpoint can return a score or decision without its cited
+  One query-builder function (`_evidence_query`) generates either the single-role pattern or a
+  `UNION` of all four, built from the same `_ROLE_SUBPROPERTY` mapping the write side uses — not four
+  hand-written near-duplicates. Reused by both the standalone evidence endpoint and the decision
+  endpoint's per-placement evidence lookup.
+
+- [x] Task: Evidence-completeness guard (NFR2)
+  - [x] Write a test proving no read endpoint can return a score or decision without its cited
         evidence attached
-  - [ ] Implement the guard if the above tests surface a gap
+  - [x] Implement the guard if the above tests surface a gap
 
-- [ ] Task: Verify coverage ≥ 60% on the read path; `ruff`/`mypy` clean
+  Gap found and fixed: `RankingIn.citations` (Phase 3) defaulted to an empty list, even though
+  `eat:cites` is 1..n on `eat:RankedPlacement` in the ontology (same cardinality as `Score`, which
+  *was* already enforced). Added `Field(min_length=1)`, matching `ScoreIn`. The read-side guarantee is
+  a consequence of this write-time validation, not separate filtering logic in `reads.py` — proven by
+  a test showing the write is rejected before the state could ever exist to filter.
+
+- [x] Task: Verify coverage ≥ 60% on the read path; `ruff`/`mypy` clean
+
+  372 tests total, 97% coverage across `app/` (lowest single file 92%), `ruff check .` and
+  `mypy app tests` both clean.
 
 - [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
