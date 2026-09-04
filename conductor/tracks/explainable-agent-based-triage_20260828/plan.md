@@ -5,6 +5,13 @@
 required, 60%. Tier 3 = smoke tests only. Depends on `graph-foundation_20260826` being seeded and
 queryable.
 
+**Per ADR-002** (`decisions.md`, accepted 2026-09-04): agents never write to Postgres or the graph
+directly. `retrieval-service_20260904` is the single write path — `POST /scores`/`/decisions`/
+`/overrides` write `agent.*` first, then synchronously project the matching triples into the graph on
+success (never a separate batch mapping step). Every "write scored/Decision/cites edges" task below is
+superseded by "call the retrieval service's write endpoint"; the graph projection is already handled by
+that service, so no separate "project `agent.*` into the graph" task is needed here.
+
 ---
 
 ## Phase 1: Urgency Agent (Tier 1)
@@ -15,9 +22,12 @@ queryable.
 - [ ] Task: NEWS2 scoring logic
     - [ ] Sub-task: Write failing tests for NEWS2 score computation, cited to the NEWS2 rubric
     - [ ] Sub-task: Implement deterministic NEWS2 scorer
-- [ ] Task: Write scored edges to the graph (Tier 2)
-    - [ ] Sub-task: Round-trip test — score, write, query back, compare
-    - [ ] Sub-task: Implement `triage.agents.urgency` writing `scored` edges (Agent→Referral, score as edge property)
+- [ ] Task: Write scores via retrieval-service_20260904 (Tier 2)
+    - [ ] Sub-task: Round-trip test — score, `POST /scores`, read back via `GET /runs/{run_id}/
+          hospitals/{hospital_hipe}/scores`, compare
+    - [ ] Sub-task: Implement `triage.agents.urgency` calling `POST /scores` with its evidence
+          citations (gather context first via `GET /referrals/{hospital_hipe}/{pathway_number}/
+          context`, ADR-002)
 - [ ] Task: Conductor - User Manual Verification 'Urgency Agent' (Protocol in workflow.md)
 
 ---
@@ -27,9 +37,12 @@ queryable.
 - [ ] Task: Constraint reasoning logic
     - [ ] Sub-task: Write failing tests for available-capacity and overcrowding-state scoring
     - [ ] Sub-task: Implement deterministic capacity scorer reading `BedStatus` via SPARQL
-- [ ] Task: Write scored edges to the graph (Tier 2)
-    - [ ] Sub-task: Round-trip test — score, write, query back, compare
-    - [ ] Sub-task: Implement `triage.agents.capacity`
+- [ ] Task: Write scores via retrieval-service_20260904 (Tier 2)
+    - [ ] Sub-task: Round-trip test — score, `POST /scores`, read back via `GET /runs/{run_id}/
+          hospitals/{hospital_hipe}/scores`, compare
+    - [ ] Sub-task: Implement `triage.agents.capacity` calling `POST /scores` with its evidence
+          citations (gather context first via `GET /referrals/{hospital_hipe}/{pathway_number}/
+          context`, ADR-002)
 - [ ] Task: Conductor - User Manual Verification 'Capacity Agent' (Protocol in workflow.md)
 
 ---
@@ -38,14 +51,22 @@ queryable.
 
 - [ ] Task: Ranking query and tie-breaking
     - [ ] Sub-task: Write failing tests for tie-break order (CPC, then CRT breach, then oldest-first)
-    - [ ] Sub-task: Implement SPARQL ranking query over both agents' `scored` edges
+    - [ ] Sub-task: Implement ranking logic over both agents' scores, gathered via
+          `GET /hospitals/{hospital_hipe}/cohort/{as_of_date}` (which already includes CPC and
+          computed `crt_breached`/`crt_threshold_days`, spec.md FR10) and
+          `GET /runs/{run_id}/hospitals/{hospital_hipe}/scores`
 - [ ] Task: CPC/CRT ordering constraint enforcement
     - [ ] Sub-task: Write failing tests asserting an urgent referral is never ranked behind an
           in-window semi-urgent one
-    - [ ] Sub-task: Implement the enforcement check against the OWL constraint from `graph-foundation`
-- [ ] Task: Decision and cites materialisation (Tier 2)
-    - [ ] Sub-task: Write a test walking `cites` backward from a ranked position to its evidence nodes
-    - [ ] Sub-task: Implement `triage.agents.coordinator` writing `Decision` nodes and `cites` edges
+    - [ ] Sub-task: Implement the enforcement check against the OWL constraint from `graph-foundation`,
+          using the cohort endpoint's already-computed `crt_breached` rather than re-deriving it
+- [ ] Task: Decision materialisation via retrieval-service_20260904 (Tier 2)
+    - [ ] Sub-task: Write a test walking `decision_citations` back to its evidence rows via
+          `GET /decisions/{hospital_hipe}/{as_of_date}` (evidence resolved inline, spec.md FR8)
+    - [ ] Sub-task: Implement `triage.agents.coordinator` calling `POST /decisions` with rankings,
+          citations, and rule checks in one call (ADR-002) — the graph projection (`eat:Decision`/
+          `eat:RankedPlacement`/`eat:RuleCheck`/`eat:cites`) happens synchronously inside that call,
+          no separate mapping step needed
 - [ ] Task: Conductor - User Manual Verification 'Coordinating Agent and Audit Trail' (Protocol in workflow.md)
 
 ---

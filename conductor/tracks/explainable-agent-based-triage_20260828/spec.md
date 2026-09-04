@@ -25,26 +25,42 @@ ranked position reproducible and auditable under the EU AI Act framing the propo
 
 ## Functional Requirements
 
+Per **ADR-002** (`decisions.md`): agents never write to Postgres or the graph directly, and don't need
+to query the graph directly for input either. `retrieval-service_20260904` is the single mediator for
+both directions — agent *input* (`GET /referrals/.../context`, `GET /hospitals/.../cohort/...`,
+`GET /runs/.../hospitals/.../scores`) and agent *output* (`POST /scores`/`/decisions`/`/overrides`,
+each writing Postgres first and synchronously projecting into the graph on success — no separate
+mapping step). FR1–FR3 below describe what each agent computes; the read/write mechanics are that
+service's endpoints throughout.
+
 ### FR1 — Urgency agent
 
-- Reads `Patient`→`Condition`→`UrgencySignal` via SPARQL.
-- Computes MTS category and NEWS2 score deterministically from graph data.
-- Writes a `scored` edge (Agent→Referral) back to the graph, score as an edge property.
+- Gathers one referral's clinical data via `GET /referrals/{hospital_hipe}/{pathway_number}/context`
+  (observations, conditions, triage events) rather than a direct SPARQL query.
+- Computes MTS category and NEWS2 score deterministically from that data.
+- Writes its score and citations via `POST /scores`.
 
 ### FR2 — Capacity agent
 
-- Reads `Specialty`→`Ward`→`BedStatus` via SPARQL, including the SimPy-produced occupancy time series.
+- Gathers the referral's specialty's capacity data — wards, latest bed status, recent clinic
+  sessions — via the same `GET /referrals/{hospital_hipe}/{pathway_number}/context` call (it returns
+  both clinical and capacity data together, spec.md FR9 of `retrieval-service_20260904`).
 - Applies deterministic constraint reasoning (available capacity, overcrowding state) per specialty/ward.
-- Writes a `scored` edge back to the graph.
+- Writes its score and citations via `POST /scores`.
 
 ### FR3 — Coordinating agent
 
-- Ranks referrals via a SPARQL query over both agents' `scored` edges plus deterministic tie-breaking:
-  CPC, then CRT breach status, then oldest-referral-first.
-- Materialises `Decision` nodes and `cites` edges (Decision→UrgencySignal|BedStatus) for every ranked
-  position — this is the audit trail per proposal §9–10.
+- Gathers its cohort via `GET /hospitals/{hospital_hipe}/cohort/{as_of_date}` (every referral still on
+  the list, with CPC and computed CRT breach already included) and every score already written for it
+  via `GET /runs/{run_id}/hospitals/{hospital_hipe}/scores`, then ranks with deterministic
+  tie-breaking: CPC, then CRT breach status (`crt_breached`, no need to re-derive it), then
+  oldest-referral-first.
+- Writes the full ranked decision — rankings, citations, and rule checks — via one `POST /decisions`
+  call, atomically. This is the audit trail per proposal §9–10; the graph projection (`Decision` nodes,
+  `RankedPlacement`/`RuleCheck` nodes, `cites` edges) happens inside that same call.
 - Never lets a `Decision` rank an urgent `Referral` behind a semi-urgent one still inside its CRT
-  (enforces the OWL constraint declared in `graph-foundation`).
+  (enforces the OWL constraint declared in `graph-foundation`, checked via SHACL against the
+  projected graph).
 
 ### FR4 — Rationale layer
 
@@ -57,8 +73,12 @@ ranked position reproducible and auditable under the EU AI Act framing the propo
 - FastAPI + Jinja2 + HTMX ranked-list view (per `tech-stack.md`), showing each patient's rank,
   rationale, and cited evidence.
 - Accept / reorder / override controls per proposal §6.
-- Every override is written back into the graph as a new fact, closing the loop (future rankings can
-  account for it).
+- Every override is written via `POST /overrides` (`retrieval-service_20260904`), closing the loop
+  (future rankings can account for it) — the same Postgres-then-graph write path as every other agent
+  output.
+- New referrals arrive via `POST /referrals` on the same service (`retrieval-service_20260904` FR11) —
+  clinician/hospital UI input, not an agent action; entering a referral there is what makes it show up
+  in the coordinator's `GET /hospitals/.../cohort/...` for a future run.
 
 ### FR6 — CPC/CRT compliance validation
 

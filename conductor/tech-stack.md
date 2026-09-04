@@ -113,12 +113,22 @@ exactly which evidence nodes produced it, without leaving the store.
 **Deterministic scoring cores, LLM-generated rationale.** This is the central architectural decision
 and it is a compliance decision as much as a technical one.
 
+**Per ADR-002** (`conductor/tracks/explainable-agent-based-triage_20260828/decisions.md`): agents never
+write to Postgres or the graph directly — `retrieval-service_20260904` (already built) is the single
+write path. `POST /scores`/`/decisions`/`/overrides` write `agent.*` first, then synchronously project
+the matching `eat:Score`/`Decision`/`cites` triples into the graph on success — no batch mapping step,
+one code path per write, immediately after each Postgres commit.
+
 - **Urgency agent** — MTS and NEWS2 logic implemented as deterministic, unit-tested Python. Same
-  inputs always yield the same score. Writes `eat:Score` nodes and `eat:cites` edges to the graph.
-- **Capacity agent** — deterministic constraint reasoning over the SimPy occupancy model. Same.
-- **Coordinating agent** — ranking is a **SPARQL query** over both sets of triples plus deterministic
-  tie-breaking (CPC, then CRT breach, then oldest referral first). Materialises `Decision` nodes,
-  `RankedPlacement` nodes and `cites` edges.
+  inputs always yield the same score. Gathers its input via `GET /referrals/.../context`, writes via
+  `POST /scores`.
+- **Capacity agent** — deterministic constraint reasoning over the SimPy occupancy model. Same input/
+  output path as the urgency agent.
+- **Coordinating agent** — ranking runs over both agents' already-written scores (`GET /runs/.../
+  hospitals/.../scores`) and its cohort (`GET /hospitals/.../cohort/...`, which already carries CPC
+  and computed CRT breach) plus deterministic tie-breaking (CPC, then CRT breach, then oldest referral
+  first). Writes the full decision atomically via `POST /decisions`, which projects `Decision`/
+  `RankedPlacement`/`cites` triples as part of that same call.
 - **LLM layer** — takes the already-cited graph evidence for one ranked position and writes the
   human-readable rationale. It explains a decision it did not make. It cannot alter scores or ranks.
 

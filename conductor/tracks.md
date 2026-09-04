@@ -6,7 +6,7 @@
 
 | Track | Type | Status | Description |
 |---|---|---|---|
-| [explainable-agent-based-triage_20260828](./tracks/explainable-agent-based-triage_20260828/index.md) | feature | pending; ADR-002 resolved and implemented by `retrieval-service_20260904` — agents should call that service's write endpoints | Full build on top of graph-foundation: urgency agent, capacity agent, coordinator + audit trail, rationale layer, clinician UI + override loop, CPC/CRT compliance validation (proposal §14 Days 3–6) |
+| [explainable-agent-based-triage_20260828](./tracks/explainable-agent-based-triage_20260828/index.md) | feature | pending; ADR-002 resolved and implemented by `retrieval-service_20260904` — agents should call that service's write endpoints | Full build on top of graph-foundation: urgency agent, capacity agent, coordinator + audit trail, rationale layer, clinician UI + override loop, CPC/CRT compliance validation (proposal §14 Days 3–6). Write target settled by ADR-002 (Postgres, graph projects it) |
 
 ## Planned Tracks
 

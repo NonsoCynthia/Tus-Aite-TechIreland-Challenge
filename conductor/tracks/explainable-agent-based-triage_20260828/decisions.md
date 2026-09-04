@@ -48,3 +48,12 @@ successful Postgres commit is a detectable, recoverable inconsistency (the row s
 reported) rather than data loss — but it is a new failure mode this codebase did not previously have,
 and retry/reconciliation beyond detect-and-report is explicitly out of scope for
 `retrieval-service_20260904`.
+
+**Note on a since-superseded write-up:** `origin/main` briefly recorded a different resolution to this
+same question — Postgres as write target with a *batch* Morph-KGC-style mapping file
+(`kg/mappings/agent_outputs.rml.ttl`, never built) projecting `agent.*` into the graph, rather than a
+synchronous per-write projection. That version was written independently of
+`retrieval-service_20260904` and predates its delivery; this merge keeps the synchronous-projection
+decision above because it is what was actually built, tested (411 tests), and is now the real write
+path every agent and the clinician UI use — recording an ADR that contradicted the shipped service
+would leave this document wrong the moment it merged.
