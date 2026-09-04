@@ -19,21 +19,28 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
   - [x] Reference this track (`retrieval-service_20260904`) as the implementation
   - [x] Update that track's status in `conductor/tracks.md` to reflect the blocker is resolved
 
-- [ ] Task: docker-compose service scaffold
-  - [ ] Add a `retrieval` service definition (Dockerfile/build context) alongside `db` and `oxigraph`
-  - [ ] Publish the service's port to the host (FR1 — reachable from outside the compose network)
-  - [ ] Wire environment config: Postgres DSN using the `agent_rw` role, Oxigraph query/update URLs,
+- [x] Task: docker-compose service scaffold
+  - [x] Add a `retrieval` service definition (Dockerfile/build context) alongside `db` and `oxigraph`
+  - [x] Publish the service's port to the host (FR1 — reachable from outside the compose network)
+  - [x] Wire environment config: Postgres DSN using the `agent_rw` role, Oxigraph query/update URLs,
         the bearer-token secret(s) — all env-based, nothing committed
-  - [ ] Confirm the service starts under `docker compose up` and does not collide with the pinned
+  - [x] Confirm the service starts under `docker compose up` and does not collide with the pinned
         `/triage_db` container name convention from `tech-stack.md`
 
-- [ ] Task: FastAPI app skeleton and bearer-token auth (FR7)
-  - [ ] Write a smoke test: a request to a health-check route with no `Authorization` header returns
+  Note: `agent_rw` (migration 007) turned out to be `NOLOGIN` — a group role, not something a service
+  can connect as directly. Added `dataset/db/migrations/009_retrieval_login_role.sql`, a `LOGIN` role
+  `retrieval_rw` granted membership in `agent_rw`, mirroring how `kg_loader` is set up. Also added a
+  `triage_net` external Docker network (declared in `dataset/docker-compose.yml`, joined as external
+  by the root `docker-compose.yml`) so `retrieval` and `oxigraph` can reach `db` by hostname across
+  the two separate compose projects — this network didn't exist before this track.
+
+- [x] Task: FastAPI app skeleton and bearer-token auth (FR7)
+  - [x] Write a smoke test: a request to a health-check route with no `Authorization` header returns
         `401`
-  - [ ] Write a smoke test: the same route with a valid bearer token returns `200`
-  - [ ] Implement the FastAPI app skeleton and an auth dependency/middleware applied to every route,
+  - [x] Write a smoke test: the same route with a valid bearer token returns `200`
+  - [x] Implement the FastAPI app skeleton and an auth dependency/middleware applied to every route,
         checked before any handler logic (including before Postgres/Oxigraph access)
-  - [ ] Implement a `GET /health` route (no DB/graph dependency) proving the app boots and auth is
+  - [x] Implement a `GET /health` route (no DB/graph dependency) proving the app boots and auth is
         enforced
 
 - [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)

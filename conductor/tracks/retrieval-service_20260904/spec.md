@@ -123,8 +123,10 @@ table. No ad hoc graph or IRI scheme is invented by this service.
   count, 60% coverage gate.
 - **NFR2** — No score or decision is ever returned by a read endpoint without its cited evidence
   attached (product.md success criterion 6).
-- **NFR3** — Postgres access uses the existing `agent_rw` role only; this track does not create a
-  broader role.
+- **NFR3** — Postgres access carries exactly `agent_rw`'s privileges, no broader. `agent_rw` itself is
+  `NOLOGIN` (a group role — see migration 007), so a new `LOGIN` role granted membership in it was
+  required to connect at all (`retrieval_rw`, migration 009); this is a login wrapper, not a privilege
+  expansion, and mirrors how `kg_loader` is set up as its own standalone login role.
 - **NFR4** — The service is reachable outside the docker-compose network (host port published), so
   every endpoint requires bearer-token auth (FR7) — this is a deliberate narrowing of product.md's
   general "no authentication hardening" non-goal, scoped specifically to this service because it's the

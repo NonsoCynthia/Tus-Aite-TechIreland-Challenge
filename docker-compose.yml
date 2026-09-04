@@ -1,7 +1,9 @@
 # Application services. The dataset stack (Postgres + pgAdmin) is separate,
 # in dataset/docker-compose.yml, and runs on port 5433.
-# The FastAPI `app` service described in conductor/tech-stack.md is not yet
-# built; only oxigraph runs here for now.
+#
+# `triage_net` is created by dataset/docker-compose.yml (see its own `networks:`
+# block). Bring that stack up first -- `docker compose up` here will fail fast
+# with a clear "network not found" error if you haven't.
 
 services:
   oxigraph:
@@ -11,6 +13,30 @@ services:
     volumes:
       - oxigraph_data:/data
     command: serve --location /data --bind 0.0.0.0:7878
+    networks:
+      - triage_net
+
+  # Retrieval service (conductor/tracks/retrieval-service_20260904): the single
+  # write/read path between Postgres core/agent and this graph, for the
+  # not-yet-built agents and the clinician UI. Implements ADR-002. Port is
+  # published to the host (not internal-only) -- see that track's spec.md FR1.
+  retrieval:
+    build: ./retrieval
+    env_file: ./retrieval/.env
+    environment:
+      OXIGRAPH_QUERY_URL: http://oxigraph:7878/query
+      OXIGRAPH_UPDATE_URL: http://oxigraph:7878/update
+    ports:
+      - "${RETRIEVAL_PORT:-8000}:8000"
+    depends_on:
+      - oxigraph
+    networks:
+      - triage_net
 
 volumes:
   oxigraph_data:
+
+networks:
+  triage_net:
+    external: true
+    name: triage_net

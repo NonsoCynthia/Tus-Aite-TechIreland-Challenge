@@ -25,6 +25,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    # `default` keeps pgadmin/loader reachable as before. `triage_net` is a second,
+    # explicitly-named network (declared below) so services from OTHER compose
+    # files -- the retrieval service in the root docker-compose.yml -- can reach
+    # `db` by hostname without joining this project's default network. Bring this
+    # stack up before the root one; `triage_net` is created here, not there.
+    networks:
+      - default
+      - triage_net
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -63,3 +71,9 @@ services:
 volumes:
   db_data:
   pgadmin_data:
+
+networks:
+  # Shared, project-independent name (not prefixed with the compose project name)
+  # so the root docker-compose.yml can attach to it as `external: true`.
+  triage_net:
+    name: triage_net
