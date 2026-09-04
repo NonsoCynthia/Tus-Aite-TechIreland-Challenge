@@ -1,14 +1,16 @@
-"""Retrieval service -- FastAPI app skeleton.
+"""Retrieval service -- FastAPI app.
 
-Phase 1 of conductor/tracks/retrieval-service_20260904/plan.md: scaffold and
-auth only. The write/read endpoints (FR2-FR4) land in later phases.
+The write endpoints (FR2, the ADR-002 projector) live in routes.py. Read
+endpoints (FR3) land in Phase 4.
 """
 
 from fastapi import Depends, FastAPI
 
 from .auth import require_bearer_token
+from .routes import router
 
 app = FastAPI(title="Retrieval Service", dependencies=[Depends(require_bearer_token)])
+app.include_router(router)
 
 
 @app.get("/health")

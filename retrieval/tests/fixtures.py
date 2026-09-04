@@ -44,6 +44,34 @@ def _pathway_number(rng: random.Random, hospital_hipe: str) -> str:
     return f"PW-{hospital_hipe}-{rng.randint(1, 999999):06d}"
 
 
+def _evidence_key(
+    rng: random.Random, evidence_type: str, hospital_hipe: str, pathway_number: str
+) -> str:
+    """The composite-key suffix app.iri.evidence_iri expects -- shaped to
+    match each evidence class's own template in namespaces.md #4, not an
+    opaque placeholder. See app/iri.py's evidence_iri docstring for the
+    confirmed convention this mirrors.
+    """
+    if evidence_type == "observation":
+        obs_datetime = (_BASE_DATE - timedelta(days=rng.randint(0, 10))).isoformat()
+        column = rng.choice(("news2", "resp_rate", "heart_rate", "spo2"))
+        return f"{hospital_hipe}/{pathway_number}/{obs_datetime}/{column}"
+    if evidence_type == "condition":
+        icd10am_code = f"I{rng.randint(10, 99)}"
+        return f"{hospital_hipe}/{pathway_number}/{icd10am_code}"
+    if evidence_type == "triage_event":
+        return f"TE-{rng.randint(1, 999999):06d}"
+    if evidence_type == "bed_status":
+        ward_id = f"W{rng.randint(1, 20):02d}"
+        snapshot_datetime = (_BASE_DATE - timedelta(days=rng.randint(0, 10))).isoformat()
+        return f"{hospital_hipe}/{ward_id}/{snapshot_datetime}"
+    if evidence_type == "clinic_session":
+        clinic_code = f"CL{rng.randint(1, 20):02d}"
+        session_date = (_BASE_DATE - timedelta(days=rng.randint(0, 10))).isoformat()
+        return f"{hospital_hipe}/{clinic_code}/{session_date}"
+    raise ValueError(f"unknown evidence_type: {evidence_type!r}")
+
+
 @dataclass(frozen=True)
 class ScorePayload:
     run_id: str
@@ -110,7 +138,9 @@ def make_score(
         score=round(rng.uniform(0, 1), 3),
         method=f"{chosen_agent}-fixture-v1",
         agent_version="fixture-0.1.0",
-        citations=tuple((et, f"{et}-{seed}-{i}") for i, et in enumerate(evidence_types)),
+        citations=tuple(
+            (et, _evidence_key(rng, et, hospital_hipe, pathway_number)) for et in evidence_types
+        ),
     )
 
 
@@ -126,14 +156,17 @@ def make_decision(
     for position in range(1, cohort_size + 1):
         pathway_number = _pathway_number(rng, hospital_hipe)
         n_citations = rng.randint(1, 2)
-        citations = tuple(
-            (
-                rng.choice(VALID_EVIDENCE_TYPES),
-                f"ev-{seed}-{position}-{i}",
-                rng.choice(VALID_CITATION_ROLES),
+        citation_list: list[tuple[str, str, str]] = []
+        for _ in range(n_citations):
+            evidence_type = rng.choice(VALID_EVIDENCE_TYPES)
+            citation_list.append(
+                (
+                    evidence_type,
+                    _evidence_key(rng, evidence_type, hospital_hipe, pathway_number),
+                    rng.choice(VALID_CITATION_ROLES),
+                )
             )
-            for i in range(n_citations)
-        )
+        citations = tuple(citation_list)
         rule_checks = tuple(
             (rule_id, rng.random() > 0.1, None) for rule_id in rng.sample(VALID_RULE_IDS, 2)
         )
@@ -151,7 +184,12 @@ def make_decision(
             )
         )
     return DecisionPayload(
-        decision_id=f"dec-{seed:06d}",
+        # decision_id is a standalone PK (agent.decisions), not scoped by any
+        # other column -- folding run_id in keeps two decisions from
+        # different runs (e.g. two test invocations) from colliding, without
+        # weakening determinism: same (seed, run_id) still always produces
+        # the same decision_id.
+        decision_id=f"dec-{run_id}-{seed:06d}",
         run_id=run_id,
         hospital_hipe=hospital_hipe,
         as_of_date=_BASE_DATE - timedelta(days=rng.randint(0, 5)),
@@ -166,7 +204,10 @@ def make_override(seed: int, *, decision: DecisionPayload | None = None) -> Over
         decision = make_decision(seed)
     ranking = decision.rankings[rng.randrange(len(decision.rankings))]
     return OverridePayload(
-        override_id=f"ovr-{seed:06d}",
+        # override_id is a standalone PK (agent.overrides) -- same reasoning
+        # as decision_id above: fold in the parent decision's run_id so two
+        # runs never collide, while (seed, decision) still determines it.
+        override_id=f"ovr-{decision.run_id}-{seed:06d}",
         decision_id=decision.decision_id,
         hospital_hipe=ranking.hospital_hipe,
         pathway_number=ranking.pathway_number,

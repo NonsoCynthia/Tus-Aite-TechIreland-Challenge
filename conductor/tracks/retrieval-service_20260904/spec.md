@@ -83,9 +83,11 @@ Each handler: validate the payload against the same constraints as the SQL CHECK
 `[0, 1]`, `agent_name` in `{urgency, capacity}`, citation `role` in
 `{urgency, capacity, timeframe, multi_list}`, non-blank override reason); insert in a Postgres
 transaction and commit; **only on successful commit**, construct the corresponding triples
-(`eat:Score`, `eat:Decision`, `eat:RankedPlacement`, `eat:cites` + its four role subproperties) using
-`namespaces.md` IRI conventions and push them via SPARQL Update into `…/graph/run/{run_id}` (or
-`…/graph/overrides`), in the same request.
+(`eat:Score`, `eat:Decision`, `eat:RankedPlacement`, `eat:RuleCheck`, `eat:Override`, `eat:cites` +
+its four role subproperties — every class the Postgres side above writes has a graph-side
+counterpart, per the ontology and `namespaces.md`'s named-graph table) using `namespaces.md` IRI
+conventions and push them via SPARQL Update into `…/graph/run/{run_id}` (or `…/graph/overrides`), in
+the same request.
 
 If the graph write fails after the Postgres commit succeeds, the Postgres row stands (it's the system
 of record) and the endpoint returns a response distinguishing "committed, graph projection failed" from
