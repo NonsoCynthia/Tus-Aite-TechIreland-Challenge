@@ -37,7 +37,9 @@ Bearer <token>`, checked against one of the comma-separated values in `RETRIEVAL
 ## Endpoints
 
 All require `Authorization: Bearer <token>` except `/health`, which is deliberately unauthenticated
-so Docker/a load balancer/an uptime monitor can use it without holding a credential.
+so Docker/a load balancer/an uptime monitor can use it without holding a credential. Full descriptions
+(response shapes, gotchas) are in `/docs` (Swagger UI) -- click **Authorize** there once and every
+"Try it out" call picks up the token automatically.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -46,14 +48,23 @@ so Docker/a load balancer/an uptime monitor can use it without holding a credent
 | `POST` | `/decisions` | Write a decision: rankings, citations, rule checks, atomically |
 | `POST` | `/overrides` | Write a clinician override |
 | `GET` | `/referrals/{hospital_hipe}/{pathway_number}/wait-counters?as_of_date=` | The four wait counters, via `kg/queries/wait_counters.rq` unmodified (FR3) |
-| `GET` | `/decisions/{hospital_hipe}/{as_of_date}` | Every ranked position for that day, with its cited evidence, reconstructed by walking `eat:cites` |
-| `GET` | `/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}?role=` | One placement's cited evidence; omit `role` for all four, or narrow to `urgency`/`capacity`/`timeframe`/`multi_list` |
+| `GET` | `/decisions/{hospital_hipe}/{as_of_date}` | Every ranked position for that day, with its cited evidence resolved to real values (FR8) -- reconstructed by walking `eat:cites` |
+| `GET` | `/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}?role=` | One placement's cited evidence, resolved (FR8); omit `role` for all four, or narrow to `urgency`/`capacity`/`timeframe`/`multi_list` |
 
 Every write endpoint follows the same contract: `200 {"status": "ok"}` on full success; `207
 {"status": "postgres_committed_graph_projection_failed", "detail": ...}` if Postgres committed but
 the graph push then failed (the Postgres row still stands -- it's the system of record); `400` if
 Postgres itself rejects the payload (no graph write is even attempted); `422` if the payload fails
 validation before either store is touched.
+
+Every read endpoint's evidence is **resolved inline** (FR8, Phase 6) -- each citation comes back as
+`{"role": ..., "iri": ..., "type": ..., "properties": {...}}`, the node's actual data (e.g. a
+`ClinicSession`'s `slotsAvailable`), not just an identifier the caller would have to dereference
+separately. A citation whose underlying evidence isn't loaded degrades to `type: null` / empty
+`properties` rather than erroring. All IRIs in every response are **short** (namespace prefix
+stripped, e.g. `clinic-session/9003/CL02/2026-08-26`, never the full
+`https://nonsocynthia.github.io/.../kg/id/...` form) -- that full form is only ever used internally,
+for the actual SPARQL queries against Oxigraph.
 
 ## Tests
 

@@ -365,23 +365,60 @@ IRI. It does not tell it *what that node says*. `product-guidelines.md` requires
 `"NEWS2 aggregate 7"`, `"Ward B occupancy 104%"` — actual values, not opaque identifiers. Rendering
 that requires a second hop: dereferencing the evidence IRI into its own properties. FR8 in spec.md.
 
-- [ ] Task: `GET /evidence/resolve?iri=`
-  - [ ] Write a test: insert a synthetic `ClinicSession` node (real ontology properties —
+**Course-corrected mid-phase, twice, both by user direction:**
+
+1. Originally planned as a standalone `GET /evidence/resolve?iri=` endpoint. User: fold resolution
+   directly into the existing `GET /decisions` and `GET /evidence` responses instead — no second
+   round-trip for the UI to orchestrate. Implemented as an internal `_resolve_iri` helper, called
+   once per citation inside `_evidence_for_placement`, so every citation in either endpoint's
+   response now carries `type` + `properties` alongside `role`, not just an IRI. The standalone
+   endpoint idea was dropped entirely, not kept as an option alongside the embedded version.
+2. User: the full `https://nonsocynthia.github.io/.../kg/id/...` form in JSON responses is
+   unnecessarily verbose for a caller — why does the API need to expose it. Added `iri.short()`,
+   applied to every IRI field in every read-endpoint response (`decision`, `placement`, `referral`,
+   evidence `iri`, resolved property values, resolved `type`). The full IRI is still used for every
+   actual SPARQL query/update (required, per `namespaces.md`) — only JSON API responses are
+   shortened, since that file's "no unescaped `/` in a prefixed name" rule is a Turtle/N-Quads
+   serialisation constraint, not something that applies to a JSON string field.
+
+- [x] Task: Evidence resolution, folded into `GET /decisions` and `GET /evidence`
+  - [x] Write a test: insert a synthetic `ClinicSession` node (real ontology properties —
         `eat:clinicName`, `eat:slotsTotal`, `eat:slotsBooked`, `eat:slotsAvailable`, `eat:sessionDate`)
-        directly into the graph, call the endpoint, assert every property comes back correctly typed
-        and keyed by its short name (not the full predicate IRI)
-  - [ ] Write a test that `rdf:type` is pulled out into the response's `type` field, not left sitting
-        in `properties` alongside everything else
-  - [ ] Write a test that an IRI with no triples at all returns `404`
-  - [ ] Write a test against a *real* evidence IRI produced by this service's own write path: `POST
-        /scores` with a fixture citation, then resolve that exact citation's `evidence_key`-derived
-        IRI — proving the two hops (`cites` walk, then resolve) actually compose end to end, not just
-        that each works in isolation
-  - [ ] Implement the endpoint: `SELECT ?p ?o WHERE { GRAPH ?g { <iri> ?p ?o } }`, split `rdf:type`
-        out, shorten every other predicate/object-class IRI by stripping the `eat:`/`prov:`/`rdf:`
-        namespace prefix
+        directly into the graph, `POST` a decision citing that exact IRI, `GET` it back, assert the
+        citation carries the real property values — not just re-confirming the IRI was cited
+  - [x] Write a test that `rdf:type` is pulled out into a `type` field, not left in `properties`
+  - [x] Write a test that a citation whose evidence node has no triples loaded degrades to
+        `type: null` / `properties: {}` rather than erroring or being dropped — the normal case in
+        this dev environment, where the full dataset isn't loaded
+  - [x] Write a test proving the two hops (`cites` walk, then resolve) compose end to end against a
+        citation this service's own `POST /decisions` wrote, not a hand-inserted fixture alone
+  - [x] Implement `_resolve_iri`: `SELECT ?p ?o WHERE { GRAPH ?g { <iri> ?p ?o } }`, `rdf:type` split
+        out into `type`, every other predicate shortened via `iri.short`
 
-- [ ] Task: Verify coverage stays ≥ 60% on the read path; `ruff`/`mypy` clean
+- [x] Task: Shorten every IRI in every read-endpoint response (`iri.short`, added to `iri.py`)
+  - [x] Unit tests: strips the instance/vocabulary/graph namespace correctly; leaves non-namespaced
+        literal values (a plain string, a date) unchanged rather than mangling them
+  - [x] Integration test asserting no response body contains `"https://"` anywhere
 
-- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Rebuild, run the full suite, confirm live against the running container from the host
+- [x] Task: Per-endpoint `summary`/`description` for `/docs` (user request, mid-phase)
+  - [x] All 7 routes (`/health` + 3 writes + 3 reads) get a `summary` and a full `description`
+        covering what the endpoint does, its response contract (writes: 200/207/400/422), and any
+        gotcha a caller needs (decision-node accumulation, evidence-degradation behaviour, etc.)
+  - [x] App-level `description` on the `FastAPI(...)` constructor, shown at the top of `/docs`,
+        pointing at `spec.md` and `README.md`
+
+- [x] Task: Verify coverage stays ≥ 60% on the read path; `ruff`/`mypy` clean
+
+  388 tests total (up from 381), 97% coverage on `app/`, `ruff`/`mypy` clean. Confirmed stable across
+  three consecutive full-suite runs (the accumulation gotcha documented above was actually caught and
+  fixed here — the first attempt at the new evidence-resolution tests failed intermittently across
+  runs until they adopted the same wide-random-`as_of_date` isolation pattern `test_reads_decision.py`
+  already used).
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+  - [x] Rebuilt, ran the full suite three times consecutively (388 passed each time), confirmed live
+        against the running container: `POST /decisions` with a citation pointing at a synthetically
+        inserted `ClinicSession`, then `GET /decisions/...` — response showed
+        `"clinicName": "Cardiology Outreach"`, `"slotsAvailable": "2"` etc. directly, IRIs in short
+        form throughout, zero occurrences of the full namespace URL. `/openapi.json` confirmed every
+        route carries the expected `summary`.

@@ -45,6 +45,25 @@ def rdf(term: str) -> str:
     return f"{RDF_NS}{term}"
 
 
+def short(value: str) -> str:
+    """Strips the namespace prefix off a full IRI for API *responses* only --
+    internal graph operations (SPARQL queries/updates) always use the full
+    IRI, per namespaces.md; this is purely a JSON-response convenience so a
+    caller sees `clinic-session/9003/CL02/2026-08-26` instead of the full
+    `https://.../kg/id/clinic-session/9003/CL02/2026-08-26`. namespaces.md's
+    "no unescaped `/` in a prefixed name" rule is about Turtle/N-Quads files
+    specifically (a real serialisation constraint); a JSON string field has
+    no such restriction, so this drops the prefix outright rather than
+    producing an `eatd:`-style compromise. Values outside our namespaces
+    (rare, but possible for object values in resolved evidence) pass through
+    unchanged rather than being silently mangled.
+    """
+    for ns in (EATD_NS, EAT_NS, GRAPH_BASE):
+        if value.startswith(ns):
+            return value[len(ns) :]
+    return value
+
+
 def referral_iri(hospital_hipe: str, pathway_number: str) -> str:
     return eatd(f"referral/{hospital_hipe}/{pathway_number}")
 

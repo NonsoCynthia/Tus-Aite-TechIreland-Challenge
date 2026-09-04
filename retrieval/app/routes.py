@@ -23,6 +23,18 @@ from .schemas import DecisionIn, OverrideIn, ScoreIn
 logger = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(require_bearer_token)])
 
+_RESPONSE_CONTRACT = (
+    "\n\n**Response contract**, the same on every write endpoint: `200` "
+    '`{"status": "ok"}` on full success. `207` '
+    '`{"status": "postgres_committed_graph_projection_failed", "detail": ...}` '
+    "if the Postgres write committed but the graph projection then failed -- "
+    "the Postgres row still stands, since Postgres is the system of record "
+    "(ADR-002); retry the graph side out of band, don't resubmit the write. "
+    "`400` if Postgres itself rejects the payload (a FK/CHECK constraint "
+    "violation) -- nothing was written to either store. `422` if the request "
+    "body fails validation before either store is touched."
+)
+
 
 def _projection_failed_response(detail: str) -> JSONResponse:
     return JSONResponse(
@@ -31,7 +43,17 @@ def _projection_failed_response(detail: str) -> JSONResponse:
     )
 
 
-@router.post("/scores", response_model=None)
+@router.post(
+    "/scores",
+    response_model=None,
+    summary="Write an agent score",
+    description=(
+        "Called by the urgency/capacity agents (once built) after scoring one referral. Writes "
+        "`agent.agent_scores` + `agent.agent_citations`, then projects `eat:Score` + `eat:cites` "
+        "triples into the graph. `citations` must be non-empty -- every score must cite at least "
+        "one piece of evidence (`eat:cites` is 1..n in the ontology)." + _RESPONSE_CONTRACT
+    ),
+)
 async def create_score(payload: ScoreIn) -> JSONResponse | dict[str, str]:
     try:
         db.insert_score(payload)
@@ -52,7 +74,22 @@ async def create_score(payload: ScoreIn) -> JSONResponse | dict[str, str]:
     return {"status": "ok"}
 
 
-@router.post("/decisions", response_model=None)
+@router.post(
+    "/decisions",
+    response_model=None,
+    summary="Write a coordinator decision (ranked list)",
+    description=(
+        "Called by the coordinating agent (once built) after ranking one hospital's referrals for "
+        "one day. One call submits the whole decision atomically: `agent.decisions` + every ranked "
+        "position (`agent.decision_rankings`), its citations (`agent.decision_citations`), and its "
+        "rule checks (`agent.rule_checks`) in a single Postgres transaction, then projects "
+        "`eat:Decision`/`eat:RankedPlacement`/`eat:RuleCheck`/`eat:cites` triples into the graph. "
+        "Every ranking's `citations` must be non-empty (same 1..n rule as scores), and `position` "
+        "must be unique within the decision. Note: the graph node this lands on is keyed only by "
+        "`(hospital_hipe, as_of_date)` -- a second decision for the same hospital and day adds to "
+        "the same node rather than replacing it." + _RESPONSE_CONTRACT
+    ),
+)
 async def create_decision(payload: DecisionIn) -> JSONResponse | dict[str, str]:
     try:
         db.insert_decision(payload)
@@ -70,7 +107,19 @@ async def create_decision(payload: DecisionIn) -> JSONResponse | dict[str, str]:
     return {"status": "ok"}
 
 
-@router.post("/overrides", response_model=None)
+@router.post(
+    "/overrides",
+    response_model=None,
+    summary="Write a clinician override",
+    description=(
+        "Called by the clinician UI (once built) when a clinician accepts/reorders/overrides a "
+        "ranked position. `decision_id` must already exist (written by a prior `POST "
+        "/decisions`) -- this endpoint looks up that decision's `as_of_date` itself to build "
+        "the graph IRI, so the caller doesn't need to pass it separately. `reason` must be "
+        "non-blank; overrides are treated as first-class clinician judgement, never as "
+        "corrections or errors." + _RESPONSE_CONTRACT
+    ),
+)
 async def create_override(payload: OverrideIn) -> JSONResponse | dict[str, str]:
     try:
         db.insert_override(payload)

@@ -7,7 +7,6 @@
 | Track | Type | Status | Description |
 |---|---|---|---|
 | [explainable-agent-based-triage_20260828](./tracks/explainable-agent-based-triage_20260828/index.md) | feature | pending; ADR-002 resolved and implemented by `retrieval-service_20260904` — agents should call that service's write endpoints | Full build on top of graph-foundation: urgency agent, capacity agent, coordinator + audit trail, rationale layer, clinician UI + override loop, CPC/CRT compliance validation (proposal §14 Days 3–6) |
-| [retrieval-service_20260904](./tracks/retrieval-service_20260904/index.md) | feature | reopened 2026-09-04; Phase 6 in progress (evidence resolution) | Retrieval service mediating Postgres `core`/`agent` and the Oxigraph graph for agents and the clinician UI; implements ADR-002 (Postgres-first writes, synchronous graph projection on success) |
 
 ## Planned Tracks
 
@@ -21,6 +20,7 @@
 
 | Track | Type | Description |
 |---|---|---|
+| [retrieval-service_20260904](./tracks/retrieval-service_20260904/index.md) | feature | Retrieval service mediating Postgres `core`/`agent` and the Oxigraph graph for agents and the clinician UI. Implements ADR-002: `POST /scores`/`/decisions`/`/overrides`, plus read endpoints (wait counters wrapping `wait_counters.rq` unmodified, decision/evidence-audit-trail lookup with citations resolved inline to real values, role-scoped evidence lookup). Also consolidated the dataset + app docker-compose stacks into one project. Reopened once same day for evidence resolution, IRI shortening, and `/health` dependency checks. 388 tests, 97% coverage, 14 acceptance criteria met. See [`retrieval/README.md`](../retrieval/README.md) |
 | [graph-foundation_20260826](./tracks/graph-foundation_20260826/index.md) | feature | Knowledge graph foundation: OWL ontology, Oxigraph bootstrap, RDF projection (Morph-KGC/R2RML) over the `dataset/` Postgres pipeline. 590,814 triples, 19 SHACL shapes, `kg_loader` role isolated from `eval`. See [`kg/README.md`](../kg/README.md) |
 | [add-missing-data-layer_20260903](./tracks/add-missing-data-layer_20260903/index.md) | chore | Add missing data-layer literal properties to the ontology |
 | [complete-eat-ttl-owl_20260903](./tracks/complete-eat-ttl-owl_20260903/index.md) | chore | Complete the `eat.ttl` OWL ontology |

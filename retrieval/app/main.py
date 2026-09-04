@@ -12,12 +12,27 @@ from . import db, graph
 from .reads import router as reads_router
 from .routes import router as writes_router
 
-app = FastAPI(title="Retrieval Service")
+app = FastAPI(
+    title="Retrieval Service",
+    description=(
+        "The single read/write path between Postgres (`core`/`agent` schemas) and the Oxigraph "
+        "knowledge graph, for the urgency/capacity/coordinator agents and the clinician UI. "
+        "Implements ADR-002: Postgres is the system of record; every write projects matching "
+        "RDF triples into the graph only on successful commit. Every endpoint except `/health` "
+        "requires `Authorization: Bearer <token>` -- click **Authorize** above to set it once "
+        "for every request below.\n\n"
+        "See `conductor/tracks/retrieval-service_20260904/spec.md` for the full requirements and "
+        "`retrieval/README.md` for a quickstart."
+    ),
+)
 app.include_router(writes_router)
 app.include_router(reads_router)
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    summary="Health check (no auth)",
+)
 async def health() -> JSONResponse:
     """Deliberately unauthenticated -- a health check that itself requires a
     credential can't be used by infra (Docker HEALTHCHECK, a load balancer,

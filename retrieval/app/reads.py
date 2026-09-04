@@ -78,7 +78,19 @@ def _wrap_wait_counters_query(referral_iri: str, as_of_date: date) -> str:
     return fragment[:start] + f"\n  GRAPH <{inputs_graph}> {{{body}}}\n" + fragment[end:]
 
 
-@router.get("/referrals/{hospital_hipe}/{pathway_number}/wait-counters")
+@router.get(
+    "/referrals/{hospital_hipe}/{pathway_number}/wait-counters",
+    summary="Get the four wait-time counters for one referral",
+    description=(
+        "Wraps `kg/queries/wait_counters.rq` unmodified -- the one shared fragment every agent and "
+        "the rule checker use, so they can never disagree about a wait. Returns "
+        "`days_since_referral`, `days_since_received`, `days_awaiting_triage` (`null` if the "
+        "referral isn't currently awaiting triage), and `adjusted_wait_days` (suspensions "
+        "subtracted). `404` if the referral has no data as of that date in the graph's `inputs` "
+        "layer -- this needs the real dataset loaded via the Morph-KGC pipeline, not just fixture "
+        "data from the write endpoints."
+    ),
+)
 async def wait_counters(
     hospital_hipe: str, pathway_number: str, as_of_date: date = Query(...)
 ) -> dict[str, Any]:
@@ -89,7 +101,7 @@ async def wait_counters(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no referral data for that date")
     row = bindings[0]
     return {
-        "referral": referral,
+        "referral": iri.short(referral),
         "as_of_date": as_of_date.isoformat(),
         "days_since_referral": int(row["daysSinceReferral"]["value"]),
         "days_since_received": int(row["daysSinceReceived"]["value"]),
@@ -118,14 +130,62 @@ def _evidence_query(placement_iri: str, role: CitationRole | None) -> str:
     )
 
 
+async def _resolve_iri(target_iri: str) -> dict[str, Any]:
+    """Dereferences one graph node into its own properties (spec.md FR8) --
+    walking eat:cites (_evidence_query above) only tells you *which* node was
+    cited, as an IRI; this is the second hop that says *what it says* (e.g. a
+    BedStatus's actual occupancy numbers). Folded directly into the read
+    endpoints below rather than a separate endpoint the UI would have to
+    round-trip to -- callers get fully-resolved evidence in one request.
+
+    Every predicate/class name is shortened (iri.short) for the response --
+    a caller has no use for the full
+    `https://nonsocynthia.github.io/.../kg/ns#slotsAvailable` when
+    `slotsAvailable` identifies the same thing unambiguously within this
+    API's own responses. If the IRI has no triples at all (nothing loaded
+    for it yet), this degrades to an empty `properties` dict rather than
+    failing the whole enclosing response -- one missing citation's detail
+    shouldn't take down an otherwise-complete decision.
+    """
+    query = f"SELECT ?p ?o WHERE {{\n  GRAPH ?g {{ <{target_iri}> ?p ?o }}\n}}"
+    bindings = await _sparql_select(query)
+    rdf_type = iri.rdf("type")
+    entity_type: str | None = None
+    properties: dict[str, str] = {}
+    for row in bindings:
+        predicate = row["p"]["value"]
+        obj = row["o"]["value"]
+        if predicate == rdf_type:
+            entity_type = iri.short(obj)
+            continue
+        properties[iri.short(predicate)] = iri.short(obj)
+    return {"iri": iri.short(target_iri), "type": entity_type, "properties": properties}
+
+
 async def _evidence_for_placement(
     placement_iri: str, role: CitationRole | None = None
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     bindings = await _sparql_select(_evidence_query(placement_iri, role))
-    return [{"role": b["role"]["value"], "evidence": b["evidence"]["value"]} for b in bindings]
+    results = []
+    for b in bindings:
+        resolved = await _resolve_iri(b["evidence"]["value"])
+        results.append({"role": b["role"]["value"], **resolved})
+    return results
 
 
-@router.get("/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}")
+@router.get(
+    "/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}",
+    summary="Get one ranked position's cited evidence, resolved",
+    description=(
+        "Every citation the coordinator recorded for this placement (via `POST /decisions`), "
+        "each already resolved (spec.md FR8) into its actual properties -- not just the IRI of "
+        "the node that was cited. Omit `role` for all four citation roles "
+        "(`urgency`/`capacity`/`timeframe`/`multi_list`) at once, the full row-expansion view; "
+        "pass one to narrow to just that section. A citation whose underlying evidence node has "
+        "no data loaded (common in a dev environment without the full dataset) still appears, "
+        "with `type: null` and empty `properties`, rather than being dropped or erroring."
+    ),
+)
 async def evidence_for_placement(
     hospital_hipe: str,
     as_of_date: date,
@@ -133,18 +193,28 @@ async def evidence_for_placement(
     role: CitationRole | None = None,
 ) -> dict[str, Any]:
     placement = iri.placement_iri(hospital_hipe, as_of_date.isoformat(), pathway_number)
-    return {"placement": placement, "evidence": await _evidence_for_placement(placement, role)}
+    return {
+        "placement": iri.short(placement),
+        "evidence": await _evidence_for_placement(placement, role),
+    }
 
 
-@router.get("/decisions/{hospital_hipe}/{as_of_date}")
+@router.get(
+    "/decisions/{hospital_hipe}/{as_of_date}",
+    summary="Get one hospital-day's ranked list, with resolved evidence",
+    description=(
+        "The audit trail, made queryable: reconstructs the full decision -- every ranked "
+        "position, in order, with its cited evidence already resolved to actual properties "
+        "(FR8), not just IRIs -- purely by walking `eat:hasPlacement` then `eat:cites` from the "
+        "`Decision` node. No placement is ever returned without evidence (spec.md NFR2): every "
+        "one has at least one citation, guaranteed by write-time validation, not by filtering "
+        "here. `404` if nothing has been written for that hospital/date yet. Note: a second "
+        "`POST /decisions` for the same hospital and day adds its placements to this same "
+        "result rather than replacing it -- the graph node is keyed only by "
+        "`(hospital_hipe, as_of_date)`."
+    ),
+)
 async def get_decision(hospital_hipe: str, as_of_date: date) -> dict[str, Any]:
-    """Reconstructs the full decision -- every ranked position with its
-    cited evidence -- purely by walking eat:hasPlacement then eat:cites (via
-    its role subproperties) from the Decision node. No score or placement is
-    ever returned without its evidence (spec.md NFR2): every placement here
-    has at least one citation, guaranteed by RankingIn's own validation
-    (schemas.py) at write time, not by filtering here.
-    """
     decision = iri.decision_iri(hospital_hipe, as_of_date.isoformat())
     query = (
         f"PREFIX eat: <{iri.EAT_NS}>\n"
@@ -163,13 +233,14 @@ async def get_decision(hospital_hipe: str, as_of_date: date) -> dict[str, Any]:
     placements = []
     for row in bindings:
         placement_iri = row["placement"]["value"]
+        referral_iri = row["referral"]["value"]
         placements.append(
             {
-                "placement": placement_iri,
+                "placement": iri.short(placement_iri),
                 "position": int(row["position"]["value"]),
-                "referral": row["referral"]["value"],
-                "pathway_number": _pathway_number_from_iri(row["referral"]["value"]),
+                "referral": iri.short(referral_iri),
+                "pathway_number": _pathway_number_from_iri(referral_iri),
                 "evidence": await _evidence_for_placement(placement_iri),
             }
         )
-    return {"decision": decision, "placements": placements}
+    return {"decision": iri.short(decision), "placements": placements}

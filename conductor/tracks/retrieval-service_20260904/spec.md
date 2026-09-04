@@ -131,20 +131,33 @@ that track's blocker), pointing at this track as the implementation.
 All graph writes strictly follow `conductor/kg/namespaces.md`'s IRI-minting conventions and named-graph
 table. No ad hoc graph or IRI scheme is invented by this service.
 
-### FR8 — Evidence resolution (added Phase 6, reopened)
+### FR8 — Evidence resolution, embedded in FR3's read endpoints (added Phase 6, reopened)
 
-`GET /evidence/resolve?iri=<evidence IRI>` dereferences any IRI (an evidence node returned by FR3's
-decision/evidence lookups, but not restricted to those — any graph node works) into its own
-properties: every `?p ?o` triple with that IRI as subject, across any named graph. Response shape:
-`{"iri": ..., "type": <short class name, from rdf:type>, "properties": {<short predicate name>:
-<value>, ...}}`. Predicate/class names are shortened by stripping the `eat:`/`prov:`/`rdf:` namespace
-prefix (matching how a UI would actually want to key into the response), not returned as full IRIs.
-`404` if the IRI has no triples at all (nothing to resolve, not an empty-but-valid result).
+Every citation returned by `GET /decisions/{hospital_hipe}/{as_of_date}` and `GET
+/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}` is resolved to its actual properties, not
+left as a bare IRI. **Not a separate endpoint** — a standalone `GET /evidence/resolve?iri=` was the
+original design; the user asked for it folded directly into the existing responses instead, so the UI
+never needs a second round-trip per citation. Internally: `_resolve_iri` dereferences one IRI (every
+`?p ?o` triple with it as subject, across any named graph) and is called once per citation inside the
+existing evidence-lookup helper.
 
-This is deliberately generic — a single dereference endpoint, not five per-evidence-type endpoints —
-because the citation tables already carry `evidence_type` (so a caller who needs to branch on type
-already has it from the FR3 response that gave them the IRI in the first place); this endpoint's only
-job is "what does this specific node say," which is the same question regardless of type.
+Each citation entry becomes `{"role": ..., "iri": ..., "type": <short class name, from rdf:type>,
+"properties": {<short predicate name>: <value>, ...}}`. If the evidence node has no triples loaded
+(the normal case in a dev environment without the full dataset), `type` is `null` and `properties` is
+empty — the citation still appears, degrading gracefully rather than erroring or being dropped; one
+missing citation's detail must not take down an otherwise-complete decision.
+
+Generic by design — one resolver, not five per-evidence-type ones — because the citation itself
+already carries `evidence_type` if a caller needs to branch on it; resolution only answers "what does
+this specific node say," the same question regardless of type.
+
+**IRI shortening (added alongside FR8, same user request):** every IRI in every read-endpoint JSON
+response (`decision`, `placement`, `referral`, evidence `iri`, resolved property values/`type`) has
+its namespace prefix stripped (`iri.short`) — e.g. `clinic-session/9003/CL02/2026-08-26`, not
+`https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/clinic-session/9003/CL02/
+2026-08-26`. The full IRI is still used for every actual SPARQL query/update — this is purely a
+response-shaping concern, not a change to how the graph itself is addressed or namespaces.md's
+conventions.
 
 ## Non-Functional Requirements
 
@@ -190,9 +203,14 @@ job is "what does this specific node say," which is the same question regardless
 11. Any request without a valid `Authorization: Bearer` token returns `401` on every endpoint except
     `/health`, including writes; a request with a valid token succeeds. `/health` itself returns `200`
     regardless of whether a token is present.
-12. `GET /evidence/resolve?iri=` on a real evidence IRI (e.g. one returned by the decision/evidence
-    endpoints) returns that node's actual properties, not just its IRI — e.g. a `ClinicSession`'s
-    `slotsAvailable`/`slotsTotal`, not only the fact that it was cited. `404` on an IRI with no triples.
+12. Citations returned by `GET /decisions/...` and `GET /evidence/...` carry the cited node's actual
+    properties (e.g. a `ClinicSession`'s `slotsAvailable`/`slotsTotal`), not just its IRI — resolved
+    inline, no second request needed. A citation with nothing loaded for its IRI degrades to
+    `type: null` / empty `properties` rather than erroring.
+13. No read-endpoint JSON response contains the full `https://nonsocynthia.github.io/...` namespace
+    prefix anywhere — every IRI field is shortened to its relative form.
+14. Every endpoint (`/health` included) has a `summary` and `description` visible in `/docs`
+    (`/openapi.json`), covering what it does and, for writes, the response contract.
 
 ## Out of Scope
 
