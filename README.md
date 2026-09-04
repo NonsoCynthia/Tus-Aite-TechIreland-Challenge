@@ -191,8 +191,8 @@ Oxigraph — 590,814 triples, 19 SHACL shapes. See `kg/README.md` and `dataset/R
 
 The active track is `explainable-agent-based-triage_20260828`: the urgency agent, capacity agent,
 coordinating agent, rationale layer, clinician UI, and CPC/CRT compliance validation built on top of
-the graph. It is blocked on ADR-002 — where agent outputs (scores, citations, rankings) get written:
-Postgres `agent.*`, the graph, or both — which should be resolved first.
+the graph. Per ADR-002, agents write to Postgres `agent.*`; a projection step mirrors that into the
+graph, same pattern as the cohort data.
 
 See `conductor/product.md`, `conductor/tech-stack.md`, and
 `conductor/tracks/explainable-agent-based-triage_20260828/spec.md` for the detailed project plan.

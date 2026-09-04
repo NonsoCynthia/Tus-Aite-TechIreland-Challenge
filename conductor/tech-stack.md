@@ -109,12 +109,19 @@ exactly which evidence nodes produced it, without leaving the store.
 **Deterministic scoring cores, LLM-generated rationale.** This is the central architectural decision
 and it is a compliance decision as much as a technical one.
 
+**Per ADR-002** (`conductor/tracks/explainable-agent-based-triage_20260828/decisions.md`): agents write
+to Postgres `agent.*`, not directly to the graph. A projection step, in the same declarative style as
+`kg/mappings/`, mirrors `agent.*` into `eat:Score`/`Decision`/`cites` triples so the graph still
+exposes the full audit trail — Postgres is the source of record it's projected from, same as cohort
+data under ADR-001.
+
 - **Urgency agent** — MTS and NEWS2 logic implemented as deterministic, unit-tested Python. Same
-  inputs always yield the same score. Writes `eat:Score` nodes and `eat:cites` edges to the graph.
+  inputs always yield the same score. Writes to `agent.agent_scores` via `agent_rw`.
 - **Capacity agent** — deterministic constraint reasoning over the SimPy occupancy model. Same.
 - **Coordinating agent** — ranking is a **SPARQL query** over both sets of triples plus deterministic
-  tie-breaking (CPC, then CRT breach, then oldest referral first). Materialises `Decision` nodes,
-  `RankedPlacement` nodes and `cites` edges.
+  tie-breaking (CPC, then CRT breach, then oldest referral first). Writes `agent.decisions`,
+  `decision_rankings` and `decision_citations` rows, projected into `Decision`/`RankedPlacement`/
+  `cites` triples.
 - **LLM layer** — takes the already-cited graph evidence for one ranked position and writes the
   human-readable rationale. It explains a decision it did not make. It cannot alter scores or ranks.
 

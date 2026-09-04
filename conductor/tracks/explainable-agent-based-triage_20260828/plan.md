@@ -5,6 +5,11 @@
 required, 60%. Tier 3 = smoke tests only. Depends on `graph-foundation_20260826` being seeded and
 queryable.
 
+**Per ADR-002** (`decisions.md`, accepted 2026-09-04): agents write to Postgres `agent.*` via
+`agent_rw`, not directly to the graph. Every "write scored/Decision/cites edges to the graph" task
+below is superseded by "write to `agent.*`," with a projection step (Phase 3) mirroring it into the
+graph — same shape as `kg/mappings/`.
+
 ---
 
 ## Phase 1: Urgency Agent (Tier 1)
@@ -15,9 +20,9 @@ queryable.
 - [ ] Task: NEWS2 scoring logic
     - [ ] Sub-task: Write failing tests for NEWS2 score computation, cited to the NEWS2 rubric
     - [ ] Sub-task: Implement deterministic NEWS2 scorer
-- [ ] Task: Write scored edges to the graph (Tier 2)
-    - [ ] Sub-task: Round-trip test — score, write, query back, compare
-    - [ ] Sub-task: Implement `triage.agents.urgency` writing `scored` edges (Agent→Referral, score as edge property)
+- [ ] Task: Write scores to Postgres (Tier 2)
+    - [ ] Sub-task: Round-trip test — score, write to `agent.agent_scores`, read back, compare
+    - [ ] Sub-task: Implement `triage.agents.urgency` writing via `agent_rw` (ADR-002)
 - [ ] Task: Conductor - User Manual Verification 'Urgency Agent' (Protocol in workflow.md)
 
 ---
@@ -27,9 +32,9 @@ queryable.
 - [ ] Task: Constraint reasoning logic
     - [ ] Sub-task: Write failing tests for available-capacity and overcrowding-state scoring
     - [ ] Sub-task: Implement deterministic capacity scorer reading `BedStatus` via SPARQL
-- [ ] Task: Write scored edges to the graph (Tier 2)
-    - [ ] Sub-task: Round-trip test — score, write, query back, compare
-    - [ ] Sub-task: Implement `triage.agents.capacity`
+- [ ] Task: Write scores to Postgres (Tier 2)
+    - [ ] Sub-task: Round-trip test — score, write to `agent.agent_scores`, read back, compare
+    - [ ] Sub-task: Implement `triage.agents.capacity` writing via `agent_rw` (ADR-002)
 - [ ] Task: Conductor - User Manual Verification 'Capacity Agent' (Protocol in workflow.md)
 
 ---
@@ -38,14 +43,24 @@ queryable.
 
 - [ ] Task: Ranking query and tie-breaking
     - [ ] Sub-task: Write failing tests for tie-break order (CPC, then CRT breach, then oldest-first)
-    - [ ] Sub-task: Implement SPARQL ranking query over both agents' `scored` edges
+    - [ ] Sub-task: Implement ranking logic over both agents' `agent.agent_scores` rows (read via
+          Postgres or the graph projection below — pick one at implementation time, document the
+          choice)
 - [ ] Task: CPC/CRT ordering constraint enforcement
     - [ ] Sub-task: Write failing tests asserting an urgent referral is never ranked behind an
           in-window semi-urgent one
     - [ ] Sub-task: Implement the enforcement check against the OWL constraint from `graph-foundation`
-- [ ] Task: Decision and cites materialisation (Tier 2)
-    - [ ] Sub-task: Write a test walking `cites` backward from a ranked position to its evidence nodes
-    - [ ] Sub-task: Implement `triage.agents.coordinator` writing `Decision` nodes and `cites` edges
+- [ ] Task: Decision materialisation in Postgres (Tier 2)
+    - [ ] Sub-task: Write a test walking `decision_citations` back to its evidence rows
+    - [ ] Sub-task: Implement `triage.agents.coordinator` writing `agent.decisions`,
+          `decision_rankings`, `decision_citations` via `agent_rw` (ADR-002)
+- [ ] Task: Project `agent.*` into the graph (Tier 2) — new since ADR-002
+    - [ ] Sub-task: Write a mapping (`kg/mappings/agent_outputs.rml.ttl` or equivalent) from
+          `agent.agent_scores` / `decisions` / `decision_rankings` / `decision_citations` /
+          `overrides` to `eat:Score` / `Decision` / `cites` triples, same declarative style as the
+          existing five mappings
+    - [ ] Sub-task: Write a test walking `cites` backward from a ranked position **in the graph** to
+          its evidence nodes, confirming the projection round-trips what Postgres holds
 - [ ] Task: Conductor - User Manual Verification 'Coordinating Agent and Audit Trail' (Protocol in workflow.md)
 
 ---
