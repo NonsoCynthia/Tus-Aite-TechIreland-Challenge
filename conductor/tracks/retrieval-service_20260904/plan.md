@@ -53,7 +53,11 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
   - [x] Implement a `GET /health` route (no DB/graph dependency) proving the app boots and auth is
         enforced
 
-- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+
+  Confirmed by user 2026-09-04: scaffold verified end to end on the consolidated single
+  docker-compose (see the note above the FastAPI-skeleton task for what changed after this task was
+  first completed).
 
 ---
 
