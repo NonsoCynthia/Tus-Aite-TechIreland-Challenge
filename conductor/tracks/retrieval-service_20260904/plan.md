@@ -332,3 +332,26 @@ Verified: rebuilt the image, 379 tests pass, `ruff`/`mypy` clean, recreated the 
 pick up the new env wiring, and confirmed live from the host — `/health` returns `200` with no token
 and with a bogus one; `/decisions` still `401`s with no token and resolves correctly (`404`, not an
 auth or connection error) with the token now sourced from the consolidated root `.env`.
+
+3. **`/docs` showed no Authorize button.** `auth.py` read `Authorization` as a plain `Header(...)`
+   parameter, which works but never registers an OpenAPI security scheme — Swagger UI had no padlock
+   icons and no global "Authorize" button, so the header had to be retyped by hand on every "Try it
+   out" call. Fixed by switching to `fastapi.security.HTTPBearer` (`auto_error=False`, since its own
+   default is `403` on a missing header and this service's contract is `401` for both missing and
+   invalid tokens — handled explicitly, so behaviour is unchanged). Confirmed via `/openapi.json`: all
+   six protected routes now carry `security: [{"HTTPBearer": []}]`, `/health` correctly carries none.
+   379 tests unmodified and still passing, `ruff`/`mypy` clean.
+
+4. **`/health` didn't check its dependencies.** It returned a static `{"status": "ok"}` proving only
+   that the process was up, not that it could do its job. User request: check the databases explicitly.
+   Added `db.check_connection()` (a `SELECT 1` with a 2s `connect_timeout`) and
+   `graph.check_connection()` (an `ASK` query with a 2s `httpx` timeout) — both short-timeout so a
+   hung dependency fails the health check fast rather than hanging it. `/health` now returns `200
+   {"status": "ok", "postgres": "ok", "oxigraph": "ok"}` when both are reachable, `503 {"status":
+   "degraded", ...}` with per-dependency detail otherwise — `503`, not a `200` with a degraded body
+   only, so a naive `curl -f` health check (or a Docker `HEALTHCHECK` using one) correctly reports
+   unhealthy without parsing the response. Still unauthenticated (unaffected by fix 1 above). Two new
+   tests monkeypatch each dependency independently to prove the `503` path; verified again against
+   real infrastructure, not just mocks, by actually stopping the `oxigraph` container mid-session —
+   `/health` correctly went to `503 {"oxigraph": "unreachable"}` and recovered to `200` once it was
+   started again. 381 tests total, `ruff`/`mypy` clean.

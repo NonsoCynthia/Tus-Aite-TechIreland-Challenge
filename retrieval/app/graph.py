@@ -203,3 +203,22 @@ async def push_triples(triples: list[Triple], graph_iri: str) -> None:
             headers={"Content-Type": "application/sparql-update"},
         )
         response.raise_for_status()
+
+
+async def check_connection() -> bool:
+    """Used by /health (main.py). A short, fixed timeout -- not the 10s used
+    for real writes -- so a health check fails fast rather than stalling the
+    caller. A plain ASK, not a real query, since this only needs to prove
+    Oxigraph is reachable and answering, not that any particular data
+    exists."""
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            response = await client.post(
+                settings.oxigraph_query_url,
+                data={"query": "ASK { ?s ?p ?o }"},
+                headers={"Accept": "application/sparql-results+json"},
+            )
+            response.raise_for_status()
+        return True
+    except httpx.HTTPError:
+        return False

@@ -41,7 +41,7 @@ so Docker/a load balancer/an uptime monitor can use it without holding a credent
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/health` | No auth, no DB/graph dependency -- proves the app process is up |
+| `GET` | `/health` | No auth. Checks Postgres and Oxigraph connectivity (short timeouts); `200` when both reachable, `503` with per-dependency detail otherwise |
 | `POST` | `/scores` | Write an agent score + its citations (FR2, the ADR-002 projector) |
 | `POST` | `/decisions` | Write a decision: rankings, citations, rule checks, atomically |
 | `POST` | `/overrides` | Write a clinician override |

@@ -17,6 +17,18 @@ from .config import settings
 from .schemas import DecisionIn, OverrideIn, ScoreIn
 
 
+def check_connection() -> bool:
+    """Used by /health (main.py). A short, fixed connect_timeout -- not the
+    default (which can hang for a long time against a dead host) -- so a
+    health check fails fast rather than stalling the caller."""
+    try:
+        with psycopg.connect(settings.retrieval_db_url, connect_timeout=2) as conn:
+            conn.execute("SELECT 1")
+        return True
+    except psycopg.Error:
+        return False
+
+
 def _connect() -> psycopg.Connection:
     return psycopg.connect(settings.retrieval_db_url)
 
