@@ -164,6 +164,27 @@ conventions. Covers `eat:`/`eatd:`/graph IRIs (stripped bare, no label) and the 
 collide) — found to matter, not assumed, when a real `Observation` citation (`sosa:Observation`)
 resolved against the real loaded graph and came back with full unshortened `sosa:` URIs.
 
+### FR9 — Referral context (agent judgment input, added Phase 7, reopened again)
+
+FR3/FR8 cover the *output* side: what an agent already decided, with its citations resolved. They
+give an agent no way to gather the *input* it needs to decide in the first place. `GET
+/referrals/{hospital_hipe}/{pathway_number}/context` closes that gap: the referral's own record
+(specialty, clinic, referral/received dates, triage status), every recorded observation (vitals),
+condition (ICD-10-AM), and triage event tied to that referral, plus a `capacity` section — every ward
+serving the referral's specialty (primary ward first) with its latest bed-status snapshot, and the 5
+most recent clinic sessions for that specialty.
+
+Reads Postgres `core.*` directly, not the graph — `retrieval_rw` already has `SELECT` on all of `core`
+(migration 007), and the input data is fully relational there; going through SPARQL would mean
+reconstructing joins (referral → specialty → ward, referral → specialty → clinic) that Postgres
+already expresses as foreign keys. This is also why this endpoint can't be tested by inserting its own
+fixture data the way the write-path tests do: `core.*` is genuinely read-only for this service by
+design (NFR3's boundary), so its own tests run against whatever real dataset is actually loaded,
+skipping cleanly rather than failing when it isn't.
+
+`404` if the referral itself doesn't exist. Unlike FR3/FR8, there's no `eat:cites` walk here and
+nothing to resolve — this is raw input, not an audit trail of agent output.
+
 ## Non-Functional Requirements
 
 - **NFR1** — Tier 2 (`workflow.md`): tests required, TDD encouraged not enforced, round-trip tests
@@ -216,6 +237,10 @@ resolved against the real loaded graph and came back with full unshortened `sosa
     prefix anywhere — every IRI field is shortened to its relative form.
 14. Every endpoint (`/health` included) has a `summary` and `description` visible in `/docs`
     (`/openapi.json`), covering what it does and, for writes, the response contract.
+15. `GET /referrals/{hospital_hipe}/{pathway_number}/context` on a real, fully-populated referral
+    returns its observations, conditions, and triage events, plus capacity data (wards serving its
+    specialty with latest bed status, recent clinic sessions for that specialty). `404` on a referral
+    that doesn't exist.
 
 ## Out of Scope
 

@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from . import iri
+from . import db, iri
 from .auth import require_bearer_token
 from .config import settings
 from .schemas import CitationRole
@@ -110,6 +110,32 @@ async def wait_counters(
         ),
         "adjusted_wait_days": int(row["adjustedWaitDays"]["value"]),
     }
+
+
+@router.get(
+    "/referrals/{hospital_hipe}/{pathway_number}/context",
+    summary="Get everything needed to judge one referral (agent input)",
+    description=(
+        "Built for the urgency/capacity agents (spec.md FR9, added by user request after "
+        "GET /decisions and GET /evidence turned out to only cover the *output* side -- an "
+        "agent still had no single call to gather the *input* data it needs to compute a "
+        "score in the first place). Returns: the referral's own record (specialty, clinic, "
+        "referral/received dates, triage status); every recorded `observation` (vitals -- hr, "
+        "sbp, dbp, rr, temp, spo2, pain, avpu, chief complaint, news2, mts/icts category); "
+        "every `condition` (ICD-10-AM code, label, whether primary); every `triage_event`; "
+        "and a `capacity` section -- every ward serving this referral's specialty (primary "
+        "ward first) with its latest bed-status snapshot, plus the 5 most recent clinic "
+        "sessions for that specialty. Reads straight from Postgres `core.*` (retrieval_rw's "
+        "existing SELECT grant), not the graph -- this is raw input data, not an audit trail "
+        "of agent output, so there's nothing to resolve via `eat:cites`. `404` if the "
+        "referral itself doesn't exist."
+    ),
+)
+async def referral_context(hospital_hipe: str, pathway_number: str) -> dict[str, Any]:
+    context = db.get_referral_context(hospital_hipe, pathway_number)
+    if context is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no such referral")
+    return context
 
 
 def _evidence_query(placement_iri: str, role: CitationRole | None) -> str:

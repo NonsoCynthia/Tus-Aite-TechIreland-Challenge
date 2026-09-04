@@ -50,12 +50,21 @@ so Docker/a load balancer/an uptime monitor can use it without holding a credent
 | `GET` | `/referrals/{hospital_hipe}/{pathway_number}/wait-counters?as_of_date=` | The four wait counters, via `kg/queries/wait_counters.rq` unmodified (FR3) |
 | `GET` | `/decisions/{hospital_hipe}/{as_of_date}` | Every ranked position for that day, with its cited evidence resolved to real values (FR8) -- reconstructed by walking `eat:cites` |
 | `GET` | `/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}?role=` | One placement's cited evidence, resolved (FR8); omit `role` for all four, or narrow to `urgency`/`capacity`/`timeframe`/`multi_list` |
+| `GET` | `/referrals/{hospital_hipe}/{pathway_number}/context` | Everything an urgency/capacity agent needs to judge one referral (FR9) -- observations, conditions, triage events, plus capacity data for its specialty (wards + latest bed status, recent clinic sessions). Reads Postgres `core.*` directly, not the graph |
 
 Every write endpoint follows the same contract: `200 {"status": "ok"}` on full success; `207
 {"status": "postgres_committed_graph_projection_failed", "detail": ...}` if Postgres committed but
 the graph push then failed (the Postgres row still stands -- it's the system of record); `400` if
 Postgres itself rejects the payload (no graph write is even attempted); `422` if the payload fails
 validation before either store is touched.
+
+**Two directions of data flow through this service.** `POST /scores`/`/decisions`/`/overrides` and
+`GET /decisions`/`/evidence`/`/wait-counters` are all about agent *output* -- what an agent already
+decided, written through and read back with its audit trail. `GET /referrals/.../context` (FR9) is the
+other direction: agent *input* -- the raw clinical and capacity data an agent needs to gather before it
+can compute a score at all. It reads Postgres `core.*` directly rather than the graph, since that's
+where the input data actually lives relationally, and returns `404` for a referral that doesn't exist
+rather than an empty body.
 
 Every read endpoint's evidence is **resolved inline** (FR8, Phase 6) -- each citation comes back as
 `{"role": ..., "iri": ..., "type": ..., "properties": {...}}`, the node's actual data (e.g. a

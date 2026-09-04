@@ -465,3 +465,51 @@ not — only this session's own test-run graphs existed, no `…/kg/graph/inputs
 
 Not committed to the repo (no code/mapping changes) — this loaded data into the local Oxigraph
 container's runtime state only, for interactive testing.
+
+---
+
+## Phase 7: Referral context — agent judgment input (Tier 2, reopened again 2026-09-04)
+
+**Why reopened:** walking the real data flow end to end with the user surfaced a real architectural
+gap. FR3/FR8 cover the *output* side (an agent's already-computed score/decision, read back with
+citations resolved). Nothing built so far gives an urgency/capacity agent a way to gather the *input*
+data it needs to compute a score in the first place — the design assumed agents would query Oxigraph's
+`inputs` graph directly via raw SPARQL, but there was no single call for "everything relevant to
+referral X," and the user asked for one, explicitly adding it to this track's scope. FR9 in spec.md.
+
+- [x] Task: `GET /referrals/{hospital_hipe}/{pathway_number}/context`
+  - [x] Checked the schema before designing anything: `core.referral_daily` carries `specialty_hipe`
+        directly (no graph traversal needed to find it); `core.ward_specialty` maps
+        (hospital_hipe, specialty_hipe) → wards with an `is_primary` flag; `core.clinic_sessions`
+        carries `specialty_hipe` directly too. This is why the endpoint reads Postgres, not the
+        graph — the joins already exist as foreign keys there.
+  - [x] Write a test that an unknown referral returns `404`
+  - [x] Write a test that the endpoint requires auth (401 without a token)
+  - [x] Write tests against real, currently-loaded data: observations/conditions/triage_events present
+        with the expected shape, capacity section's wards actually serve the referral's specialty, at
+        most one ward marked primary, no full `https://` IRIs anywhere in a Postgres-backed response
+  - [x] Implement `db.get_referral_context` (new function, `psycopg.rows.dict_row` for clean
+        column-name access) and the route in `reads.py`
+
+  **Testing note, not a compromise:** unlike the write-path tests, this can't insert its own fixture
+  data — `core.*` is genuinely read-only for `retrieval_rw` (NFR3's boundary, by design: this service
+  must never be able to write input-layer data, only agent output). So the real-data tests query
+  whatever's actually loaded and `pytest.skip` cleanly if the full dataset isn't present, rather than
+  either failing in a fresh environment or weakening the role's privileges just to make testing easier.
+
+  **Serialization note:** `core.bed_status.occupancy_pct` is `NUMERIC(5,2)` and every date/datetime
+  column is a real Python `date`/`datetime` object from psycopg — none of this needed manual
+  `.isoformat()` conversion (unlike `wait_counters`'s hand-built dict): FastAPI's automatic
+  `jsonable_encoder` on a returned `dict[str, Any]` already handles `date`/`datetime`/`Decimal`
+  correctly. Verified live rather than assumed, per this track's own practice.
+
+- [x] Task: Verify coverage stays ≥ 60% on the read path; `ruff`/`mypy` clean
+
+  393 tests total (up from 389), 97% coverage on `app/`, `ruff`/`mypy` clean.
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+  - [x] Confirmed live against real referral `9001`/`PW-9001-000007`: full response with 1 observation
+        (heart rate 126, NEWS2 3, MTS category orange), 1 condition (M16.1, primary), 1 triage event
+        (turnaround 1 day), and capacity data for 2 wards serving specialty `1800` (primary ward
+        `W-9001-04` at 83.52% occupancy) plus 5 recent clinic sessions for that specialty. `404`
+        confirmed for a nonexistent referral.
