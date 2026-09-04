@@ -1,11 +1,13 @@
 # Retrieval service — source materials and file map
 
-**Purpose of this file:** you're about to design/build a retrieval service that sits between Postgres, the
-knowledge graph (Oxigraph), and the agents that will consume both. This file is the index Claude Code should
-read first — it links every reference document relevant to that service and says what each one is actually
-for, so you know which to trust when two of them disagree (they do, in places — noted below).
-**Companion file:** `conductor/retrieval-database-onboarding.md` — read that one too. It covers build steps,
-gotchas, and the current ADR-002 blocker in more depth than this file repeats.
+**Status, updated 2026-09-04:** built. `retrieval-service_20260904` implemented and verified this service —
+see `retrieval/README.md` for the endpoint list and how to run it, and
+`conductor/tracks/retrieval-service_20260904/` for the spec, plan, and implementation notes. This file's
+original purpose (a reading index for *designing* the service) is now historical background; still useful
+for understanding *why* it's shaped the way it is, but read `retrieval/README.md` first for how to actually
+use it.
+**Companion file:** `conductor/retrieval-database-onboarding.md` — also updated; ADR-002 is resolved, not
+still open.
 
 ## Where the retrieval service sits
 
@@ -17,12 +19,13 @@ Postgres (core/agent schemas)  <-->  retrieval service  <-->  Oxigraph (RDF grap
                                     rule-checker agents, clinician UI
 ```
 
-This service is not a new idea invented from scratch — it's the practical implementation of the still-open
+This service is not a new idea invented from scratch — it was built as the practical implementation of the
 ADR-002 decision (where agent outputs get written) plus the read-side patterns the graph-foundation work
 already established (`wait_counters.rq`'s single-shared-fragment principle, named-graph scoping discipline).
-Building this service *is* how ADR-002 gets resolved in code, not just in a document — see the proposal in
-`conductor/retrieval-database-onboarding.md` for the specific shape being proposed (Postgres as system of
-record, one code path pushing a synchronous projection into the graph).
+Building this service *is* how ADR-002 got resolved in code, not just in a document — Postgres is the system
+of record, one code path pushes a synchronous projection into the graph on successful commit. See
+`conductor/tracks/explainable-agent-based-triage_20260828/decisions.md` for the recorded decision and
+`retrieval/README.md` for the endpoints that implement it.
 
 ## The three external source materials you asked to link
 

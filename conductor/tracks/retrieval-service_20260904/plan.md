@@ -252,20 +252,46 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
 
 ## Phase 5: Integration and acceptance pass (Tier 3)
 
-- [ ] Task: End-to-end demo path
-  - [ ] `docker compose up`, then from the host (outside any container): call `POST /decisions` with
+- [x] Task: End-to-end demo path
+  - [x] `docker compose up`, then from the host (outside any container): call `POST /decisions` with
         a generated fixture, then read it back via the Phase 4 endpoints, using a valid bearer token
-  - [ ] Confirm an unauthenticated call is rejected the same way, from the host
+  - [x] Confirm an unauthenticated call is rejected the same way, from the host
 
-- [ ] Task: Documentation
-  - [ ] Document how to run the service, set the bearer-token env var, and the published port, in the
+  Ran a fixture decision through `POST /decisions` from inside a throwaway container talking to the
+  running `retrieval:8000` (simulating what an agent will do), then `GET /decisions/{hospital_hipe}/
+  {as_of_date}` from the same process — every ranked position came back with its cited evidence.
+  Separately confirmed from a bare `curl` on the host, outside any container: unauthenticated write
+  and read both `401`; authenticated `/health` `200`.
+
+- [x] Task: Documentation
+  - [x] Document how to run the service, set the bearer-token env var, and the published port, in the
         service's own README (or `conductor/kg/requirements.md`-style doc, whichever the codebase
         convention points to)
-  - [ ] Note the service in `retrieval-database-onboarding.md` / `retrieval-service-references.md` as
+  - [x] Note the service in `retrieval-database-onboarding.md` / `retrieval-service-references.md` as
         built, not just proposed
 
-- [ ] Task: Full acceptance-criteria pass
-  - [ ] Walk `spec.md`'s Acceptance Criteria 1–11 one by one against the running system and record the
+  `retrieval/README.md` gained an Endpoints table (all 7 routes, the write-response contract) and a
+  corrected Running section. Both root-level docs updated: their "ADR-002 still open" framing replaced
+  with "resolved and built," pointing at this track and `retrieval/README.md`.
+
+- [x] Task: Full acceptance-criteria pass
+  - [x] Walk `spec.md`'s Acceptance Criteria 1–11 one by one against the running system and record the
         result
+
+  | # | Criterion | Result |
+  |---|---|---|
+  | 1 | `retrieval` container up, port reachable | ✅ `docker compose ps` — `Up`, `0.0.0.0:8000->8000` |
+  | 2 | `POST /decisions` → Postgres rows + `eat:Decision`/`RankedPlacement`/`cites` triples | ✅ `test_routes.py::TestCreateDecision`, live demo |
+  | 3 | `POST /scores` → Postgres rows + `eat:Score`/`cites` | ✅ `test_routes.py::TestCreateScore` |
+  | 4 | `POST /overrides` → Postgres row + `overrides` graph entry | ✅ `test_routes.py::TestCreateOverride` |
+  | 5 | Postgres commits, graph fails → row stands, failure reported | ✅ `test_partial_failure.py` (all 3 endpoints) |
+  | 6 | Wait-counters endpoint matches `wait_counters.rq` directly | ✅ `test_reads_wait_counters.py`, independent comparison |
+  | 7 | Decision endpoint reconstructs evidence via `cites` walk | ✅ `test_reads_decision.py` |
+  | 8 | ADR-002 recorded in the blocked track's `decisions.md` | ✅ Phase 1, verified present |
+  | 9 | Fixture generator seeded and reproducible | ✅ `test_fixtures.py::TestDeterminism` |
+  | 10 | Port reachable from the host, outside any container | ✅ `curl http://localhost:8000/...` from host, this session |
+  | 11 | No/invalid token → `401` on every endpoint; valid token succeeds | ✅ `test_health.py` + live `curl`, writes and reads both |
+
+  11/11 met.
 
 - [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)

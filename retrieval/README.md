@@ -31,7 +31,28 @@ docker compose up -d retrieval
 ```
 
 The service is reachable on the host at `http://localhost:${RETRIEVAL_PORT:-8000}` (published, not
-internal-only -- see spec.md FR1/NFR4). Every endpoint requires `Authorization: Bearer <token>`.
+internal-only -- see spec.md FR1/NFR4). Every endpoint requires `Authorization: Bearer <token>`,
+checked against one of the comma-separated values in `RETRIEVAL_BEARER_TOKENS` (`retrieval/.env`).
+
+## Endpoints
+
+All require `Authorization: Bearer <token>`.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/health` | No DB/graph dependency -- proves the app is up and auth is enforced |
+| `POST` | `/scores` | Write an agent score + its citations (FR2, the ADR-002 projector) |
+| `POST` | `/decisions` | Write a decision: rankings, citations, rule checks, atomically |
+| `POST` | `/overrides` | Write a clinician override |
+| `GET` | `/referrals/{hospital_hipe}/{pathway_number}/wait-counters?as_of_date=` | The four wait counters, via `kg/queries/wait_counters.rq` unmodified (FR3) |
+| `GET` | `/decisions/{hospital_hipe}/{as_of_date}` | Every ranked position for that day, with its cited evidence, reconstructed by walking `eat:cites` |
+| `GET` | `/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}?role=` | One placement's cited evidence; omit `role` for all four, or narrow to `urgency`/`capacity`/`timeframe`/`multi_list` |
+
+Every write endpoint follows the same contract: `200 {"status": "ok"}` on full success; `207
+{"status": "postgres_committed_graph_projection_failed", "detail": ...}` if Postgres committed but
+the graph push then failed (the Postgres row still stands -- it's the system of record); `400` if
+Postgres itself rejects the payload (no graph write is even attempted); `422` if the payload fails
+validation before either store is touched.
 
 ## Tests
 
