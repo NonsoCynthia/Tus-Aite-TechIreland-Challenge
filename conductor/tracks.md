@@ -7,7 +7,7 @@
 | Track | Type | Status | Description |
 |---|---|---|---|
 | [explainable-agent-based-triage_20260828](./tracks/explainable-agent-based-triage_20260828/index.md) | feature | pending; ADR-002 confirmed 2026-09-04, formal record + service land in `retrieval-service_20260904` | Full build on top of graph-foundation: urgency agent, capacity agent, coordinator + audit trail, rationale layer, clinician UI + override loop, CPC/CRT compliance validation (proposal §14 Days 3–6) |
-| [retrieval-service_20260904](./tracks/retrieval-service_20260904/index.md) | feature | new | Retrieval service mediating Postgres `core`/`agent` and the Oxigraph graph for agents and the clinician UI; implements ADR-002 (Postgres-first writes, synchronous graph projection on success) |
+| [retrieval-service_20260904](./tracks/retrieval-service_20260904/index.md) | feature | in progress | Retrieval service mediating Postgres `core`/`agent` and the Oxigraph graph for agents and the clinician UI; implements ADR-002 (Postgres-first writes, synchronous graph projection on success) |
 
 ## Planned Tracks
 
