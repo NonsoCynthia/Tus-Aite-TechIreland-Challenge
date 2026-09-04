@@ -11,9 +11,15 @@ and the hospital codes use a reserved range that matches no real facility.
 
 ## Get it running
 
+`docker-compose.yml` lives at the repo root now (Postgres, pgAdmin, the loader, Oxigraph and the
+retrieval service are all one compose project there), so `.env` and every `make` target run from
+the root too. The commands below still work unchanged from inside `dataset/` — they forward to the
+same root targets.
+
 ```bash
+cd ..                     # repo root
 cp .env.example .env      # add your Hugging Face token
-make up                   # Postgres and pgAdmin
+make up                   # Postgres, pgAdmin, Oxigraph, retrieval
 make load                 # download and load
 ```
 

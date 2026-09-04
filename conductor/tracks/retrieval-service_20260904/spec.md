@@ -48,13 +48,15 @@ rather than being blocked further on this.
 
 ### FR1 — Service scaffold
 
-- New `retrieval` service added to docker-compose, network-adjacent to `db` and `oxigraph`, following
-  existing container/port conventions (`db:5432` internal, host `5433`; Oxigraph `7878`).
+- New `retrieval` service in the repo-root `docker-compose.yml`, which now defines the whole stack —
+  `db`, `pgadmin`, `loader`, `oxigraph` and `retrieval` — as one compose project on one default
+  network, addressable by service name (`db`, `oxigraph`, `retrieval`). `dataset/docker-compose.yml`
+  is retired; `dataset/Makefile` forwards its targets to a new root `Makefile`.
 - **Port published to the host** (not internal-network-only), so the service is reachable by
   `host:port` from outside the compose network — e.g. mentors, a demo, or a UI hosted elsewhere. No
   TLS/domain/reverse proxy in scope; this is a host port mapping, not a production deployment.
-- Connects to Postgres as the `agent_rw` role (least privilege already provisioned — never broadened)
-  and to Oxigraph over its SPARQL Query/Update HTTP endpoints.
+- Connects to Postgres as `retrieval_rw`, a login role carrying exactly `agent_rw`'s privileges (see
+  NFR3), and to Oxigraph over its SPARQL Query/Update HTTP endpoints.
 - FastAPI app, Pydantic v2 request/response models.
 
 ### FR7 — Bearer-token authentication

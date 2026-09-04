@@ -9,25 +9,25 @@ Full spec and plan: [`conductor/tracks/retrieval-service_20260904/`](../conducto
 
 ## Running
 
-This service is built and run from the **repo root** `docker-compose.yml`, not from within this
-directory -- it depends on `triage_net`, a network created by `dataset/docker-compose.yml`.
+This service is built and run from the **repo root** `docker-compose.yml` -- Postgres, pgAdmin, the
+loader, Oxigraph and this service are all one compose project there (see the root `Makefile`).
 
 ```bash
-# 1. Bring up the dataset stack first (creates triage_net); see dataset/README.md.
-cd dataset && make up && make load && cd ..
+# 1. From the repo root: dataset up + loaded, migrations included (009 creates retrieval_rw).
+cp .env.example .env       # repo root -- edit HF_TOKEN etc.
+make up
+make load
 
-# 2. Apply migration 009 and set the retrieval_rw password, the same way kg_loader's is set:
-docker compose -f dataset/docker-compose.yml exec -T db psql -U triage_admin -d triage \
-  < dataset/db/migrations/009_retrieval_login_role.sql
-docker compose -f dataset/docker-compose.yml exec db psql -U triage_admin -d triage \
+# 2. Set the retrieval_rw password, the same way kg_loader's is set:
+docker compose exec db psql -U triage_admin -d triage \
   -c "ALTER ROLE retrieval_rw PASSWORD '<value from retrieval/.env>';"
 
 # 3. Configure this service.
 cp retrieval/.env.example retrieval/.env   # edit RETRIEVAL_BEARER_TOKENS and the DB password
 
-# 4. Build and run.
-docker compose build retrieval
-docker compose up -d oxigraph retrieval
+# 4. Build and run (already included in `make up` once retrieval/.env exists).
+make retrieval-build
+docker compose up -d retrieval
 ```
 
 The service is reachable on the host at `http://localhost:${RETRIEVAL_PORT:-8000}` (published, not
@@ -36,7 +36,7 @@ internal-only -- see spec.md FR1/NFR4). Every endpoint requires `Authorization: 
 ## Tests
 
 ```bash
-docker compose run --rm retrieval pytest tests/ -v
-docker compose run --rm retrieval ruff check .
-docker compose run --rm retrieval mypy app
+make retrieval-test
+make retrieval-lint
+make retrieval-typecheck
 ```

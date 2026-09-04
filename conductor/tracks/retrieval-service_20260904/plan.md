@@ -29,10 +29,20 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
 
   Note: `agent_rw` (migration 007) turned out to be `NOLOGIN` — a group role, not something a service
   can connect as directly. Added `dataset/db/migrations/009_retrieval_login_role.sql`, a `LOGIN` role
-  `retrieval_rw` granted membership in `agent_rw`, mirroring how `kg_loader` is set up. Also added a
-  `triage_net` external Docker network (declared in `dataset/docker-compose.yml`, joined as external
-  by the root `docker-compose.yml`) so `retrieval` and `oxigraph` can reach `db` by hostname across
-  the two separate compose projects — this network didn't exist before this track.
+  `retrieval_rw` granted membership in `agent_rw`, mirroring how `kg_loader` is set up.
+
+  Also consolidated `dataset/docker-compose.yml` (`db`, `pgadmin`, `loader`) into the root
+  `docker-compose.yml` alongside `oxigraph` and `retrieval`, at the user's request, so every service
+  is one compose project on one default network — no more `triage_net` external-network workaround
+  between two separate projects (an earlier version of this task briefly introduced that, then
+  removed it again in the same phase). `dataset/db/pgadmin/servers.json` and the loader's build
+  context/volume paths were updated to `./dataset/...` accordingly. `dataset/Makefile` and
+  `dataset/.env`/`.env.example` are superseded by a new root `Makefile`/`.env.example` — `dataset/Makefile`
+  now forwards each target to the root so `cd dataset && make up` still works. `kg/Makefile`'s DB path
+  was updated (`dataset/` → repo root) and its unquoted path fixed (broke on this checkout's
+  space-containing path; pre-existing bug, not something this track introduced). `tech-stack.md`'s
+  Setup/Infrastructure sections still describe the old two-stack layout — left for the track's
+  end-of-implementation docs sync, not fixed here (user's call).
 
 - [x] Task: FastAPI app skeleton and bearer-token auth (FR7)
   - [x] Write a smoke test: a request to a health-check route with no `Authorization` header returns

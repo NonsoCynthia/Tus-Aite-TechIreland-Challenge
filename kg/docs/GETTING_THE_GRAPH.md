@@ -51,10 +51,11 @@ cp .env.example .env        # then edit, see below
 make kg-views               # applies sql/001 and sql/002
 ```
 
-Then set the role's password, which is deliberately absent from the committed SQL:
+Then set the role's password, which is deliberately absent from the committed SQL. `docker-compose.yml`
+lives at the repo root (db, pgadmin, loader, oxigraph and retrieval are all one compose project there):
 
 ```bash
-cd ../dataset
+cd ..
 docker compose exec -T db psql -U triage_admin -d triage \
   -c "ALTER ROLE kg_loader PASSWORD 'the value from kg/.env';"
 ```
