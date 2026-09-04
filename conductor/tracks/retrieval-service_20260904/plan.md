@@ -567,3 +567,45 @@ scores already written via `POST /scores` — a `GET /scores` never existed. FR1
         (0.72) and capacity (0.45) scores for that same referral under one `run_id`, then confirmed
         `GET .../scores` returned both, correctly grouped, with their citations intact — the full
         write-then-coordinator-read loop working end to end against real data.
+
+## Post-completion fix: CRT breach flag on the cohort endpoint (user request, "can we also flag that?")
+
+- [x] Task: Reverse the Phase 8 decision to omit CRT-breach computation
+  - [x] Phase 8 (line 533 above) deliberately left CRT-breach out, citing `tech-stack.md` Decision 5's
+        separation of data access from rule-checking. Re-read Decision 5 on push-back: it explicitly
+        calls `RULE-CRT-*` "facts about the hospital, not invalid graphs" — unlike `RULE-ORDER`/
+        `RULE-TIEBREAK` (which compare referrals against each other — real ranking judgements), CRT
+        breach is single-referral date math against an already-normative, documented threshold. That's
+        squarely "expose a fact," not "make a judgement call" — the boundary this service actually
+        needs to hold. Reversed the earlier call as over-conservative.
+  - [x] Checked where the threshold itself lives before writing any query, rather than assuming
+        `core.ref_rules` (Phase 8's own note) or hardcoding 28/91: `core.ref_codes` (`code_table=
+        'triage_category'`) already carries a `crt_days` column directly per CPC — Urgent=28,
+        Semi-Urgent=91, Routine/Excluded=`NULL`. Simpler than expected; no need to touch `ref_rules` or
+        maintain a CPC→rule-id mapping in application code at all.
+  - [x] Checked column types before joining: `ref_codes.code_value` is `text`, `triage_events.
+        triage_category` is `integer` — join needs an explicit `::text` cast on the CPC side.
+  - [x] `db.get_cohort`: added `LEFT JOIN core.ref_codes rc ON rc.code_table = 'triage_category' AND
+        rc.code_value = te.triage_category::text`, selecting `rc.crt_days AS crt_threshold_days` and a
+        computed `crt_breached`.
+  - [x] **Bug caught by the test suite, not review**: first attempt computed `crt_breached` as
+        `(rc.crt_days IS NOT NULL AND rd.adjusted_wait_days > rc.crt_days)` — in SQL this evaluates to
+        `false`, not `NULL`, when `crt_days IS NULL` (`AND` with a `false` left operand short-circuits
+        rather than propagating `NULL`). `test_crt_breach_is_computed_only_when_a_threshold_applies`
+        caught it immediately (`assert False is None` failure) before this ever reached real data.
+        Fixed with an explicit `CASE WHEN rc.crt_days IS NOT NULL THEN ... ELSE NULL END`.
+  - [x] Updated `reads.py`'s cohort route `description=` and `README.md`'s endpoint table to document
+        the new fields and the reasoning for computing them here.
+  - [x] Added `test_crt_breach_is_computed_only_when_a_threshold_applies` (real-data, skips cleanly
+        without the full dataset) asserting both the computed case (CPC 1/3: real `true`/`false`
+        matching `adjusted_wait_days > crt_threshold_days`) and the not-applicable case (CPC 2/4/`null`:
+        both fields `null`). Extended the existing shape-assertion test with the two new keys.
+  - [x] `ruff check .` / `mypy app tests` clean; `pytest -q` run twice back-to-back for stability —
+        402 passed both times (up from 401 — one new test; the CRT keys are additive to the existing
+        shape test, not a new one, beyond the dedicated breach test).
+  - [x] Verified live against real data (`docker compose up -d retrieval` after rebuild), hospital
+        `9001`/`2026-08-26`: `PW-9001-001328` (CPC 1, 882 adjusted wait days) → `crt_threshold_days:28,
+        crt_breached:true`; `PW-9001-001075` (CPC 3, 878 days) → `91, true`; CPC 2/`null` referrals →
+        `null`/`null` in both fields. Matches the manual math in every case checked.
+  - [x] `spec.md` FR10 updated to document the fields and the reversed reasoning; new acceptance
+        criterion 18 added.

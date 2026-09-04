@@ -292,10 +292,17 @@ def get_cohort(hospital_hipe: str, as_of_date: date) -> list[dict[str, Any]]:
     -- the coordinator's cohort to rank -- spec.md FR10. "Still on the list"
     means core.referral_daily.removal_date IS NULL; `currently_suspended` is
     exposed as a raw flag, not acted on here (whether to rank a suspended
-    referral is the coordinator's judgement, not this service's -- matching
-    the project's own separation of data access from decision logic, e.g.
-    tech-stack.md Decision 5 keeping SHACL rule-checking a separate layer
-    from the ontology it validates against).
+    referral is the coordinator's judgement, not this service's).
+
+    `crt_breached` IS computed here, unlike a ranking judgement -- it's a
+    single-referral fact (date math against a documented threshold), not a
+    comparison between referrals the way RULE-ORDER/RULE-TIEBREAK are
+    (tech-stack.md Decision 5 explicitly calls RULE-CRT-* "facts about the
+    hospital, not invalid graphs"). The threshold itself (`crt_days`) comes
+    from core.ref_codes' triage_category scheme, not a hardcoded 28/91 --
+    found there, not assumed, while designing this query: `code_value=4`
+    ("Excluded") has no crt_days at all, and Routine (`code_value=2`) is
+    NULL too, so `crt_breached` is correctly `null` for both.
     """
     with psycopg.connect(settings.retrieval_db_url, row_factory=dict_row) as conn:
         return conn.execute(
@@ -306,12 +313,18 @@ def get_cohort(hospital_hipe: str, as_of_date: date) -> list[dict[str, Any]]:
                 rd.days_since_referral, rd.days_since_received,
                 rd.days_awaiting_triage, rd.adjusted_wait_days,
                 te.triage_category AS cpc,
+                rc.crt_days AS crt_threshold_days,
+                CASE WHEN rc.crt_days IS NOT NULL
+                     THEN rd.adjusted_wait_days > rc.crt_days
+                     ELSE NULL END AS crt_breached,
                 (rd.suspension_start_date IS NOT NULL
                     AND rd.suspension_start_date <= rd.as_of_date
                     AND (rd.suspension_end_date IS NULL OR rd.suspension_end_date > rd.as_of_date)
                 ) AS currently_suspended
             FROM core.referral_daily rd
             LEFT JOIN core.triage_events te ON te.triage_event_id = rd.triage_event_id
+            LEFT JOIN core.ref_codes rc
+                ON rc.code_table = 'triage_category' AND rc.code_value = te.triage_category::text
             WHERE rd.hospital_hipe = %s AND rd.as_of_date = %s AND rd.removal_date IS NULL
             ORDER BY rd.referral_date, rd.pathway_number
             """,

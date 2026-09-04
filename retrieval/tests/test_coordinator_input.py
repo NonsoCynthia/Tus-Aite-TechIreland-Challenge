@@ -94,12 +94,39 @@ class TestCohort:
             "adjusted_wait_days",
             "cpc",
             "currently_suspended",
+            "crt_threshold_days",
+            "crt_breached",
         ):
             assert key in first
 
         # oldest-referral-first (namespaces.md / tech-stack.md tie-break rule)
         dates = [r["referral_date"] for r in referrals]
         assert dates == sorted(dates)
+
+    def test_crt_breach_is_computed_only_when_a_threshold_applies(
+        self, client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        """CPC 1 (Urgent, crt_days=28) and CPC 3 (Semi-Urgent, crt_days=91) get a
+        real true/false; CPC 2/4 (Routine/Excluded) and untriaged referrals get
+        `null` for both fields -- core.ref_codes has no crt_days for them."""
+        real = _find_a_real_hospital_day()
+        if real is None:
+            pytest.skip("full dataset not loaded in this environment")
+        hospital_hipe, as_of_date = real
+
+        response = client.get(
+            f"/hospitals/{hospital_hipe}/cohort/{as_of_date.isoformat()}", headers=auth_headers
+        )
+        referrals = response.json()["referrals"]
+
+        for r in referrals:
+            if r["cpc"] in (1, 3):
+                assert r["crt_threshold_days"] in (28, 91)
+                assert isinstance(r["crt_breached"], bool)
+                assert r["crt_breached"] == (r["adjusted_wait_days"] > r["crt_threshold_days"])
+            else:
+                assert r["crt_threshold_days"] is None
+                assert r["crt_breached"] is None
 
     def test_no_full_https_iris_leak_into_a_postgres_backed_response(
         self, client: TestClient, auth_headers: dict[str, str]

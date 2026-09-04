@@ -195,9 +195,16 @@ cover: **which** referrals need ranking, and **what the other two agents already
   received dates, the same wait counters `wait_counters.rq` computes (denormalised onto the row
   already, no per-referral call needed), CPC (from its triage event, `null` if not yet triaged), and a
   `currently_suspended` flag. That flag is informational only — whether to rank a suspended referral is
-  the coordinator's judgement, not decided here (this service does data access, not rule logic; CPC/CRT
-  rule-checking is its own separate layer per `tech-stack.md` Decision 5). Empty list, not `404`, if
-  the hospital exists but nothing is on the list that day.
+  the coordinator's judgement, not decided here. Also includes `crt_threshold_days`/`crt_breached`
+  (Clinical Response Time: `core.ref_codes.crt_days` for the referral's CPC, e.g. 28 for Urgent, 91 for
+  Semi-Urgent, `null` for Routine/Excluded/untriaged; `crt_breached` is `adjusted_wait_days >
+  crt_threshold_days`, `null` when no threshold applies) — user request ("can we also flag that?"),
+  reversing this track's own earlier, more conservative design call. Originally omitted citing
+  `tech-stack.md` Decision 5's separation of data access from rule logic; on reflection Decision 5 itself
+  calls `RULE-CRT-*` "facts about the hospital, not invalid graphs" — unlike `RULE-ORDER`/`RULE-TIEBREAK`,
+  it isn't a judgement comparing referrals, just date math against an already-normative threshold, so
+  it's computed here rather than left to callers to re-derive. Empty list, not `404`, if the hospital
+  exists but nothing is on the list that day.
 - `GET /runs/{run_id}/hospitals/{hospital_hipe}/scores` — every urgency/capacity score already written
   via `POST /scores` for that run and hospital, with citations, keyed by `pathway_number` then
   `agent_name`. A referral with only one agent's score written so far still appears, with just that
@@ -270,6 +277,10 @@ tests use the write path directly and need no such skip.
 17. A score written via `POST /scores` is retrievable via `GET /runs/{run_id}/hospitals/{hospital_hipe}
     /scores`, grouped by `pathway_number` then `agent_name`, with its citations intact. Empty `scores`
     object, not `404`, when nothing has been scored yet for that run/hospital.
+18. `GET /hospitals/{hospital_hipe}/cohort/{as_of_date}` computes `crt_breached`/`crt_threshold_days`
+    per referral from `core.ref_codes.crt_days`: a real `true`/`false` for CPC 1 (Urgent, 28 days) and
+    CPC 3 (Semi-Urgent, 91 days) matching `adjusted_wait_days > crt_threshold_days`, `null` for both
+    fields for CPC 2/4 (Routine/Excluded) and untriaged referrals.
 
 ## Out of Scope
 

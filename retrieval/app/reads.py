@@ -150,8 +150,14 @@ async def referral_context(hospital_hipe: str, pathway_number: str) -> dict[str,
         "there's no need to call that endpoint per referral), CPC (`cpc`, from its triage "
         "event, `null` if not yet triaged), and a `currently_suspended` flag. That flag is "
         "informational only -- whether to rank a suspended referral is the coordinator's "
-        "judgement, not decided here. Empty list (not 404) if the hospital exists but nothing "
-        "is on the list that day."
+        "judgement, not decided here. Also includes `crt_threshold_days` (the Clinical "
+        "Response Time limit for this referral's CPC, e.g. 28 for Urgent, 91 for Semi-Urgent, "
+        "`null` for Routine/Excluded/untriaged) and `crt_breached` (`adjusted_wait_days > "
+        "crt_threshold_days`, `null` when no threshold applies) -- unlike `currently_suspended`, "
+        "this IS computed here: it's a single-referral fact against a documented, already-"
+        "normative threshold (tech-stack.md Decision 5 calls RULE-CRT-* 'facts about the "
+        "hospital, not invalid graphs'), not a ranking judgement between referrals. Empty list "
+        "(not 404) if the hospital exists but nothing is on the list that day."
     ),
 )
 async def cohort(hospital_hipe: str, as_of_date: date) -> dict[str, Any]:
