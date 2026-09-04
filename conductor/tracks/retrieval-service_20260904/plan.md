@@ -294,4 +294,6 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
 
   11/11 met.
 
-- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+
+  Confirmed by user 2026-09-04. Track complete.
