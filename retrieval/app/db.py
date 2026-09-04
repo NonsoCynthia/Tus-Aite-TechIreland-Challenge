@@ -1,11 +1,14 @@
-"""Postgres write layer (spec.md FR2) and the referral-context read (FR9).
+"""Postgres write layer (spec.md FR2/FR11) and the referral-context read (FR9).
 
 Each write function is one transaction: `with psycopg.connect(...) as conn:`
 commits on clean exit, rolls back on any exception -- so a decision's
 rankings, citations and rule checks either all land or none do. Connects as
 retrieval_rw (migration 009), which carries exactly agent_rw's SELECT/INSERT
 grants -- see spec.md NFR3. The same role's SELECT on all of `core`
-(migration 007) is what get_referral_context reads from directly.
+(migration 007) is what get_referral_context/get_cohort/get_scores_for_run
+read from directly; migration 010 narrowly adds INSERT on the four core
+tables insert_referral touches -- the one write path this service has into
+core, everything else there stays SELECT-only.
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from .config import settings
-from .schemas import DecisionIn, OverrideIn, ScoreIn
+from .schemas import DecisionIn, OverrideIn, ReferralIn, ScoreIn
 
 
 def check_connection() -> bool:
@@ -178,6 +181,137 @@ def insert_override(payload: OverrideIn) -> None:
                 payload.rule_warning_accepted,
             ),
         )
+
+
+class UnknownPatientError(ValueError):
+    """Raised when a referral names a patient_id this hospital has no
+    record of, and no `new_patient` demographics were supplied to create
+    one -- routes.py turns this into 400, distinct from a psycopg.Error
+    (this never reaches Postgres at all)."""
+
+
+def insert_referral(payload: ReferralIn, today: date) -> str:
+    """A brand-new referral arriving -- spec.md FR11. Generates
+    pathway_number server-side (core.pathway_number_seq, migration 010)
+    rather than trusting the caller to invent a hospital-unique ID, and
+    mints today's initial core.referral_daily row directly: this is live
+    intake, not a backfill, so as_of_date is always `today` (the caller's
+    route handler computes it once and passes it in here, and again into
+    graph.referral_triples, so both stores agree on the exact same date
+    even if the call happens to straddle midnight).
+
+    Returns the new pathway_number.
+    """
+    with _connect() as conn:
+        if payload.new_patient is not None:
+            np = payload.new_patient
+            if np.ihi_number is not None:
+                conn.execute(
+                    """
+                    INSERT INTO core.persons
+                        (ihi_number, person_sex, person_date_of_birth, area_of_residence_code)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (ihi_number) DO NOTHING
+                    """,
+                    (
+                        np.ihi_number,
+                        np.person_sex,
+                        np.person_date_of_birth,
+                        np.person_area_of_residence_code,
+                    ),
+                )
+            conn.execute(
+                """
+                INSERT INTO core.patients
+                    (hospital_hipe, patient_id, ihi_number, patient_sex,
+                     patient_date_of_birth, area_of_residence_code)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (hospital_hipe, patient_id) DO NOTHING
+                """,
+                (
+                    payload.hospital_hipe,
+                    payload.patient_id,
+                    np.ihi_number,
+                    np.patient_sex,
+                    np.patient_date_of_birth,
+                    np.area_of_residence_code,
+                ),
+            )
+        else:
+            exists = conn.execute(
+                "SELECT 1 FROM core.patients WHERE hospital_hipe = %s AND patient_id = %s",
+                (payload.hospital_hipe, payload.patient_id),
+            ).fetchone()
+            if exists is None:
+                raise UnknownPatientError(
+                    f"no patient {payload.patient_id!r} at hospital {payload.hospital_hipe!r} -- "
+                    "supply new_patient demographics to register them"
+                )
+
+        pathway_number_row = conn.execute(
+            "SELECT 'PW-' || %s || '-' || nextval('core.pathway_number_seq')::text",
+            (payload.hospital_hipe,),
+        ).fetchone()
+        assert pathway_number_row is not None
+        pathway_number: str = pathway_number_row[0]
+
+        conn.execute(
+            """
+            INSERT INTO core.referrals
+                (hospital_hipe, pathway_number, patient_id, specialty_hipe, referral_date,
+                 referral_received_date, priority_level_gp, referral_source)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                payload.hospital_hipe,
+                pathway_number,
+                payload.patient_id,
+                payload.specialty_hipe,
+                payload.referral_date,
+                payload.referral_received_date,
+                payload.priority_level_gp,
+                payload.referral_source,
+            ),
+        )
+
+        days_since_referral = (today - payload.referral_date).days
+        days_since_received = (today - payload.referral_received_date).days
+        conn.execute(
+            """
+            INSERT INTO core.referral_daily
+                (hospital_hipe, pathway_number, as_of_date, patient_id, specialty_hipe,
+                 referral_date, referral_received_date, priority_level_gp, referral_source,
+                 record_creation_date, high_clinical_or_social_needs, triage_status,
+                 days_since_referral, days_since_received, adjusted_wait_days,
+                 days_awaiting_triage)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'awaiting_triage', %s, %s, %s, %s)
+            """,
+            (
+                payload.hospital_hipe,
+                pathway_number,
+                today,
+                payload.patient_id,
+                payload.specialty_hipe,
+                payload.referral_date,
+                payload.referral_received_date,
+                payload.priority_level_gp,
+                payload.referral_source,
+                today,
+                int(payload.high_clinical_or_social_needs),
+                days_since_referral,
+                days_since_received,
+                # No suspension possible yet on a referral created moments ago --
+                # adjusted_wait_days equals the raw wait, same as a fresh row in
+                # the batch-generated data (dataset/generator/generate.py's own
+                # day-0 case).
+                days_since_received,
+                # triage_status is always 'awaiting_triage' at intake, so
+                # days_awaiting_triage equals days_since_received too (mirrors
+                # wait_counters.rq's own logic for that status).
+                days_since_received,
+            ),
+        )
+    return pathway_number
 
 
 def get_referral_context(hospital_hipe: str, pathway_number: str) -> dict[str, Any] | None:

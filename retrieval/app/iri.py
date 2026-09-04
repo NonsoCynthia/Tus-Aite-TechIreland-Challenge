@@ -100,6 +100,36 @@ def referral_iri(hospital_hipe: str, pathway_number: str) -> str:
     return eatd(f"referral/{hospital_hipe}/{pathway_number}")
 
 
+def referral_state_iri(hospital_hipe: str, pathway_number: str, valid_from: str) -> str:
+    return eatd(f"referral-state/{hospital_hipe}/{pathway_number}/{valid_from}")
+
+
+def patient_iri(hospital_hipe: str, patient_id: str) -> str:
+    return eatd(f"patient/{hospital_hipe}/{patient_id}")
+
+
+def person_iri(ihi_number: str) -> str:
+    return eatd(f"person/{ihi_number}")
+
+
+def hospital_iri(hospital_hipe: str) -> str:
+    return eatd(f"hospital/{hospital_hipe}")
+
+
+def service_iri(hospital_hipe: str, specialty_hipe: str) -> str:
+    return eatd(f"service/{hospital_hipe}/{specialty_hipe}")
+
+
+def concept_iri(code_table: str, code_value: int) -> str:
+    """A `ref_codes` concept reference (namespaces.md #4's 'Other code
+    concepts' row, `{code_table}/{code_value}`) -- used for e.g. `eat:
+    gpPriority`/`eat:referralSource`, which are `skos:Concept` references,
+    never literals. Referenced only, never re-minted with its own type/
+    label triples here -- the batch mapping (reference_layer.rml.ttl)
+    already projects the full ConceptScheme for every code_table."""
+    return eatd(f"{code_table}/{code_value}")
+
+
 def rule_iri(rule_id: str) -> str:
     return eatd(f"rule/{rule_id}")
 
@@ -177,3 +207,11 @@ def run_graph(run_id: str) -> str:
 
 def overrides_graph() -> str:
     return f"{GRAPH_BASE}overrides"
+
+
+def inputs_graph() -> str:
+    """Same named graph the batch Morph-KGC pipeline projects referrals/
+    patients/persons into -- a referral written through POST /referrals
+    (spec.md FR11) lands here too, so it's indistinguishable from a
+    batch-loaded one to every read endpoint."""
+    return f"{GRAPH_BASE}inputs"

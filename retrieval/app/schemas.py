@@ -20,11 +20,12 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 EvidenceType = Literal["observation", "condition", "triage_event", "bed_status", "clinic_session"]
 CitationRole = Literal["urgency", "capacity", "timeframe", "multi_list"]
 AgentName = Literal["urgency", "capacity"]
+Sex = Literal["M", "F", "U"]
 
 
 class ScoreCitationIn(BaseModel):
@@ -312,3 +313,114 @@ class OverrideIn(BaseModel):
         if not reason.strip():
             raise ValueError("reason must not be blank")
         return reason
+
+
+class NewPatientIn(BaseModel):
+    """Demographics for a patient this hospital hasn't seen before (spec.md
+    FR11). Only needed the first time a `patient_id` shows up at a given
+    hospital -- a later referral for the same (hospital_hipe, patient_id)
+    omits this entirely and just reuses the existing patient record."""
+
+    patient_sex: Sex = Field(description="M/F/U, this hospital's own record for this patient.")
+    patient_date_of_birth: date = Field(description="As held by this hospital's own record.")
+    area_of_residence_code: str = Field(
+        min_length=4, max_length=4, description="4-character area-of-residence code."
+    )
+    ihi_number: str | None = Field(
+        default=None,
+        description=(
+            "National identifier, if known -- around a third of real patients have "
+            "none (core.patients.ihi_number's own comment), so this is optional. "
+            "When given, `person_sex`/`person_date_of_birth`/`person_area_of_residence_code` "
+            "become required too, to create the linked core.persons/eat:Person record."
+        ),
+    )
+    person_sex: Sex | None = Field(
+        default=None, description="Required if ihi_number is given -- the national record's sex."
+    )
+    person_date_of_birth: date | None = Field(
+        default=None, description="Required if ihi_number is given."
+    )
+    person_area_of_residence_code: str | None = Field(
+        default=None,
+        min_length=4,
+        max_length=4,
+        description="Required if ihi_number is given -- may differ from the hospital record's.",
+    )
+
+    @model_validator(mode="after")
+    def person_fields_required_with_ihi(self) -> NewPatientIn:
+        if self.ihi_number is not None and (
+            self.person_sex is None
+            or self.person_date_of_birth is None
+            or self.person_area_of_residence_code is None
+        ):
+            raise ValueError(
+                "person_sex, person_date_of_birth and person_area_of_residence_code are "
+                "required when ihi_number is given"
+            )
+        return self
+
+
+class ReferralIn(BaseModel):
+    """A brand-new referral arriving at a hospital -- spec.md FR11 (user
+    request: "input new patients"). Writes `core.patients`/`core.persons`
+    (only if `new_patient` is given), `core.referrals`, and today's initial
+    `core.referral_daily` row (triage_status='awaiting_triage', wait
+    counters computed fresh), then projects `eat:Referral` (+ `eat:Patient`/
+    `eat:Person` if new, + an initial `eat:ReferralState`) into the graph's
+    `inputs` named graph -- the same graph the batch mapping pipeline
+    projects into, so this referral is indistinguishable from a
+    batch-loaded one to every other read endpoint once written.
+
+    This is data intake only -- it does NOT recompute any agent score or
+    re-run the coordinator's ranking. That is deliberate: scoring and
+    ranking are judgement calls belonging to the urgency/capacity/
+    coordinator agents (a separate track), not something this data-access
+    service decides on its own. An agent (or orchestrator) watching for new
+    referrals is expected to call `POST /scores` and `POST /decisions`
+    itself once it has judged this referral, the same way it already would
+    for any other referral in the cohort."""
+
+    hospital_hipe: str = Field(
+        min_length=4, max_length=4, description="4-character HIPE hospital code.", examples=["9001"]
+    )
+    patient_id: str = Field(
+        description=(
+            "This hospital's own patient identifier -- always required, whether the "
+            "patient is new (pair with `new_patient`) or already known to this hospital."
+        ),
+        examples=["P-90010001"],
+    )
+    new_patient: NewPatientIn | None = Field(
+        default=None,
+        description=(
+            "Demographics for this patient, if `patient_id` is new to this hospital. "
+            "Omit when the patient already has a core.patients row here -- the referral "
+            "attaches to the existing record. If omitted and the patient truly doesn't "
+            "exist yet, the request is rejected with 400."
+        ),
+    )
+    specialty_hipe: str = Field(
+        min_length=4,
+        max_length=4,
+        description="4-character HIPE specialty code -- must be active at this hospital.",
+        examples=["0100"],
+    )
+    referral_date: date = Field(description="Date on the GP's referral letter.")
+    referral_received_date: date = Field(
+        description="Date the hospital received it -- must be >= referral_date."
+    )
+    priority_level_gp: int | None = Field(
+        default=None,
+        description="Optional GP-assigned priority (1 or 2), coded via core.ref_codes.",
+    )
+    referral_source: int = Field(
+        description=(
+            "Where the referral came from, coded via core.ref_codes (referral_source table)."
+        )
+    )
+    high_clinical_or_social_needs: bool = Field(
+        default=False,
+        description="Whether this referral is flagged for high clinical/social needs.",
+    )

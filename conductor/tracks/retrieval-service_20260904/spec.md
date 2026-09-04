@@ -215,6 +215,38 @@ read-only boundary as FR9 (tests skip cleanly without the full dataset loaded); 
 reads `agent.agent_scores`/`agent_citations`, which this service's own `POST /scores` writes, so its
 tests use the write path directly and need no such skip.
 
+### FR11 — New-referral intake (added, reopened again; user request: "input new patients")
+
+The user observed a real gap: nothing in this service could add a brand-new referral to `core.*` at
+all — every write endpoint (FR2) only writes agent *output* (scores/decisions/overrides). Since "the
+scores need to be updated and the patients need to be reordered accordingly" when new patient
+information arrives, and the current system had no way for new patients to enter it in the first
+place, this FR adds the intake write-path itself. Recomputing scores and re-ranking is explicitly
+**not** this FR's job — that is the urgency/capacity/coordinator agents' own judgement (a separate
+track); this only gets a referral onto the list so an agent or orchestrator can act on it, the same
+way it would for any other referral in `GET /hospitals/.../cohort/...`.
+
+- `POST /referrals` — same ADR-002 flow as every other write endpoint (Postgres commit, then graph
+  projection, confirmed with the user before implementing). Accepts `hospital_hipe`, `patient_id`,
+  optional `new_patient` demographics (required only the first time a `patient_id` shows up at a
+  hospital — omitted and the request 400s if the patient truly doesn't exist yet), `specialty_hipe`,
+  `referral_date`, `referral_received_date`, optional `priority_level_gp`, `referral_source`, and
+  `high_clinical_or_social_needs`. Writes `core.persons` (only if `new_patient.ihi_number` is given),
+  `core.patients` (only if `new_patient` given), `core.referrals`, and an initial `core.referral_daily`
+  row for today (`triage_status='awaiting_triage'`, wait counters computed fresh — no suspension or
+  triage event is possible yet on a referral seconds old). `pathway_number` is generated server-side
+  (`core.pathway_number_seq`, started well above the batch dataset's own numbering so it can never
+  collide) and returned in the response — the caller never supplies one. Then projects `eat:Referral`
+  (+ `eat:Patient`/`eat:Person` if new, + an initial `eat:ReferralState`) into the graph's `inputs`
+  named graph — the same graph the batch Morph-KGC pipeline uses, so the new referral is
+  indistinguishable from a batch-loaded one to every other read endpoint (`wait-counters`, `cohort`,
+  `context`) immediately after this call returns.
+- **NFR3 amendment**: this is the one write path this service has into `core.*` — every other `core.*`
+  access remains SELECT-only. Migration 010 grants `agent_rw` INSERT narrowly on exactly the four
+  tables intake touches (`persons`/`patients`/`referrals`/`referral_daily`), not a blanket widening of
+  `core` access, and no UPDATE/DELETE (this service creates referrals, it does not amend or remove
+  them).
+
 ## Non-Functional Requirements
 
 - **NFR1** — Tier 2 (`workflow.md`): tests required, TDD encouraged not enforced, round-trip tests
@@ -281,11 +313,19 @@ tests use the write path directly and need no such skip.
     per referral from `core.ref_codes.crt_days`: a real `true`/`false` for CPC 1 (Urgent, 28 days) and
     CPC 3 (Semi-Urgent, 91 days) matching `adjusted_wait_days > crt_threshold_days`, `null` for both
     fields for CPC 2/4 (Routine/Excluded) and untriaged referrals.
+19. `POST /referrals` for a brand-new patient writes `core.patients`/`core.referrals`/
+    `core.referral_daily` and returns a server-generated `pathway_number`; that same referral then
+    appears in `GET /hospitals/{hospital_hipe}/cohort/{as_of_date}` for today, and
+    `GET /referrals/{hospital_hipe}/{pathway_number}/wait-counters` (graph-backed) returns wait counters
+    identical to the Postgres-backed cohort row for the same referral. `POST /referrals` for a
+    `patient_id` this hospital has no record of, with no `new_patient` given, returns `400`.
 
 ## Out of Scope
 
 - The urgency/capacity/coordinator agents' actual scoring logic (`explainable-agent-based-triage_20260828`,
-  still blocked — this track unblocks it, doesn't implement it).
+  still blocked — this track unblocks it, doesn't implement it). This explicitly includes triggering a
+  re-score/re-rank after `POST /referrals` (FR11) — intake only gets a referral onto the list; deciding
+  to act on it is the agents' job, not this data-access service's.
 - The clinician UI's Jinja2/HTMX pages — this track builds the HTTP API the UI will call, not the UI.
 - Production-grade auth: per-caller identity/API keys, token rotation/expiry, OAuth2/JWT, TLS/domain
   termination. FR7 is a single shared static bearer token only.

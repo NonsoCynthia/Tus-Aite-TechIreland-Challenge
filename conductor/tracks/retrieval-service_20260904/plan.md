@@ -609,3 +609,118 @@ scores already written via `POST /scores` — a `GET /scores` never existed. FR1
         `null`/`null` in both fields. Matches the manual math in every case checked.
   - [x] `spec.md` FR10 updated to document the fields and the reversed reasoning; new acceptance
         criterion 18 added.
+
+## Post-completion feature: new-referral intake, `POST /referrals` (user request, "input new patients")
+
+User observed: "Each time a new patient information arrives the scores need to be updated and the
+patients need to be reordered accordingly" -- the current system had no way for a new patient to enter
+it at all. Scoped this explicitly with the user first (recomputing scores/reordering is agent
+judgement, out of scope for this data-access service, same boundary as everywhere else in this track;
+only the intake write-path itself is in scope) and confirmed it follows the same ADR-002 flow
+("Postgres first, then knowledge graph") as every other write endpoint, before writing any code.
+
+- [x] Task: Scope the intake payload shape with the user
+  - [x] Asked (AskUserQuestion): should `POST /referrals` accept full patient demographics for a
+        genuinely new patient, or require the patient to already exist? User chose full demographics
+        (Recommended) -- `core.patients` isn't globally unique, a patient can be new to one hospital
+        while known to another, so requiring pre-existence would leave the actual "new patient" case
+        uncovered.
+- [x] Task: Design the write path against the real schema, not assumptions
+  - [x] Read `core.referrals`/`core.referral_daily`/`core.patients`/`core.persons` DDL
+        (dataset/db/migrations/003_core.sql) before writing any query -- confirmed
+        `core.referrals` is "Derived by the loader. Not a CSV" (its own comment), i.e. previously
+        loader-only; this is the first non-loader write path into it.
+  - [x] Read `conductor/kg/namespaces.md` for the Referral/Patient/Person/ReferralState IRI templates
+        and `kg/ontology/eat.ttl` for the exact predicates (`eat:forPatient`, `eat:referralDate`,
+        `eat:gpPriority`/`eat:referralSource` as `skos:Concept` refs not literals, `eat:stateOf`/
+        `eat:validFrom`/`eat:triageStatus` on `eat:ReferralState`, shared `eat:sex`/`eat:dateOfBirth`/
+        `eat:areaOfResidenceCode` between Person and Patient) -- reused these exactly rather than
+        inventing new ones.
+  - [x] Read `kg/queries/wait_counters.rq` to confirm what graph shape a freshly-intaken referral needs
+        to be readable by the existing wait-counters endpoint: a full `eat:Referral` node plus one
+        `eat:ReferralState` with `eat:triageStatus`.
+  - [x] **Found a real privilege gap, not assumed**: `retrieval_rw`/`agent_rw` had SELECT-only on all
+        of `core` (migration 007, NFR3) -- no write path into `core.*` existed anywhere in this
+        service. Rather than widen this silently, scoped a new migration (010) granting INSERT
+        narrowly on exactly the four tables intake touches (`persons`/`patients`/`referrals`/
+        `referral_daily`), not a blanket widening of `core` access, and documented it as an explicit
+        NFR3 amendment in spec.md.
+  - [x] Added `core.pathway_number_seq` (migration 010, started at 900001) so pathway_number generation
+        never races a `SELECT max(...)+1` under concurrent intake, and can never collide with the
+        batch-loaded dataset's own numbering (observed up to the low thousands, e.g.
+        `PW-9001-001685`).
+  - [x] Applied migration 010 via the loader's own `--migrate-only` (not a raw `psql` command) so it's
+        properly recorded in `public.schema_migrations`, not just applied ad hoc.
+- [x] Task: `NewPatientIn`/`ReferralIn` schemas (`app/schemas.py`)
+  - [x] `patient_id` always required (the hospital's own identifier -- this service doesn't invent
+        one); `new_patient` optional, required only the first time that `patient_id` is new to this
+        hospital. A `model_validator` enforces person_sex/person_date_of_birth/
+        person_area_of_residence_code are all present whenever `ihi_number` is given (needed to write
+        `core.persons`), matching the same "no partial person record" spirit as `core.patients.
+        ihi_number`'s own comment ("nullable on purpose... do not backfill").
+  - [x] Every field carries a `description`, matching this track's established schema-documentation
+        standard (the "add descriptions so agents/UI devs can read /docs" request from earlier in
+        this track).
+- [x] Task: `db.insert_referral` (`app/db.py`)
+  - [x] One transaction: upsert `core.persons`/`core.patients` (ON CONFLICT DO NOTHING -- idempotent,
+        an existing patient's demographics are never silently overwritten by a later referral for
+        them), insert `core.referrals`, insert today's initial `core.referral_daily` row
+        (`triage_status='awaiting_triage'`, `days_awaiting_triage`/`adjusted_wait_days` both equal the
+        raw wait -- no suspension or triage event is possible yet on a referral seconds old, mirroring
+        the batch generator's own day-0 case, `dataset/generator/generate.py`).
+  - [x] `today` is computed once in the route handler and threaded into both `db.insert_referral` and
+        `graph.referral_triples`, rather than each calling `date.today()` independently -- so Postgres
+        and the graph can never disagree on the date if a call happens to straddle midnight.
+  - [x] `UnknownPatientError` (not a bare `ValueError`) for "no `new_patient` given and the patient
+        doesn't exist" -- lets `routes.py` tell it apart from a `psycopg.Error`, both mapped to `400`
+        but from different causes.
+- [x] Task: `graph.referral_triples` (`app/graph.py`)
+  - [x] `eat:Hospital`/`eat:HospitalService` nodes are referenced only (`eat:atHospital`/
+        `eat:referredToService`), never re-minted -- they already exist from the batch load for any
+        hospital/specialty this referral could legally reference (the FK to
+        `core.hospital_specialty` guarantees that Postgres-side before this function ever runs).
+        `eat:gpPriority`/`eat:referralSource` concept IRIs (`concept_iri`, `app/iri.py`) are
+        referenced the same way -- the batch mapping already projects the full `ConceptScheme` for
+        every `ref_codes` table.
+  - [x] Projected into `iri.inputs_graph()` (new helper, `.../kg/graph/inputs`) -- the same named
+        graph the batch Morph-KGC pipeline writes into (confirmed against `kg/mappings/*.rml.ttl`'s
+        own `rr:graphMap`), not a new graph -- so a live-intake referral is indistinguishable from a
+        batch-loaded one to every other read endpoint.
+- [x] Task: `POST /referrals` route (`app/routes.py`)
+  - [x] Same 200/207/400/422 response contract as every other write endpoint; 200/207 both include
+        the server-generated `pathway_number` in the body (the caller has no other way to learn it).
+  - [x] Description explicitly states this does NOT recompute scores or re-rank -- points the caller
+        at `GET /hospitals/.../cohort/...` (which will now include the new referral) as the trigger
+        for whatever re-scoring an agent/orchestrator wants to do.
+- [x] Task: Tests (`tests/test_referral_intake.py`, new file)
+  - [x] Pure unit tests on `graph.referral_triples` (new-patient case gets Patient+Person triples,
+        existing-patient case gets neither, `gpPriority` omitted when absent) -- no Oxigraph needed,
+        same pattern as `test_graph_triples.py`.
+  - [x] Integration tests against the real Postgres/Oxigraph this container runs alongside: new-patient
+        intake writes both stores correctly; an existing patient's second referral doesn't need
+        `new_patient`; an unknown patient with no `new_patient` given returns `400`; a
+        `referral_received_date` before `referral_date` is rejected by Postgres's own CHECK (`400`,
+        not a Pydantic-level re-implementation of that rule); auth is required; and, end to end, a
+        newly-intaken referral shows up in `GET /hospitals/.../cohort/...` for today.
+  - [x] All test fixture dates/codes cross-checked against this environment's own live Postgres before
+        writing them (`core.hospital_specialty`, `core.ref_codes`) rather than assumed -- caught one
+        real mistake this way: `area_of_residence_code` fixtures used a 3-character value ("D01"),
+        which fails the schema's own `min_length=4` (the column is `character(4)`; real values look
+        like "D024") -- fixed to a real 4-character code before the suite passed clean.
+  - [x] `ruff check .` / `mypy app tests` clean; `pytest -q` run twice back-to-back -- 411 passed both
+        times (up from 402: 9 new tests).
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verified live end to end against the running stack (rebuilt image, real Postgres, real
+        Oxigraph): `POST /referrals` for a brand-new patient at hospital 9001 returned
+        `{"status":"ok","pathway_number":"PW-9001-900016"}`; that referral then appeared correctly in
+        `GET /hospitals/9001/cohort/<today>` (`triage_status:"awaiting_triage"`, wait counters matching
+        the manual day-count, `cpc`/`crt_breached` both `null` as expected for an untriaged referral);
+        and `GET /referrals/9001/PW-9001-900016/wait-counters` (graph-backed, `wait_counters.rq`
+        unmodified) returned **identical** counters to the Postgres-backed cohort row -- direct
+        confirmation the graph projection landed correctly, not just that the call didn't error.
+        Cleaned up the manual verification row from both Postgres and the graph afterward (this
+        service has no DELETE endpoint by design, so cleanup used `psql`/a direct SPARQL `DELETE
+        WHERE` as the DB admin, not this service's own API).
+  - [x] `spec.md` FR11 added (with an explicit NFR3 amendment for the narrowed core.* INSERT grant)
+        and acceptance criterion 19 added; `README.md`'s endpoint table and write/read-direction
+        explanation updated.

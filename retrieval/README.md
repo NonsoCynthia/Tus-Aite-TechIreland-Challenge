@@ -47,6 +47,7 @@ so Docker/a load balancer/an uptime monitor can use it without holding a credent
 | `POST` | `/scores` | Write an agent score + its citations (FR2, the ADR-002 projector) |
 | `POST` | `/decisions` | Write a decision: rankings, citations, rule checks, atomically |
 | `POST` | `/overrides` | Write a clinician override |
+| `POST` | `/referrals` | Intake a brand-new referral (FR11) -- patient (+ demographics if new), specialty, dates. Generates and returns `pathway_number`; does NOT recompute scores or re-rank (that's the agents' job) |
 | `GET` | `/referrals/{hospital_hipe}/{pathway_number}/wait-counters?as_of_date=` | The four wait counters, via `kg/queries/wait_counters.rq` unmodified (FR3) |
 | `GET` | `/decisions/{hospital_hipe}/{as_of_date}` | Every ranked position for that day, with its cited evidence resolved to real values (FR8) -- reconstructed by walking `eat:cites` |
 | `GET` | `/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}?role=` | One placement's cited evidence, resolved (FR8); omit `role` for all four, or narrow to `urgency`/`capacity`/`timeframe`/`multi_list` |
@@ -54,7 +55,8 @@ so Docker/a load balancer/an uptime monitor can use it without holding a credent
 | `GET` | `/hospitals/{hospital_hipe}/cohort/{as_of_date}` | Which referrals the coordinator needs to rank (FR10) -- every referral still on the list that day, oldest-first, with CPC, wait counters, and a computed CRT breach flag (`crt_breached`/`crt_threshold_days`, `null` when no CRT applies to that CPC). Empty list, not 404, if nothing's on the list |
 | `GET` | `/runs/{run_id}/hospitals/{hospital_hipe}/scores` | The urgency/capacity scores already written for this run+hospital (FR10), grouped by pathway then agent, citations included. Empty `scores` object, not 404, if nothing's been scored yet |
 
-Every write endpoint follows the same contract: `200 {"status": "ok"}` on full success; `207
+Every write endpoint follows the same contract: `200 {"status": "ok"}` on full success (`POST
+/referrals` also returns the server-generated `pathway_number`); `207
 {"status": "postgres_committed_graph_projection_failed", "detail": ...}` if Postgres committed but
 the graph push then failed (the Postgres row still stands -- it's the system of record); `400` if
 Postgres itself rejects the payload (no graph write is even attempted); `422` if the payload fails
@@ -69,6 +71,11 @@ ranking, and what the other agents already decided about them. All three read Po
 `agent.*` directly rather than the graph, since that's where this data actually lives relationally,
 and return an empty result (`404` for a single referral that doesn't exist, otherwise an empty
 list/object) rather than erroring when there's simply nothing there yet.
+
+`POST /referrals` (FR11) is a third case: a write into `core.*` itself, not `agent.*` -- the one path
+that puts new *input* data into the system, rather than reading it or writing an agent's output. It
+does not recompute anything; it only makes a referral exist so the input-side endpoints above (and,
+eventually, an agent) can pick it up.
 
 The full picture: an urgency agent calls `GET /referrals/.../context` to gather one referral's vitals,
 then `POST /scores`. A coordinator calls `GET /hospitals/.../cohort/...` to find its cohort, then

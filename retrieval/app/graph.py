@@ -17,7 +17,7 @@ import httpx
 
 from . import iri
 from .config import settings
-from .schemas import DecisionIn, OverrideIn, RankingIn, RuleCheckIn, ScoreIn
+from .schemas import DecisionIn, OverrideIn, RankingIn, ReferralIn, RuleCheckIn, ScoreIn
 
 Triple = tuple[str, str, str]
 
@@ -175,6 +175,96 @@ def override_triples(payload: OverrideIn, as_of_date: date) -> list[Triple]:
     ]
     # Override carries no prov:wasGeneratedBy (its domain is unionOf(Score,
     # Decision, RuleCheck) only) -- a clinician action, not an agent one.
+    return triples
+
+
+def referral_triples(payload: ReferralIn, pathway_number: str, today: date) -> list[Triple]:
+    """spec.md FR11: an eat:Referral (+ eat:Patient/eat:Person if new, + an
+    initial eat:ReferralState) for a brand-new intake referral. Projected
+    into iri.inputs_graph() -- the same graph the batch pipeline writes
+    into, so read endpoints (wait-counters, evidence resolution) can't tell
+    this referral apart from a batch-loaded one.
+
+    eat:HospitalService/eat:Hospital nodes are referenced only (eat:
+    referredToService / eat:atHospital), never re-minted here -- both
+    already exist from the batch load for any hospital/specialty this
+    referral could legally reference (the FK to core.hospital_specialty
+    guarantees that Postgres-side before this function is ever called).
+    """
+    referral = iri.referral_iri(payload.hospital_hipe, pathway_number)
+    patient = iri.patient_iri(payload.hospital_hipe, payload.patient_id)
+    hospital = iri.hospital_iri(payload.hospital_hipe)
+    service = iri.service_iri(payload.hospital_hipe, payload.specialty_hipe)
+    valid_from = payload.referral_received_date.isoformat()
+    state = iri.referral_state_iri(payload.hospital_hipe, pathway_number, valid_from)
+
+    triples = [
+        _type_triple(referral, "Referral"),
+        (_iri(referral), _iri(iri.eat("forPatient")), _iri(patient)),
+        (_iri(referral), _iri(iri.eat("atHospital")), _iri(hospital)),
+        (_iri(referral), _iri(iri.eat("referralDate")), _date(payload.referral_date)),
+        (
+            _iri(referral),
+            _iri(iri.eat("referralReceivedDate")),
+            _date(payload.referral_received_date),
+        ),
+        (_iri(referral), _iri(iri.eat("recordCreationDate")), _date(today)),
+        (_iri(referral), _iri(iri.eat("referralSource")), _iri(
+            iri.concept_iri("referral_source", payload.referral_source)
+        )),
+        _type_triple(state, "ReferralState"),
+        (_iri(state), _iri(iri.eat("stateOf")), _iri(referral)),
+        (_iri(state), _iri(iri.eat("validFrom")), _date(payload.referral_received_date)),
+        (_iri(state), _iri(iri.eat("referredToService")), _iri(service)),
+        (_iri(state), _iri(iri.eat("triageStatus")), _string("awaiting_triage")),
+        (
+            _iri(state),
+            _iri(iri.eat("hasHighClinicalOrSocialNeeds")),
+            _bool(payload.high_clinical_or_social_needs),
+        ),
+    ]
+    if payload.priority_level_gp is not None:
+        triples.append(
+            (
+                _iri(referral),
+                _iri(iri.eat("gpPriority")),
+                _iri(iri.concept_iri("gp_priority", payload.priority_level_gp)),
+            )
+        )
+
+    if payload.new_patient is not None:
+        np = payload.new_patient
+        triples.extend(
+            [
+                _type_triple(patient, "Patient"),
+                (_iri(patient), _iri(iri.eat("atHospital")), _iri(hospital)),
+                (_iri(patient), _iri(iri.eat("sex")), _string(np.patient_sex)),
+                (_iri(patient), _iri(iri.eat("dateOfBirth")), _date(np.patient_date_of_birth)),
+                (
+                    _iri(patient),
+                    _iri(iri.eat("areaOfResidenceCode")),
+                    _string(np.area_of_residence_code),
+                ),
+            ]
+        )
+        if np.ihi_number is not None:
+            person = iri.person_iri(np.ihi_number)
+            assert np.person_sex is not None
+            assert np.person_date_of_birth is not None
+            assert np.person_area_of_residence_code is not None
+            triples.extend(
+                [
+                    (_iri(patient), _iri(iri.eat("isRecordOf")), _iri(person)),
+                    _type_triple(person, "Person"),
+                    (_iri(person), _iri(iri.eat("sex")), _string(np.person_sex)),
+                    (_iri(person), _iri(iri.eat("dateOfBirth")), _date(np.person_date_of_birth)),
+                    (
+                        _iri(person),
+                        _iri(iri.eat("areaOfResidenceCode")),
+                        _string(np.person_area_of_residence_code),
+                    ),
+                ]
+            )
     return triples
 
 

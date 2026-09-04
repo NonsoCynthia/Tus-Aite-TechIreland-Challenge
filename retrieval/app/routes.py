@@ -11,6 +11,7 @@ Postgres row stands, since Postgres is the system of record (ADR-002).
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,7 +19,7 @@ from fastapi.responses import JSONResponse
 
 from . import db, graph, iri
 from .auth import require_bearer_token
-from .schemas import DecisionIn, OverrideIn, ScoreIn
+from .schemas import DecisionIn, OverrideIn, ReferralIn, ScoreIn
 
 logger = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(require_bearer_token)])
@@ -36,10 +37,14 @@ _RESPONSE_CONTRACT = (
 )
 
 
-def _projection_failed_response(detail: str) -> JSONResponse:
+def _projection_failed_response(detail: str, **extra: str) -> JSONResponse:
     return JSONResponse(
         status_code=status.HTTP_207_MULTI_STATUS,
-        content={"status": "postgres_committed_graph_projection_failed", "detail": detail},
+        content={
+            "status": "postgres_committed_graph_projection_failed",
+            "detail": detail,
+            **extra,
+        },
     )
 
 
@@ -136,3 +141,45 @@ async def create_override(payload: OverrideIn) -> JSONResponse | dict[str, str]:
         )
         return _projection_failed_response(str(exc))
     return {"status": "ok"}
+
+
+@router.post(
+    "/referrals",
+    response_model=None,
+    summary="Intake a new referral (agent input)",
+    description=(
+        "A new referral arriving at a hospital -- spec.md FR11, user request (\"input new "
+        "patients\"). Writes `core.patients`/`core.persons` (only if `new_patient` is given), "
+        "`core.referrals`, and today's initial `core.referral_daily` row (`triage_status="
+        "'awaiting_triage'`), then projects `eat:Referral` (+ `eat:Patient`/`eat:Person` if new, "
+        "+ an initial `eat:ReferralState`) into the graph's `inputs` named graph -- the same one "
+        "the batch pipeline uses, so this referral reads back identically to a batch-loaded one "
+        "everywhere else in this API. `pathway_number` is generated server-side (never supplied "
+        "by the caller) and returned in the response so the caller can address this referral "
+        "afterwards.\n\nThis endpoint does NOT recompute any score or re-run the coordinator's "
+        "ranking -- that is the urgency/capacity/coordinator agents' job (a separate track), not "
+        "a judgement this data-access service makes for itself. Call `GET /hospitals/.../cohort/"
+        "...` afterwards (it will now include this referral) to trigger whatever re-scoring an "
+        "agent or orchestrator wants to do." + _RESPONSE_CONTRACT
+    ),
+)
+async def create_referral(payload: ReferralIn) -> JSONResponse | dict[str, str]:
+    today = date.today()
+    try:
+        pathway_number = db.insert_referral(payload, today)
+    except db.UnknownPatientError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except psycopg.Error as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    triples = graph.referral_triples(payload, pathway_number, today)
+    try:
+        await graph.push_triples(triples, iri.inputs_graph())
+    except Exception as exc:
+        logger.exception(
+            "graph projection failed after Postgres commit: referral %s/%s",
+            payload.hospital_hipe,
+            pathway_number,
+        )
+        return _projection_failed_response(str(exc), pathway_number=pathway_number)
+    return {"status": "ok", "pathway_number": pathway_number}
