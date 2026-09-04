@@ -88,6 +88,16 @@ class TestIriShort:
         assert iri.short("Cardiology Outreach") == "Cardiology Outreach"
         assert iri.short("2026-08-26") == "2026-08-26"
 
+    def test_strips_reused_vocabularies_with_a_short_label(self) -> None:
+        # Found via a real citation resolving to unshortened
+        # http://www.w3.org/ns/sosa/... URIs (AC13 violation) rather than
+        # assumed up front -- every per-column Observation node is
+        # sosa:Observation with sosa:observedProperty etc.
+        assert iri.short(f"{iri.SOSA_NS}Observation") == "sosa:Observation"
+        assert iri.short(f"{iri.SOSA_NS}observedProperty") == "sosa:observedProperty"
+        assert iri.short(f"{iri.PROV_NS}wasGeneratedBy") == "prov:wasGeneratedBy"
+        assert iri.short(f"{iri.RDF_NS}type") == "rdf:type"
+
 
 class TestResolvedEvidenceInDecisionEndpoint:
     def test_evidence_carries_real_properties_not_just_an_iri(

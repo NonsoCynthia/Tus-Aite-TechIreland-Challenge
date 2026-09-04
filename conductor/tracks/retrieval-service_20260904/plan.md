@@ -422,3 +422,40 @@ that requires a second hop: dereferencing the evidence IRI into its own properti
         `"clinicName": "Cardiology Outreach"`, `"slotsAvailable": "2"` etc. directly, IRIs in short
         form throughout, zero occurrences of the full namespace URL. `/openapi.json` confirmed every
         route carries the expected `summary`.
+
+### Post-Phase-6 fix: `iri.short()` missed reused vocabularies
+
+Found by loading the **real** knowledge graph (see below) and citing genuine evidence: a real
+`Observation` node's `type`/`properties` came back as full `http://www.w3.org/ns/sosa/...` URIs,
+unshortened — `short()` only knew about `eat:`/`eatd:`/`graph/`, not the reused vocabularies
+(`tech-stack.md`: "PROV-O, SOSA, OWL-Time, SKOS and QUDT") real loaded data actually uses. Every
+per-column `Observation` is `sosa:Observation`, so this wasn't an edge case — it was the first real
+`Observation` citation resolved against real data. Fixed: `short()` now also strips
+`SOSA_NS`/`TIME_NS`/`SKOS_NS`/`QUDT_NS`/`UNIT_NS`/`PROV_NS`/`RDF_NS`, prefixed with a short label
+(`sosa:`, `prov:`, etc.) rather than bare — our own `eat:`/`eatd:`/graph namespaces stay bare, since
+they're the dominant vocabulary in every response and unambiguous. New test
+(`test_strips_reused_vocabularies_with_a_short_label`); 389 tests, `ruff`/`mypy` clean; reconfirmed
+live against the same real citation.
+
+## Real-data verification (2026-09-04, post-completion)
+
+User asked to test against real data rather than fixtures. Checked first rather than assuming:
+Postgres already had the full dataset loaded (`core.referral_daily`: 70,022 rows), but Oxigraph did
+not — only this session's own test-run graphs existed, no `…/kg/graph/inputs`. Loaded the real graph:
+
+- Found pre-existing, correctly-materialized `kg/out/*.nq` files (timestamped hours before this
+  session touched anything) — no need to regenerate via Morph-KGC. A throwaway `python -m morph_kgc`
+  run in a container on the compose network (to resolve the mappings' hardcoded `db` hostname,
+  which only resolves inside Docker, not from the host — the `.ini` files were not modified) produced
+  fragmented per-group chunk files instead of cleanly consolidating; those were discarded rather than
+  trusted, and the pre-existing clean files were used instead.
+- Loaded all 5 files into Oxigraph (`…/kg/graph/inputs`: 590,683 triples; `clinical.nq` had 381,026
+  lines vs. `kg/README.md`'s documented 357,285 — flagged to the user as unexplained, not chased
+  further, since RDF stores deduplicate on insert so loading it either way was safe).
+- Verified end-to-end against real data: `GET /referrals/9001/PW-9001-000007/wait-counters` returned
+  genuine computed counters; a `POST /decisions` citing a real `Condition` (`core.conditions`,
+  ICD-10-AM `M16.1`) resolved correctly on read-back — which is what surfaced the SOSA gap above,
+  fixed in the same session.
+
+Not committed to the repo (no code/mapping changes) — this loaded data into the local Oxigraph
+container's runtime state only, for interactive testing.

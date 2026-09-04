@@ -157,7 +157,11 @@ its namespace prefix stripped (`iri.short`) — e.g. `clinic-session/9003/CL02/2
 `https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/clinic-session/9003/CL02/
 2026-08-26`. The full IRI is still used for every actual SPARQL query/update — this is purely a
 response-shaping concern, not a change to how the graph itself is addressed or namespaces.md's
-conventions.
+conventions. Covers `eat:`/`eatd:`/graph IRIs (stripped bare, no label) and the reused vocabularies
+`tech-stack.md` names (PROV-O, SOSA, OWL-Time, SKOS, QUDT — stripped with a short label, e.g.
+`sosa:observedProperty`, since those aren't our own dominant vocabulary and a bare strip could
+collide) — found to matter, not assumed, when a real `Observation` citation (`sosa:Observation`)
+resolved against the real loaded graph and came back with full unshortened `sosa:` URIs.
 
 ## Non-Functional Requirements
 

@@ -15,6 +15,17 @@ EATD_NS = "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/"
 GRAPH_BASE = "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/"
 PROV_NS = "http://www.w3.org/ns/prov#"
 RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+# Reused vocabularies (tech-stack.md: "PROV-O, SOSA, OWL-Time, SKOS and QUDT") --
+# real loaded data uses these directly (e.g. sosa:Observation for every
+# per-column observation node), so `short()` needs to know them too, not
+# just eat:/eatd:/prov:/rdf:. Found via a real citation resolving to
+# unshortened `http://www.w3.org/ns/sosa/...` URIs (AC13 violation) rather
+# than assumed up front.
+SOSA_NS = "http://www.w3.org/ns/sosa/"
+TIME_NS = "http://www.w3.org/2006/time#"
+SKOS_NS = "http://www.w3.org/2004/02/skos/core#"
+QUDT_NS = "http://qudt.org/schema/qudt/"
+UNIT_NS = "http://qudt.org/vocab/unit/"
 
 # evidence_type (agent_citations/decision_citations) -> the IRI path segment
 # for that evidence class's own template in namespaces.md #4. 'observation'
@@ -45,6 +56,27 @@ def rdf(term: str) -> str:
     return f"{RDF_NS}{term}"
 
 
+# (namespace, label) pairs `short()` strips, checked in order. Our own
+# namespaces (eatd:/eat:/graph) reduce to the bare local name -- unambiguous,
+# since they're the dominant vocabulary in every response. Reused vocabularies
+# (SOSA in particular: every per-column Observation node is `sosa:Observation`
+# with `sosa:observedProperty`/`sosa:hasSimpleResult`/etc. -- confirmed
+# against real loaded data, not assumed) keep a short label so a property
+# from a different vocabulary doesn't silently collide with one of ours.
+_STRIPPABLE_NAMESPACES: list[tuple[str, str]] = [
+    (EATD_NS, ""),
+    (EAT_NS, ""),
+    (GRAPH_BASE, ""),
+    (PROV_NS, "prov:"),
+    (RDF_NS, "rdf:"),
+    (SOSA_NS, "sosa:"),
+    (TIME_NS, "time:"),
+    (SKOS_NS, "skos:"),
+    (QUDT_NS, "qudt:"),
+    (UNIT_NS, "unit:"),
+]
+
+
 def short(value: str) -> str:
     """Strips the namespace prefix off a full IRI for API *responses* only --
     internal graph operations (SPARQL queries/updates) always use the full
@@ -53,14 +85,14 @@ def short(value: str) -> str:
     `https://.../kg/id/clinic-session/9003/CL02/2026-08-26`. namespaces.md's
     "no unescaped `/` in a prefixed name" rule is about Turtle/N-Quads files
     specifically (a real serialisation constraint); a JSON string field has
-    no such restriction, so this drops the prefix outright rather than
-    producing an `eatd:`-style compromise. Values outside our namespaces
-    (rare, but possible for object values in resolved evidence) pass through
-    unchanged rather than being silently mangled.
+    no such restriction, so this drops the prefix outright (for our own
+    namespaces) rather than producing an `eatd:`-style compromise. Values
+    outside every known namespace pass through unchanged rather than being
+    silently mangled.
     """
-    for ns in (EATD_NS, EAT_NS, GRAPH_BASE):
+    for ns, label in _STRIPPABLE_NAMESPACES:
         if value.startswith(ns):
-            return value[len(ns) :]
+            return f"{label}{value[len(ns):]}"
     return value
 
 
