@@ -12,12 +12,12 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
 
 ## Phase 1: ADR-002 record + service scaffold (Tier 3)
 
-- [ ] Task: Record the ADR-002 decision
-  - [ ] Write the confirmed decision (Postgres system of record; synchronous, single-writer graph
+- [x] Task: Record the ADR-002 decision
+  - [x] Write the confirmed decision (Postgres system of record; synchronous, single-writer graph
         projection on successful commit) into
         `conductor/tracks/explainable-agent-based-triage_20260828/decisions.md`
-  - [ ] Reference this track (`retrieval-service_20260904`) as the implementation
-  - [ ] Update that track's status in `conductor/tracks.md` to reflect the blocker is resolved
+  - [x] Reference this track (`retrieval-service_20260904`) as the implementation
+  - [x] Update that track's status in `conductor/tracks.md` to reflect the blocker is resolved
 
 - [ ] Task: docker-compose service scaffold
   - [ ] Add a `retrieval` service definition (Dockerfile/build context) alongside `db` and `oxigraph`
