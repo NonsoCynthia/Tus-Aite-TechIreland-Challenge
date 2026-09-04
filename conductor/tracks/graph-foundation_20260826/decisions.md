@@ -31,8 +31,9 @@ Two annotations in the source proposal are unresolved and should be closed out d
    rationale as an ADR so the compliance lead can point at it.
 
 3. **Where do agent outputs live — Postgres, the graph, or both?** Raised 2026-08-31 while
-   reconciling this track against ADR-001. **Blocks the specialist-agents track; does not block this
-   one.**
+   reconciling this track against ADR-001. **Resolved 2026-09-04 as ADR-002** in
+   `explainable-agent-based-triage_20260828/decisions.md` — Postgres is the write target, the graph
+   projects it. Left below as the record of the options considered.
 
    Migration 006 already models the entire agent output surface in Postgres — `agent.agent_scores`,
    `agent_citations`, `decisions`, `decision_rankings`, `decision_citations`, `rule_checks` and

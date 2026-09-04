@@ -25,26 +25,34 @@ ranked position reproducible and auditable under the EU AI Act framing the propo
 
 ## Functional Requirements
 
+Per **ADR-002** (`decisions.md`): agents write to Postgres `agent.*`, never directly to the graph. A
+projection step, mirroring `kg/mappings/`, mirrors `agent.*` into the graph as `eat:Score`/`Decision`/
+`cites` triples so the audit trail stays walkable there. FR1–FR3 below describe the Postgres write;
+the projection is covered separately in Phase 3.
+
 ### FR1 — Urgency agent
 
 - Reads `Patient`→`Condition`→`UrgencySignal` via SPARQL.
 - Computes MTS category and NEWS2 score deterministically from graph data.
-- Writes a `scored` edge (Agent→Referral) back to the graph, score as an edge property.
+- Writes a row to `agent.agent_scores` (Agent→Referral, score as a column) via `agent_rw`.
 
 ### FR2 — Capacity agent
 
 - Reads `Specialty`→`Ward`→`BedStatus` via SPARQL, including the SimPy-produced occupancy time series.
 - Applies deterministic constraint reasoning (available capacity, overcrowding state) per specialty/ward.
-- Writes a `scored` edge back to the graph.
+- Writes a row to `agent.agent_scores` via `agent_rw`.
 
 ### FR3 — Coordinating agent
 
-- Ranks referrals via a SPARQL query over both agents' `scored` edges plus deterministic tie-breaking:
-  CPC, then CRT breach status, then oldest-referral-first.
-- Materialises `Decision` nodes and `cites` edges (Decision→UrgencySignal|BedStatus) for every ranked
-  position — this is the audit trail per proposal §9–10.
+- Ranks referrals via a SPARQL query over both agents' `agent.agent_scores` rows (read back via the
+  graph projection, or directly from Postgres — see Phase 3) plus deterministic tie-breaking: CPC,
+  then CRT breach status, then oldest-referral-first.
+- Writes `agent.decisions`, `decision_rankings` and `decision_citations` rows for every ranked
+  position — this is the audit trail per proposal §9–10, projected into the graph as `Decision` nodes
+  and `cites` edges.
 - Never lets a `Decision` rank an urgent `Referral` behind a semi-urgent one still inside its CRT
-  (enforces the OWL constraint declared in `graph-foundation`).
+  (enforces the OWL constraint declared in `graph-foundation`, checked via SHACL against the
+  projected graph).
 
 ### FR4 — Rationale layer
 
