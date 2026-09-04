@@ -87,7 +87,9 @@ is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual
   100% line coverage on `tests/fixtures.py` (25 seeds × constraint checks + determinism tests, 334
   total tests in the suite); `ruff check .` and `mypy app tests` both clean.
 
-- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+
+  Confirmed by user 2026-09-04.
 
 ---
 
