@@ -57,3 +57,38 @@ synchronous per-write projection. That version was written independently of
 decision above because it is what was actually built, tested (411 tests), and is now the real write
 path every agent and the clinician UI use — recording an ADR that contradicted the shipped service
 would leave this document wrong the moment it merged.
+
+---
+
+### ADR-003: `capacity_score` polarity — pressure, not availability
+
+**Date:** 2026-09-05
+**Status:** accepted
+
+**Context:** spec.md FR2 says the capacity agent "applies deterministic constraint reasoning
+(available capacity, overcrowding state)" and writes a score, but neither the spec, the ontology
+(`conductor/kg/ontology.md`), nor `product.md` states which direction the number runs — a `Score`
+node's `eat:scoreValue` is just a decimal, undocumented in polarity. Two readings were both
+plausible: `1.0` = "plenty of room" (an availability score) or `1.0` = "severely constrained" (a
+pressure score). Nobody was available to ask before this needed resolving, unlike
+`retrieval-service_20260904`'s comparable IRI-convention gaps (`conductor/kg/namespaces.md`'s own
+"stop and ask" instruction), so this is recorded here for the coordinator's implementer and the
+compliance lead to review, rather than left undocumented in `capacity_agent/scoring.py` alone.
+
+**Decision:** `capacity_score` is a resource-**pressure** score: `0.0` = ample capacity, no
+constraint pressure; `1.0` = severe constraint pressure — the same polarity as the urgency agent's
+score, where `1.0` is always "more clinically urgent," never the reverse for one agent and not the
+other.
+
+**Rationale:** `tech-stack.md`'s Agent Reasoning Model has the coordinating agent "combine urgency
+and capacity scores into a ranked list" (`product.md` #8). A combiner (sum, weighted average, or
+max) only produces a sensible ranking if both inputs point the same way — if capacity meant
+"availability," a coordinator naively summing the two would rank a low-urgency referral at an
+empty, ample-capacity ward *above* a high-urgency one at a severely overcrowded ward, which is
+backwards. Pressure-polarity means "higher combined score = more reason to prioritise" holds for
+both agents uniformly, whatever combination function Phase 3 ultimately picks.
+
+**Trade-off accepted:** if the coordinator's implementer intended availability-as-score, this ADR
+is the place that surfaces the mismatch before Phase 3 ships, not a silent sign error discovered
+against real rankings. `capacity_agent/scoring.py`'s module docstring and `capacity-agent/README.md`
+both restate this polarity where a reader of just the code would otherwise have to infer it.

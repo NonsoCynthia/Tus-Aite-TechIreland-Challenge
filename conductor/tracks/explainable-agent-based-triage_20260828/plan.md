@@ -34,15 +34,22 @@ that service, so no separate "project `agent.*` into the graph" task is needed h
 
 ## Phase 2: Capacity Agent (Tier 1)
 
-- [ ] Task: Constraint reasoning logic
-    - [ ] Sub-task: Write failing tests for available-capacity and overcrowding-state scoring
-    - [ ] Sub-task: Implement deterministic capacity scorer reading `BedStatus` via SPARQL
-- [ ] Task: Write scores via retrieval-service_20260904 (Tier 2)
-    - [ ] Sub-task: Round-trip test — score, `POST /scores`, read back via `GET /runs/{run_id}/
-          hospitals/{hospital_hipe}/scores`, compare
-    - [ ] Sub-task: Implement `triage.agents.capacity` calling `POST /scores` with its evidence
-          citations (gather context first via `GET /referrals/{hospital_hipe}/{pathway_number}/
-          context`, ADR-002)
+- [x] Task: Constraint reasoning logic
+    - [x] Sub-task: Write failing tests for available-capacity and overcrowding-state scoring
+    - [x] Sub-task: Implement deterministic capacity scorer — reads the `capacity` section of
+          `GET /referrals/{hospital_hipe}/{pathway_number}/context` (retrieval-service_20260904,
+          FR9) rather than SPARQL directly, per ADR-002 (agents only ever call that service; see
+          `capacity-agent/README.md` and ADR-003 for the scoring model and its polarity)
+- [x] Task: Write scores via retrieval-service_20260904 (Tier 2)
+    - [x] Sub-task: Round-trip test — score, `POST /scores`, read back via `GET /runs/{run_id}/
+          hospitals/{hospital_hipe}/scores`, compare (`capacity-agent/tests/test_run_integration.py`
+          — skips cleanly if the retrieval service isn't running; mocked-transport equivalents in
+          `test_client.py`/`test_run.py` cover the same wiring without live infra)
+    - [x] Sub-task: Implement `capacity_agent.run` (`score_referral`/`run_for_cohort`) calling
+          `POST /scores` with its evidence citations (gather context first via
+          `GET /referrals/{hospital_hipe}/{pathway_number}/context`, ADR-002). New standalone
+          package: `capacity-agent/` (sibling to `retrieval/`), 40 tests, 96% coverage,
+          ruff/mypy clean
 - [ ] Task: Conductor - User Manual Verification 'Capacity Agent' (Protocol in workflow.md)
 
 ---
