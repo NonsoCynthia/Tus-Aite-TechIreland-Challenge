@@ -22,6 +22,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from . import iri
+
 EvidenceType = Literal["observation", "condition", "triage_event", "bed_status", "clinic_session"]
 CitationRole = Literal["urgency", "capacity", "timeframe", "multi_list"]
 AgentName = Literal["urgency", "capacity"]
@@ -54,6 +56,11 @@ class ScoreCitationIn(BaseModel):
         ),
         examples=["9001/PW-9001-000007/2026-08-16%2009%3A16%3A00/hr"],
     )
+
+    @field_validator("evidence_key")
+    @classmethod
+    def evidence_key_iri_safe(cls, value: str) -> str:
+        return iri.validate_segment(value)
 
 
 class ScoreIn(BaseModel):
@@ -99,6 +106,11 @@ class ScoreIn(BaseModel):
         ),
     )
 
+    @field_validator("run_id", "hospital_hipe", "pathway_number")
+    @classmethod
+    def identifiers_iri_safe(cls, value: str) -> str:
+        return iri.validate_segment(value)
+
 
 class DecisionCitationIn(BaseModel):
     """One piece of evidence for one ranked position. Becomes an
@@ -117,6 +129,11 @@ class DecisionCitationIn(BaseModel):
             "per-section row expansion."
         ),
     )
+
+    @field_validator("evidence_key")
+    @classmethod
+    def evidence_key_iri_safe(cls, value: str) -> str:
+        return iri.validate_segment(value)
 
 
 class RuleCheckIn(BaseModel):
@@ -140,6 +157,11 @@ class RuleCheckIn(BaseModel):
             "false. Omit or use `null` -- never the literal string 'None'."
         ),
     )
+
+    @field_validator("rule_id")
+    @classmethod
+    def rule_id_iri_safe(cls, value: str) -> str:
+        return iri.validate_segment(value)
 
 
 class RankingIn(BaseModel):
@@ -199,6 +221,11 @@ class RankingIn(BaseModel):
         ),
     )
 
+    @field_validator("hospital_hipe", "pathway_number")
+    @classmethod
+    def identifiers_iri_safe(cls, value: str) -> str:
+        return iri.validate_segment(value)
+
 
 class DecisionIn(BaseModel):
     """One coordinator decision: a full ranked list for one hospital, one
@@ -244,6 +271,11 @@ class DecisionIn(BaseModel):
             "be non-empty; every `position` must be unique (enforced below)."
         ),
     )
+
+    @field_validator("run_id", "hospital_hipe")
+    @classmethod
+    def identifiers_iri_safe(cls, value: str) -> str:
+        return iri.validate_segment(value)
 
     @field_validator("rankings")
     @classmethod
@@ -314,6 +346,11 @@ class OverrideIn(BaseModel):
             raise ValueError("reason must not be blank")
         return reason
 
+    @field_validator("override_id", "hospital_hipe", "pathway_number")
+    @classmethod
+    def identifiers_iri_safe(cls, value: str) -> str:
+        return iri.validate_segment(value)
+
 
 class NewPatientIn(BaseModel):
     """Demographics for a patient this hospital hasn't seen before (spec.md
@@ -360,6 +397,11 @@ class NewPatientIn(BaseModel):
                 "required when ihi_number is given"
             )
         return self
+
+    @field_validator("ihi_number")
+    @classmethod
+    def ihi_number_iri_safe(cls, value: str | None) -> str | None:
+        return value if value is None else iri.validate_segment(value)
 
 
 class ReferralIn(BaseModel):
@@ -424,3 +466,8 @@ class ReferralIn(BaseModel):
         default=False,
         description="Whether this referral is flagged for high clinical/social needs.",
     )
+
+    @field_validator("hospital_hipe", "patient_id", "specialty_hipe")
+    @classmethod
+    def identifiers_iri_safe(cls, value: str) -> str:
+        return iri.validate_segment(value)
