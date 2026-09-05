@@ -1,0 +1,742 @@
+# Plan: Retrieval Service
+
+**Track:** `retrieval-service_20260904`
+**Spec:** `spec.md`
+
+Tiers per `workflow.md`: this track is entirely **Tier 2** (graph and pipeline: SPARQL read/write
+helpers, `cites` edge construction, override write-back) except the bare scaffold/auth wiring, which
+is **Tier 3** (smoke test only, no coverage gate). Each phase ends with a manual verification task per
+`workflow.md`'s User Manual Verification Protocol.
+
+---
+
+## Phase 1: ADR-002 record + service scaffold (Tier 3)
+
+- [x] Task: Record the ADR-002 decision
+  - [x] Write the confirmed decision (Postgres system of record; synchronous, single-writer graph
+        projection on successful commit) into
+        `conductor/tracks/explainable-agent-based-triage_20260828/decisions.md`
+  - [x] Reference this track (`retrieval-service_20260904`) as the implementation
+  - [x] Update that track's status in `conductor/tracks.md` to reflect the blocker is resolved
+
+- [x] Task: docker-compose service scaffold
+  - [x] Add a `retrieval` service definition (Dockerfile/build context) alongside `db` and `oxigraph`
+  - [x] Publish the service's port to the host (FR1 — reachable from outside the compose network)
+  - [x] Wire environment config: Postgres DSN using the `agent_rw` role, Oxigraph query/update URLs,
+        the bearer-token secret(s) — all env-based, nothing committed
+  - [x] Confirm the service starts under `docker compose up` and does not collide with the pinned
+        `/triage_db` container name convention from `tech-stack.md`
+
+  Note: `agent_rw` (migration 007) turned out to be `NOLOGIN` — a group role, not something a service
+  can connect as directly. Added `dataset/db/migrations/009_retrieval_login_role.sql`, a `LOGIN` role
+  `retrieval_rw` granted membership in `agent_rw`, mirroring how `kg_loader` is set up.
+
+  Also consolidated `dataset/docker-compose.yml` (`db`, `pgadmin`, `loader`) into the root
+  `docker-compose.yml` alongside `oxigraph` and `retrieval`, at the user's request, so every service
+  is one compose project on one default network — no more `triage_net` external-network workaround
+  between two separate projects (an earlier version of this task briefly introduced that, then
+  removed it again in the same phase). `dataset/db/pgadmin/servers.json` and the loader's build
+  context/volume paths were updated to `./dataset/...` accordingly. `dataset/Makefile` and
+  `dataset/.env`/`.env.example` are superseded by a new root `Makefile`/`.env.example` — `dataset/Makefile`
+  now forwards each target to the root so `cd dataset && make up` still works. `kg/Makefile`'s DB path
+  was updated (`dataset/` → repo root) and its unquoted path fixed (broke on this checkout's
+  space-containing path; pre-existing bug, not something this track introduced). `tech-stack.md`'s
+  Setup/Infrastructure sections still describe the old two-stack layout — left for the track's
+  end-of-implementation docs sync, not fixed here (user's call).
+
+- [x] Task: FastAPI app skeleton and bearer-token auth (FR7)
+  - [x] Write a smoke test: a request to a health-check route with no `Authorization` header returns
+        `401`
+  - [x] Write a smoke test: the same route with a valid bearer token returns `200`
+  - [x] Implement the FastAPI app skeleton and an auth dependency/middleware applied to every route,
+        checked before any handler logic (including before Postgres/Oxigraph access)
+  - [x] Implement a `GET /health` route (no DB/graph dependency) proving the app boots and auth is
+        enforced
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+
+  Confirmed by user 2026-09-04: scaffold verified end to end on the consolidated single
+  docker-compose (see the note above the FastAPI-skeleton task for what changed after this task was
+  first completed).
+
+---
+
+## Phase 2: Fixture decision generator (Tier 2)
+
+- [x] Task: Write tests for the fixture generator
+  - [x] Same seed produces identical payloads across two runs (determinism)
+  - [x] Generated `agent.agent_scores` / `agent.decisions` / `agent.decision_rankings` /
+        `agent.decision_citations` / `agent.rule_checks` / `agent.overrides` payloads satisfy every
+        SQL CHECK constraint from `dataset/db/migrations/006_outputs.sql` (score range, valid
+        `agent_name`, valid citation `role`, non-blank override reason, positive `cohort_size`,
+        positive/unique `position`)
+
+  `agent.rule_checks.rule_id` also carries a hard FK to `core.ref_rules` — queried the live table
+  (`RULE-CRT-URGENT`, `RULE-CRT-SEMI`, `RULE-TRIAGE-TURNAROUND`, `RULE-ORDER`, `RULE-TIEBREAK`) rather
+  than inventing IDs, so fixture decisions will actually insert once Phase 3 exercises them against
+  the real database, not just pass isolated unit tests.
+
+- [x] Task: Implement the fixture generator
+  - [x] Seeded, reproducible generator producing one coherent decision (rankings + citations + rule
+        checks) plus standalone score/citation and override payloads
+  - [x] Generator lives where other tests can import it directly (test fixtures/helpers, not
+        production request-handling code) — `retrieval/tests/fixtures.py`
+
+- [x] Task: Verify coverage ≥ 60% on the generator module; `ruff`/`mypy` clean
+
+  100% line coverage on `tests/fixtures.py` (25 seeds × constraint checks + determinism tests, 334
+  total tests in the suite); `ruff check .` and `mypy app tests` both clean.
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+
+  Confirmed by user 2026-09-04.
+
+---
+
+## Phase 3: Write endpoints — the ADR-002 projector (Tier 2)
+
+- [x] Task: IRI construction helpers
+  - [x] Write tests asserting generated IRIs match `conductor/kg/namespaces.md`'s minting conventions
+        for `eat:Score`, `eat:Decision`, `eat:RankedPlacement`, and citation edges
+  - [x] Write a test guarding the known gotcha: no unescaped `/` inside a prefixed name — instance
+        IRIs must be full `<...>` form where the identifier contains one
+  - [x] Implement the IRI-construction helpers — `app/iri.py`
+
+  Two gaps in `namespaces.md` filled with a documented convention rather than invented silently, per
+  its own "stop and ask" instruction:
+  - **Citation-evidence target IRIs.** `agent_citations`/`decision_citations` only store a flat
+    `(evidence_type, evidence_key)` pair; the four evidence classes each have their own multi-part
+    composite-key template. Confirmed with the user: the citing caller supplies `evidence_key` as the
+    exact composite-key suffix from that evidence type's own template (e.g. `observation` →
+    `"{hospital_hipe}/{pathway_number}/{obs_datetime}/{column}"` to match `obs/...`);
+    `iri.evidence_iri` only does the `evidence_type` → path-segment lookup. `tests/fixtures.py`'s
+    citation-key generation was updated to match (previously opaque placeholder strings).
+  - **Activity/Agent IRIs.** Needed for `prov:wasGeneratedBy`/`prov:wasAssociatedWith`
+    (cardinality 1 on `Score`/`Decision`/`RuleCheck`) but not templated anywhere. Convention: one
+    Activity per `(run_id, agent_name)` for scores and per `(run_id, hospital_hipe, as_of_date)` for
+    decisions/rule-checks (one execution, many nodes generated by it — not one Activity per node);
+    one Agent IRI per named identity (`agent/urgency`, `agent/coordinator`, ...), not per run, since
+    version is already a separate literal property. Documented in `iri.py`'s docstrings, not just
+    picked silently — worth confirming with whoever owns `conductor/kg/` if this needs to become a
+    normative addition to `namespaces.md` itself.
+
+- [x] Task: Postgres write layer
+  - [x] Write tests (using the Phase 2 fixture generator) that a valid scores/decision/override
+        payload inserts the expected rows in a single transaction and commits
+  - [x] Write a test that an invalid payload (e.g. score out of range, bad `agent_name`) is rejected
+        before any insert is attempted
+  - [x] Implement the transactional insert logic per payload shape — `app/db.py`, connects as
+        `retrieval_rw` (migration 009)
+
+- [x] Task: SPARQL Update projection layer
+  - [x] Write tests that a committed decision/score/override produces exactly the expected triples
+        (`eat:Score`, `eat:Decision`, `eat:RankedPlacement`, `eat:cites` + its four role
+        subproperties) in the correct named graph (`run/{run_id}` or `overrides`)
+  - [x] Write a test guarding the Morph-KGC-adjacent NULL gotcha: a NULL/optional column never
+        materialises as the literal string `"None"`
+  - [x] Implement the SPARQL Update construction and dispatch — `app/graph.py` (pure triple
+        construction separated from `httpx` dispatch, so it's unit-testable without Oxigraph)
+
+  `eat:RuleCheck` and `eat:Override` triples are also produced, even though spec.md FR2's
+  parenthetical triple list didn't name them — they were always implied by the surrounding sentence
+  (Postgres side explicitly includes `agent.rule_checks`) and by the ontology/named-graph docs; spec.md
+  updated to say so explicitly rather than leaving the omission standing.
+
+- [x] Task: Wire `POST /scores`
+  - [x] Write a round-trip test: fixture payload in → `agent.agent_scores`/`agent_citations` rows +
+        matching `eat:Score`/`eat:cites` triples out, both queryable after the call
+  - [x] Implement the endpoint: validate → Postgres commit → graph projection, one code path
+
+- [x] Task: Wire `POST /decisions`
+  - [x] Write a round-trip test covering the full decision shape (rankings + citations + rule checks)
+        landing correctly in both stores
+  - [x] Implement the endpoint
+
+- [x] Task: Wire `POST /overrides`
+  - [x] Write a round-trip test: override payload in → `agent.overrides` row + append-only entry in
+        `…/graph/overrides`
+  - [x] Implement the endpoint
+
+  All three verified against the real running Postgres and Oxigraph (`docker compose run --rm
+  retrieval pytest`), not mocks — actual rows queried back via `psycopg`, actual triples confirmed via
+  SPARQL `ASK` against the live store.
+
+- [x] Task: Partial-failure handling
+  - [x] Write a test that simulates the Postgres commit succeeding and the subsequent graph write
+        failing (e.g. inject a fault into the Oxigraph client) — assert the Postgres row still exists
+        and the response is distinguishable from full success (not a silent `200`)
+  - [x] Implement the response contract and error surfacing for this case across all three write
+        endpoints
+
+  Response contract: `200 {"status": "ok"}` on full success; `207 {"status":
+  "postgres_committed_graph_projection_failed", "detail": ...}` when Postgres committed but the graph
+  push then failed (row stands); `400` when Postgres itself rejects the payload (FK/CHECK violation —
+  no graph write is even attempted, verified with a spy). Tested for all three endpoints, not just
+  `/scores`.
+
+- [x] Task: Verify coverage ≥ 60% on the write path; `ruff`/`mypy` clean
+
+  366 tests total, 97% coverage across `app/` (lowest single file 92%), `ruff check .` and
+  `mypy app tests` both clean.
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+
+  Confirmed by user 2026-09-04.
+
+---
+
+## Phase 4: Read endpoints (Tier 2)
+
+- [x] Task: Wait-counters endpoint
+  - [x] Write a test asserting the endpoint's output matches running `kg/queries/wait_counters.rq`
+        directly against the same graph state
+  - [x] Implement the endpoint, including the `GRAPH` clause the fragment's header notes must be
+        added by the includer
+
+  The test builds its own independent `GRAPH`-wrapped copy of the fragment (different code path from
+  `app/reads.py`'s wrapper) as ground truth, so a wrapper-specific bug would surface as a mismatch
+  rather than the test tautologically agreeing with itself. To wrap the actual file unmodified rather
+  than re-typing its contents, the retrieval image's build context moved from `./retrieval` to the
+  repo root (`docker-compose.yml` + `retrieval/Dockerfile` updated) so it can `COPY
+  kg/queries/wait_counters.rq` verbatim.
+
+- [x] Task: Decision / ranked-position lookup
+  - [x] Write a test that the endpoint reconstructs the full cited-evidence set for a ranked position
+        purely by walking `eat:cites` (and role subproperties) backward from the `Decision` node —
+        against data written by Phase 3's endpoints, not hand-inserted fixtures
+  - [x] Implement the endpoint
+
+  **Finding, not a bug:** `decision_iri` is keyed only by `(hospital_hipe, as_of_date)` —
+  `namespaces.md` #4 says "one per hospital per day" deliberately. Two different `POST /decisions`
+  calls (different `run_id`, different Postgres `decision_id`) that land on the same hospital+day
+  accumulate their placements onto the *same* graph node rather than creating independent ones — this
+  read endpoint therefore returns the union of every run's placements for that day, not just the
+  latest run's. That's almost certainly the right behaviour for a real re-run of the coordinator
+  (this day's decision *is* one entity), but it's worth the coordinator-agent developer knowing before
+  they're surprised by it. Caught because repeated test runs in this session, reusing the fixture
+  generator's small deterministic `(hospital_hipe, as_of_date)` space, briefly accumulated placements
+  from earlier unrelated test runs onto one node — fixed in the tests with a wide random `as_of_date`
+  offset per test, not in the endpoint (the accumulation is correct behaviour).
+
+- [x] Task: Evidence-by-role lookups
+  - [x] Write tests for urgency / capacity / timeframe / multi-list evidence retrieval, one shared
+        query parameterised by role rather than four separate implementations
+  - [x] Implement the endpoint(s)
+
+  One query-builder function (`_evidence_query`) generates either the single-role pattern or a
+  `UNION` of all four, built from the same `_ROLE_SUBPROPERTY` mapping the write side uses — not four
+  hand-written near-duplicates. Reused by both the standalone evidence endpoint and the decision
+  endpoint's per-placement evidence lookup.
+
+- [x] Task: Evidence-completeness guard (NFR2)
+  - [x] Write a test proving no read endpoint can return a score or decision without its cited
+        evidence attached
+  - [x] Implement the guard if the above tests surface a gap
+
+  Gap found and fixed: `RankingIn.citations` (Phase 3) defaulted to an empty list, even though
+  `eat:cites` is 1..n on `eat:RankedPlacement` in the ontology (same cardinality as `Score`, which
+  *was* already enforced). Added `Field(min_length=1)`, matching `ScoreIn`. The read-side guarantee is
+  a consequence of this write-time validation, not separate filtering logic in `reads.py` — proven by
+  a test showing the write is rejected before the state could ever exist to filter.
+
+- [x] Task: Verify coverage ≥ 60% on the read path; `ruff`/`mypy` clean
+
+  372 tests total, 97% coverage across `app/` (lowest single file 92%), `ruff check .` and
+  `mypy app tests` both clean.
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+
+  Confirmed by user 2026-09-04.
+
+---
+
+## Phase 5: Integration and acceptance pass (Tier 3)
+
+- [x] Task: End-to-end demo path
+  - [x] `docker compose up`, then from the host (outside any container): call `POST /decisions` with
+        a generated fixture, then read it back via the Phase 4 endpoints, using a valid bearer token
+  - [x] Confirm an unauthenticated call is rejected the same way, from the host
+
+  Ran a fixture decision through `POST /decisions` from inside a throwaway container talking to the
+  running `retrieval:8000` (simulating what an agent will do), then `GET /decisions/{hospital_hipe}/
+  {as_of_date}` from the same process — every ranked position came back with its cited evidence.
+  Separately confirmed from a bare `curl` on the host, outside any container: unauthenticated write
+  and read both `401`; authenticated `/health` `200`.
+
+- [x] Task: Documentation
+  - [x] Document how to run the service, set the bearer-token env var, and the published port, in the
+        service's own README (or `conductor/kg/requirements.md`-style doc, whichever the codebase
+        convention points to)
+  - [x] Note the service in `retrieval-database-onboarding.md` / `retrieval-service-references.md` as
+        built, not just proposed
+
+  `retrieval/README.md` gained an Endpoints table (all 7 routes, the write-response contract) and a
+  corrected Running section. Both root-level docs updated: their "ADR-002 still open" framing replaced
+  with "resolved and built," pointing at this track and `retrieval/README.md`.
+
+  **Later removed by user request** (2026-09-04, post-completion): `retrieval-database-onboarding.md`
+  and `conductor/retrieval-service-references.md` were deleted outright as unnecessary for the final
+  repo — they were pre-build briefing/reference-index documents whose purpose ended once the service
+  they were briefing toward existed and was documented in `retrieval/README.md` and this track. Links
+  to them removed from this track's `index.md`.
+
+- [x] Task: Full acceptance-criteria pass
+  - [x] Walk `spec.md`'s Acceptance Criteria 1–11 one by one against the running system and record the
+        result
+
+  | # | Criterion | Result |
+  |---|---|---|
+  | 1 | `retrieval` container up, port reachable | ✅ `docker compose ps` — `Up`, `0.0.0.0:8000->8000` |
+  | 2 | `POST /decisions` → Postgres rows + `eat:Decision`/`RankedPlacement`/`cites` triples | ✅ `test_routes.py::TestCreateDecision`, live demo |
+  | 3 | `POST /scores` → Postgres rows + `eat:Score`/`cites` | ✅ `test_routes.py::TestCreateScore` |
+  | 4 | `POST /overrides` → Postgres row + `overrides` graph entry | ✅ `test_routes.py::TestCreateOverride` |
+  | 5 | Postgres commits, graph fails → row stands, failure reported | ✅ `test_partial_failure.py` (all 3 endpoints) |
+  | 6 | Wait-counters endpoint matches `wait_counters.rq` directly | ✅ `test_reads_wait_counters.py`, independent comparison |
+  | 7 | Decision endpoint reconstructs evidence via `cites` walk | ✅ `test_reads_decision.py` |
+  | 8 | ADR-002 recorded in the blocked track's `decisions.md` | ✅ Phase 1, verified present |
+  | 9 | Fixture generator seeded and reproducible | ✅ `test_fixtures.py::TestDeterminism` |
+  | 10 | Port reachable from the host, outside any container | ✅ `curl http://localhost:8000/...` from host, this session |
+  | 11 | No/invalid token → `401` on every endpoint; valid token succeeds | ✅ `test_health.py` + live `curl`, writes and reads both |
+
+  11/11 met.
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+
+  Confirmed by user 2026-09-04. Track complete.
+
+---
+
+## Post-completion fixes (2026-09-04)
+
+Two corrections raised after the track was marked done, both fixed and re-verified live:
+
+1. **`/health` was behind auth.** The original design (Phase 1) put `/health` behind the same
+   app-level auth dependency as every other route, specifically to prove auth was wired correctly.
+   User correction: a health check that itself requires a credential can't be used by infra that has
+   no reason to hold one (Docker `HEALTHCHECK`, a load balancer, an uptime monitor). Fixed by moving
+   the auth dependency from app-level (`main.py`) to per-router (`routes.py`'s and `reads.py`'s own
+   `APIRouter(dependencies=[...])`), so `/health` — defined directly on `app`, not through either
+   router — is structurally outside the auth boundary rather than special-cased inside the auth check.
+   `test_health.py` rewritten for the new behaviour; a new `test_auth.py` proves every other endpoint
+   (across both routers) still requires the token, replacing the coverage `/health` used to provide.
+   `spec.md` FR7 and AC 11 updated to state the carve-out explicitly.
+
+2. **`retrieval/.env` was a second, un-consolidated env file.** The docker-compose consolidation
+   (Phase 1 addendum) established "one root `.env` is authoritative for the whole stack" for
+   `db`/`pgadmin`/`loader`, explicitly to avoid a second file drifting out of sync — but the retrieval
+   service's own secrets (`RETRIEVAL_BEARER_TOKENS`, `RETRIEVAL_DB_URL`) were left in a separate
+   `retrieval/.env`, inconsistent with that stated principle. Fixed: both moved into the root
+   `.env`/`.env.example`, passed to the container via explicit `environment:` entries in
+   `docker-compose.yml` (same pattern as the `loader` service) instead of `env_file:
+   ./retrieval/.env`. `retrieval/.env.example` deleted as superseded (same treatment
+   `dataset/.env.example` got earlier). `retrieval/README.md` and `conductor/tech-stack.md`'s
+   Environment Variables table updated accordingly; the latter's `HF_TOKEN` row was also still saying
+   `dataset/.env` from before the consolidation — fixed in the same pass since it's the same class of
+   staleness.
+
+Verified: rebuilt the image, 379 tests pass, `ruff`/`mypy` clean, recreated the running container to
+pick up the new env wiring, and confirmed live from the host — `/health` returns `200` with no token
+and with a bogus one; `/decisions` still `401`s with no token and resolves correctly (`404`, not an
+auth or connection error) with the token now sourced from the consolidated root `.env`.
+
+3. **`/docs` showed no Authorize button.** `auth.py` read `Authorization` as a plain `Header(...)`
+   parameter, which works but never registers an OpenAPI security scheme — Swagger UI had no padlock
+   icons and no global "Authorize" button, so the header had to be retyped by hand on every "Try it
+   out" call. Fixed by switching to `fastapi.security.HTTPBearer` (`auto_error=False`, since its own
+   default is `403` on a missing header and this service's contract is `401` for both missing and
+   invalid tokens — handled explicitly, so behaviour is unchanged). Confirmed via `/openapi.json`: all
+   six protected routes now carry `security: [{"HTTPBearer": []}]`, `/health` correctly carries none.
+   379 tests unmodified and still passing, `ruff`/`mypy` clean.
+
+4. **`/health` didn't check its dependencies.** It returned a static `{"status": "ok"}` proving only
+   that the process was up, not that it could do its job. User request: check the databases explicitly.
+   Added `db.check_connection()` (a `SELECT 1` with a 2s `connect_timeout`) and
+   `graph.check_connection()` (an `ASK` query with a 2s `httpx` timeout) — both short-timeout so a
+   hung dependency fails the health check fast rather than hanging it. `/health` now returns `200
+   {"status": "ok", "postgres": "ok", "oxigraph": "ok"}` when both are reachable, `503 {"status":
+   "degraded", ...}` with per-dependency detail otherwise — `503`, not a `200` with a degraded body
+   only, so a naive `curl -f` health check (or a Docker `HEALTHCHECK` using one) correctly reports
+   unhealthy without parsing the response. Still unauthenticated (unaffected by fix 1 above). Two new
+   tests monkeypatch each dependency independently to prove the `503` path; verified again against
+   real infrastructure, not just mocks, by actually stopping the `oxigraph` container mid-session —
+   `/health` correctly went to `503 {"oxigraph": "unreachable"}` and recovered to `200` once it was
+   started again. 381 tests total, `ruff`/`mypy` clean.
+
+---
+
+## Phase 6: Evidence resolution (Tier 2, reopened 2026-09-04)
+
+**Why reopened:** walking `eat:cites` (Phases 3-4) tells the UI *which* evidence node was cited, as an
+IRI. It does not tell it *what that node says*. `product-guidelines.md` requires rationale to name
+`"NEWS2 aggregate 7"`, `"Ward B occupancy 104%"` — actual values, not opaque identifiers. Rendering
+that requires a second hop: dereferencing the evidence IRI into its own properties. FR8 in spec.md.
+
+**Course-corrected mid-phase, twice, both by user direction:**
+
+1. Originally planned as a standalone `GET /evidence/resolve?iri=` endpoint. User: fold resolution
+   directly into the existing `GET /decisions` and `GET /evidence` responses instead — no second
+   round-trip for the UI to orchestrate. Implemented as an internal `_resolve_iri` helper, called
+   once per citation inside `_evidence_for_placement`, so every citation in either endpoint's
+   response now carries `type` + `properties` alongside `role`, not just an IRI. The standalone
+   endpoint idea was dropped entirely, not kept as an option alongside the embedded version.
+2. User: the full `https://nonsocynthia.github.io/.../kg/id/...` form in JSON responses is
+   unnecessarily verbose for a caller — why does the API need to expose it. Added `iri.short()`,
+   applied to every IRI field in every read-endpoint response (`decision`, `placement`, `referral`,
+   evidence `iri`, resolved property values, resolved `type`). The full IRI is still used for every
+   actual SPARQL query/update (required, per `namespaces.md`) — only JSON API responses are
+   shortened, since that file's "no unescaped `/` in a prefixed name" rule is a Turtle/N-Quads
+   serialisation constraint, not something that applies to a JSON string field.
+
+- [x] Task: Evidence resolution, folded into `GET /decisions` and `GET /evidence`
+  - [x] Write a test: insert a synthetic `ClinicSession` node (real ontology properties —
+        `eat:clinicName`, `eat:slotsTotal`, `eat:slotsBooked`, `eat:slotsAvailable`, `eat:sessionDate`)
+        directly into the graph, `POST` a decision citing that exact IRI, `GET` it back, assert the
+        citation carries the real property values — not just re-confirming the IRI was cited
+  - [x] Write a test that `rdf:type` is pulled out into a `type` field, not left in `properties`
+  - [x] Write a test that a citation whose evidence node has no triples loaded degrades to
+        `type: null` / `properties: {}` rather than erroring or being dropped — the normal case in
+        this dev environment, where the full dataset isn't loaded
+  - [x] Write a test proving the two hops (`cites` walk, then resolve) compose end to end against a
+        citation this service's own `POST /decisions` wrote, not a hand-inserted fixture alone
+  - [x] Implement `_resolve_iri`: `SELECT ?p ?o WHERE { GRAPH ?g { <iri> ?p ?o } }`, `rdf:type` split
+        out into `type`, every other predicate shortened via `iri.short`
+
+- [x] Task: Shorten every IRI in every read-endpoint response (`iri.short`, added to `iri.py`)
+  - [x] Unit tests: strips the instance/vocabulary/graph namespace correctly; leaves non-namespaced
+        literal values (a plain string, a date) unchanged rather than mangling them
+  - [x] Integration test asserting no response body contains `"https://"` anywhere
+
+- [x] Task: Per-endpoint `summary`/`description` for `/docs` (user request, mid-phase)
+  - [x] All 7 routes (`/health` + 3 writes + 3 reads) get a `summary` and a full `description`
+        covering what the endpoint does, its response contract (writes: 200/207/400/422), and any
+        gotcha a caller needs (decision-node accumulation, evidence-degradation behaviour, etc.)
+  - [x] App-level `description` on the `FastAPI(...)` constructor, shown at the top of `/docs`,
+        pointing at `spec.md` and `README.md`
+
+- [x] Task: Verify coverage stays ≥ 60% on the read path; `ruff`/`mypy` clean
+
+  388 tests total (up from 381), 97% coverage on `app/`, `ruff`/`mypy` clean. Confirmed stable across
+  three consecutive full-suite runs (the accumulation gotcha documented above was actually caught and
+  fixed here — the first attempt at the new evidence-resolution tests failed intermittently across
+  runs until they adopted the same wide-random-`as_of_date` isolation pattern `test_reads_decision.py`
+  already used).
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+  - [x] Rebuilt, ran the full suite three times consecutively (388 passed each time), confirmed live
+        against the running container: `POST /decisions` with a citation pointing at a synthetically
+        inserted `ClinicSession`, then `GET /decisions/...` — response showed
+        `"clinicName": "Cardiology Outreach"`, `"slotsAvailable": "2"` etc. directly, IRIs in short
+        form throughout, zero occurrences of the full namespace URL. `/openapi.json` confirmed every
+        route carries the expected `summary`.
+
+### Post-Phase-6 fix: `iri.short()` missed reused vocabularies
+
+Found by loading the **real** knowledge graph (see below) and citing genuine evidence: a real
+`Observation` node's `type`/`properties` came back as full `http://www.w3.org/ns/sosa/...` URIs,
+unshortened — `short()` only knew about `eat:`/`eatd:`/`graph/`, not the reused vocabularies
+(`tech-stack.md`: "PROV-O, SOSA, OWL-Time, SKOS and QUDT") real loaded data actually uses. Every
+per-column `Observation` is `sosa:Observation`, so this wasn't an edge case — it was the first real
+`Observation` citation resolved against real data. Fixed: `short()` now also strips
+`SOSA_NS`/`TIME_NS`/`SKOS_NS`/`QUDT_NS`/`UNIT_NS`/`PROV_NS`/`RDF_NS`, prefixed with a short label
+(`sosa:`, `prov:`, etc.) rather than bare — our own `eat:`/`eatd:`/graph namespaces stay bare, since
+they're the dominant vocabulary in every response and unambiguous. New test
+(`test_strips_reused_vocabularies_with_a_short_label`); 389 tests, `ruff`/`mypy` clean; reconfirmed
+live against the same real citation.
+
+## Real-data verification (2026-09-04, post-completion)
+
+User asked to test against real data rather than fixtures. Checked first rather than assuming:
+Postgres already had the full dataset loaded (`core.referral_daily`: 70,022 rows), but Oxigraph did
+not — only this session's own test-run graphs existed, no `…/kg/graph/inputs`. Loaded the real graph:
+
+- Found pre-existing, correctly-materialized `kg/out/*.nq` files (timestamped hours before this
+  session touched anything) — no need to regenerate via Morph-KGC. A throwaway `python -m morph_kgc`
+  run in a container on the compose network (to resolve the mappings' hardcoded `db` hostname,
+  which only resolves inside Docker, not from the host — the `.ini` files were not modified) produced
+  fragmented per-group chunk files instead of cleanly consolidating; those were discarded rather than
+  trusted, and the pre-existing clean files were used instead.
+- Loaded all 5 files into Oxigraph (`…/kg/graph/inputs`: 590,683 triples; `clinical.nq` had 381,026
+  lines vs. `kg/README.md`'s documented 357,285 — flagged to the user as unexplained, not chased
+  further, since RDF stores deduplicate on insert so loading it either way was safe).
+- Verified end-to-end against real data: `GET /referrals/9001/PW-9001-000007/wait-counters` returned
+  genuine computed counters; a `POST /decisions` citing a real `Condition` (`core.conditions`,
+  ICD-10-AM `M16.1`) resolved correctly on read-back — which is what surfaced the SOSA gap above,
+  fixed in the same session.
+
+Not committed to the repo (no code/mapping changes) — this loaded data into the local Oxigraph
+container's runtime state only, for interactive testing.
+
+---
+
+## Phase 7: Referral context — agent judgment input (Tier 2, reopened again 2026-09-04)
+
+**Why reopened:** walking the real data flow end to end with the user surfaced a real architectural
+gap. FR3/FR8 cover the *output* side (an agent's already-computed score/decision, read back with
+citations resolved). Nothing built so far gives an urgency/capacity agent a way to gather the *input*
+data it needs to compute a score in the first place — the design assumed agents would query Oxigraph's
+`inputs` graph directly via raw SPARQL, but there was no single call for "everything relevant to
+referral X," and the user asked for one, explicitly adding it to this track's scope. FR9 in spec.md.
+
+- [x] Task: `GET /referrals/{hospital_hipe}/{pathway_number}/context`
+  - [x] Checked the schema before designing anything: `core.referral_daily` carries `specialty_hipe`
+        directly (no graph traversal needed to find it); `core.ward_specialty` maps
+        (hospital_hipe, specialty_hipe) → wards with an `is_primary` flag; `core.clinic_sessions`
+        carries `specialty_hipe` directly too. This is why the endpoint reads Postgres, not the
+        graph — the joins already exist as foreign keys there.
+  - [x] Write a test that an unknown referral returns `404`
+  - [x] Write a test that the endpoint requires auth (401 without a token)
+  - [x] Write tests against real, currently-loaded data: observations/conditions/triage_events present
+        with the expected shape, capacity section's wards actually serve the referral's specialty, at
+        most one ward marked primary, no full `https://` IRIs anywhere in a Postgres-backed response
+  - [x] Implement `db.get_referral_context` (new function, `psycopg.rows.dict_row` for clean
+        column-name access) and the route in `reads.py`
+
+  **Testing note, not a compromise:** unlike the write-path tests, this can't insert its own fixture
+  data — `core.*` is genuinely read-only for `retrieval_rw` (NFR3's boundary, by design: this service
+  must never be able to write input-layer data, only agent output). So the real-data tests query
+  whatever's actually loaded and `pytest.skip` cleanly if the full dataset isn't present, rather than
+  either failing in a fresh environment or weakening the role's privileges just to make testing easier.
+
+  **Serialization note:** `core.bed_status.occupancy_pct` is `NUMERIC(5,2)` and every date/datetime
+  column is a real Python `date`/`datetime` object from psycopg — none of this needed manual
+  `.isoformat()` conversion (unlike `wait_counters`'s hand-built dict): FastAPI's automatic
+  `jsonable_encoder` on a returned `dict[str, Any]` already handles `date`/`datetime`/`Decimal`
+  correctly. Verified live rather than assumed, per this track's own practice.
+
+- [x] Task: Verify coverage stays ≥ 60% on the read path; `ruff`/`mypy` clean
+
+  393 tests total (up from 389), 97% coverage on `app/`, `ruff`/`mypy` clean.
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+  - [x] Confirmed live against real referral `9001`/`PW-9001-000007`: full response with 1 observation
+        (heart rate 126, NEWS2 3, MTS category orange), 1 condition (M16.1, primary), 1 triage event
+        (turnaround 1 day), and capacity data for 2 wards serving specialty `1800` (primary ward
+        `W-9001-04` at 83.52% occupancy) plus 5 recent clinic sessions for that specialty. `404`
+        confirmed for a nonexistent referral.
+
+---
+
+## Phase 8: Coordinator input — cohort + already-written scores (Tier 2, reopened again 2026-09-04)
+
+**Why reopened:** explaining Phase 7's endpoint to the user prompted the natural next question — what
+does the *coordinator* need? Its job (`tech-stack.md`'s Agent Reasoning Model) is purely combinatorial:
+gather the urgency + capacity scores the other two agents already wrote, plus tie-break data, and rank.
+Nothing built so far told it *which* referrals to gather scores for, or gave it a way to *read back*
+scores already written via `POST /scores` — a `GET /scores` never existed. FR10 in spec.md.
+
+- [x] Task: `GET /hospitals/{hospital_hipe}/cohort/{as_of_date}`
+  - [x] Checked the schema before designing: `core.referral_daily.removal_date IS NULL` is "still on
+        the list"; CPC comes from a `LEFT JOIN` to `core.triage_events` via `triage_event_id` (`null`
+        pre-triage, not a missing join); wait counters (`days_since_referral`, `adjusted_wait_days`,
+        etc.) are already columns on `referral_daily` itself — no need to call `wait_counters`
+        per-referral, or reimplement its logic
+  - [x] Deliberately did **not** compute a CRT-breach boolean here, even though `core.ref_rules`'
+        thresholds (28/91 days) would make it easy — that's the rule-checking layer's job
+        (`tech-stack.md` Decision 5), not this service's; exposing raw ingredients (CPC, wait days)
+        and leaving the threshold comparison to whoever owns that layer keeps the boundary honest
+  - [x] Write a test that an empty cohort returns `200` with `referrals: []`, not `404`
+  - [x] Write a test that the endpoint requires auth
+  - [x] Write tests against real, currently-loaded data: expected fields present, referrals ordered
+        oldest-referral-first (the documented tie-break rule), no full `https://` IRIs in the response
+        — same skip-if-dataset-not-loaded pattern as Phase 7 (same `core.*` read-only boundary)
+  - [x] Implement `db.get_cohort` and the route in `reads.py`
+
+- [x] Task: `GET /runs/{run_id}/hospitals/{hospital_hipe}/scores`
+  - [x] Write a test that no scores yet returns `200` with `scores: {}`, not `404`
+  - [x] Write a test that the endpoint requires auth
+  - [x] Write a test: `POST /scores` for both agents on the same referral (same seed -> same
+        hospital_hipe/pathway_number before the agent_name branch runs, confirmed rather than assumed
+        — see the test's own assertion of this), then `GET .../scores` returns both, correctly grouped
+        by pathway then agent, citations intact
+  - [x] Write a test that a referral with only one agent's score written so far appears with just that
+        one key present, not a placeholder for the missing agent
+  - [x] Implement `db.get_scores_for_run` (joins `agent.agent_scores` + `agent.agent_citations` in
+        Python after two queries, not a SQL join, since citations are one-to-many per score) and the
+        route in `reads.py`. Unlike the cohort endpoint, this doesn't need the skip-if-not-loaded
+        pattern: `agent.*` is written by this service's own `POST /scores`, so its tests are
+        self-contained.
+
+- [x] Task: Verify coverage stays ≥ 60% on the read path; `ruff`/`mypy` clean
+
+  401 tests total (up from 393), 97% coverage on `app/`, `ruff`/`mypy` clean, stable across repeated
+  runs.
+
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+  - [x] Confirmed live against real hospital `9001`: cohort for `2026-08-30` returned real referrals
+        (e.g. `PW-9001-001685`, CPC 2, 881 adjusted wait days), oldest-first. Posted real urgency
+        (0.72) and capacity (0.45) scores for that same referral under one `run_id`, then confirmed
+        `GET .../scores` returned both, correctly grouped, with their citations intact — the full
+        write-then-coordinator-read loop working end to end against real data.
+
+## Post-completion fix: CRT breach flag on the cohort endpoint (user request, "can we also flag that?")
+
+- [x] Task: Reverse the Phase 8 decision to omit CRT-breach computation
+  - [x] Phase 8 (line 533 above) deliberately left CRT-breach out, citing `tech-stack.md` Decision 5's
+        separation of data access from rule-checking. Re-read Decision 5 on push-back: it explicitly
+        calls `RULE-CRT-*` "facts about the hospital, not invalid graphs" — unlike `RULE-ORDER`/
+        `RULE-TIEBREAK` (which compare referrals against each other — real ranking judgements), CRT
+        breach is single-referral date math against an already-normative, documented threshold. That's
+        squarely "expose a fact," not "make a judgement call" — the boundary this service actually
+        needs to hold. Reversed the earlier call as over-conservative.
+  - [x] Checked where the threshold itself lives before writing any query, rather than assuming
+        `core.ref_rules` (Phase 8's own note) or hardcoding 28/91: `core.ref_codes` (`code_table=
+        'triage_category'`) already carries a `crt_days` column directly per CPC — Urgent=28,
+        Semi-Urgent=91, Routine/Excluded=`NULL`. Simpler than expected; no need to touch `ref_rules` or
+        maintain a CPC→rule-id mapping in application code at all.
+  - [x] Checked column types before joining: `ref_codes.code_value` is `text`, `triage_events.
+        triage_category` is `integer` — join needs an explicit `::text` cast on the CPC side.
+  - [x] `db.get_cohort`: added `LEFT JOIN core.ref_codes rc ON rc.code_table = 'triage_category' AND
+        rc.code_value = te.triage_category::text`, selecting `rc.crt_days AS crt_threshold_days` and a
+        computed `crt_breached`.
+  - [x] **Bug caught by the test suite, not review**: first attempt computed `crt_breached` as
+        `(rc.crt_days IS NOT NULL AND rd.adjusted_wait_days > rc.crt_days)` — in SQL this evaluates to
+        `false`, not `NULL`, when `crt_days IS NULL` (`AND` with a `false` left operand short-circuits
+        rather than propagating `NULL`). `test_crt_breach_is_computed_only_when_a_threshold_applies`
+        caught it immediately (`assert False is None` failure) before this ever reached real data.
+        Fixed with an explicit `CASE WHEN rc.crt_days IS NOT NULL THEN ... ELSE NULL END`.
+  - [x] Updated `reads.py`'s cohort route `description=` and `README.md`'s endpoint table to document
+        the new fields and the reasoning for computing them here.
+  - [x] Added `test_crt_breach_is_computed_only_when_a_threshold_applies` (real-data, skips cleanly
+        without the full dataset) asserting both the computed case (CPC 1/3: real `true`/`false`
+        matching `adjusted_wait_days > crt_threshold_days`) and the not-applicable case (CPC 2/4/`null`:
+        both fields `null`). Extended the existing shape-assertion test with the two new keys.
+  - [x] `ruff check .` / `mypy app tests` clean; `pytest -q` run twice back-to-back for stability —
+        402 passed both times (up from 401 — one new test; the CRT keys are additive to the existing
+        shape test, not a new one, beyond the dedicated breach test).
+  - [x] Verified live against real data (`docker compose up -d retrieval` after rebuild), hospital
+        `9001`/`2026-08-26`: `PW-9001-001328` (CPC 1, 882 adjusted wait days) → `crt_threshold_days:28,
+        crt_breached:true`; `PW-9001-001075` (CPC 3, 878 days) → `91, true`; CPC 2/`null` referrals →
+        `null`/`null` in both fields. Matches the manual math in every case checked.
+  - [x] `spec.md` FR10 updated to document the fields and the reversed reasoning; new acceptance
+        criterion 18 added.
+
+## Post-completion feature: new-referral intake, `POST /referrals` (user request, "input new patients")
+
+User observed: "Each time a new patient information arrives the scores need to be updated and the
+patients need to be reordered accordingly" -- the current system had no way for a new patient to enter
+it at all. Scoped this explicitly with the user first (recomputing scores/reordering is agent
+judgement, out of scope for this data-access service, same boundary as everywhere else in this track;
+only the intake write-path itself is in scope) and confirmed it follows the same ADR-002 flow
+("Postgres first, then knowledge graph") as every other write endpoint, before writing any code.
+
+- [x] Task: Scope the intake payload shape with the user
+  - [x] Asked (AskUserQuestion): should `POST /referrals` accept full patient demographics for a
+        genuinely new patient, or require the patient to already exist? User chose full demographics
+        (Recommended) -- `core.patients` isn't globally unique, a patient can be new to one hospital
+        while known to another, so requiring pre-existence would leave the actual "new patient" case
+        uncovered.
+- [x] Task: Design the write path against the real schema, not assumptions
+  - [x] Read `core.referrals`/`core.referral_daily`/`core.patients`/`core.persons` DDL
+        (dataset/db/migrations/003_core.sql) before writing any query -- confirmed
+        `core.referrals` is "Derived by the loader. Not a CSV" (its own comment), i.e. previously
+        loader-only; this is the first non-loader write path into it.
+  - [x] Read `conductor/kg/namespaces.md` for the Referral/Patient/Person/ReferralState IRI templates
+        and `kg/ontology/eat.ttl` for the exact predicates (`eat:forPatient`, `eat:referralDate`,
+        `eat:gpPriority`/`eat:referralSource` as `skos:Concept` refs not literals, `eat:stateOf`/
+        `eat:validFrom`/`eat:triageStatus` on `eat:ReferralState`, shared `eat:sex`/`eat:dateOfBirth`/
+        `eat:areaOfResidenceCode` between Person and Patient) -- reused these exactly rather than
+        inventing new ones.
+  - [x] Read `kg/queries/wait_counters.rq` to confirm what graph shape a freshly-intaken referral needs
+        to be readable by the existing wait-counters endpoint: a full `eat:Referral` node plus one
+        `eat:ReferralState` with `eat:triageStatus`.
+  - [x] **Found a real privilege gap, not assumed**: `retrieval_rw`/`agent_rw` had SELECT-only on all
+        of `core` (migration 007, NFR3) -- no write path into `core.*` existed anywhere in this
+        service. Rather than widen this silently, scoped a new migration (010) granting INSERT
+        narrowly on exactly the four tables intake touches (`persons`/`patients`/`referrals`/
+        `referral_daily`), not a blanket widening of `core` access, and documented it as an explicit
+        NFR3 amendment in spec.md.
+  - [x] Added `core.pathway_number_seq` (migration 010, started at 900001) so pathway_number generation
+        never races a `SELECT max(...)+1` under concurrent intake, and can never collide with the
+        batch-loaded dataset's own numbering (observed up to the low thousands, e.g.
+        `PW-9001-001685`).
+  - [x] Applied migration 010 via the loader's own `--migrate-only` (not a raw `psql` command) so it's
+        properly recorded in `public.schema_migrations`, not just applied ad hoc.
+- [x] Task: `NewPatientIn`/`ReferralIn` schemas (`app/schemas.py`)
+  - [x] `patient_id` always required (the hospital's own identifier -- this service doesn't invent
+        one); `new_patient` optional, required only the first time that `patient_id` is new to this
+        hospital. A `model_validator` enforces person_sex/person_date_of_birth/
+        person_area_of_residence_code are all present whenever `ihi_number` is given (needed to write
+        `core.persons`), matching the same "no partial person record" spirit as `core.patients.
+        ihi_number`'s own comment ("nullable on purpose... do not backfill").
+  - [x] Every field carries a `description`, matching this track's established schema-documentation
+        standard (the "add descriptions so agents/UI devs can read /docs" request from earlier in
+        this track).
+- [x] Task: `db.insert_referral` (`app/db.py`)
+  - [x] One transaction: upsert `core.persons`/`core.patients` (ON CONFLICT DO NOTHING -- idempotent,
+        an existing patient's demographics are never silently overwritten by a later referral for
+        them), insert `core.referrals`, insert today's initial `core.referral_daily` row
+        (`triage_status='awaiting_triage'`, `days_awaiting_triage`/`adjusted_wait_days` both equal the
+        raw wait -- no suspension or triage event is possible yet on a referral seconds old, mirroring
+        the batch generator's own day-0 case, `dataset/generator/generate.py`).
+  - [x] `today` is computed once in the route handler and threaded into both `db.insert_referral` and
+        `graph.referral_triples`, rather than each calling `date.today()` independently -- so Postgres
+        and the graph can never disagree on the date if a call happens to straddle midnight.
+  - [x] `UnknownPatientError` (not a bare `ValueError`) for "no `new_patient` given and the patient
+        doesn't exist" -- lets `routes.py` tell it apart from a `psycopg.Error`, both mapped to `400`
+        but from different causes.
+- [x] Task: `graph.referral_triples` (`app/graph.py`)
+  - [x] `eat:Hospital`/`eat:HospitalService` nodes are referenced only (`eat:atHospital`/
+        `eat:referredToService`), never re-minted -- they already exist from the batch load for any
+        hospital/specialty this referral could legally reference (the FK to
+        `core.hospital_specialty` guarantees that Postgres-side before this function ever runs).
+        `eat:gpPriority`/`eat:referralSource` concept IRIs (`concept_iri`, `app/iri.py`) are
+        referenced the same way -- the batch mapping already projects the full `ConceptScheme` for
+        every `ref_codes` table.
+  - [x] Projected into `iri.inputs_graph()` (new helper, `.../kg/graph/inputs`) -- the same named
+        graph the batch Morph-KGC pipeline writes into (confirmed against `kg/mappings/*.rml.ttl`'s
+        own `rr:graphMap`), not a new graph -- so a live-intake referral is indistinguishable from a
+        batch-loaded one to every other read endpoint.
+- [x] Task: `POST /referrals` route (`app/routes.py`)
+  - [x] Same 200/207/400/422 response contract as every other write endpoint; 200/207 both include
+        the server-generated `pathway_number` in the body (the caller has no other way to learn it).
+  - [x] Description explicitly states this does NOT recompute scores or re-rank -- points the caller
+        at `GET /hospitals/.../cohort/...` (which will now include the new referral) as the trigger
+        for whatever re-scoring an agent/orchestrator wants to do.
+- [x] Task: Tests (`tests/test_referral_intake.py`, new file)
+  - [x] Pure unit tests on `graph.referral_triples` (new-patient case gets Patient+Person triples,
+        existing-patient case gets neither, `gpPriority` omitted when absent) -- no Oxigraph needed,
+        same pattern as `test_graph_triples.py`.
+  - [x] Integration tests against the real Postgres/Oxigraph this container runs alongside: new-patient
+        intake writes both stores correctly; an existing patient's second referral doesn't need
+        `new_patient`; an unknown patient with no `new_patient` given returns `400`; a
+        `referral_received_date` before `referral_date` is rejected by Postgres's own CHECK (`400`,
+        not a Pydantic-level re-implementation of that rule); auth is required; and, end to end, a
+        newly-intaken referral shows up in `GET /hospitals/.../cohort/...` for today.
+  - [x] All test fixture dates/codes cross-checked against this environment's own live Postgres before
+        writing them (`core.hospital_specialty`, `core.ref_codes`) rather than assumed -- caught one
+        real mistake this way: `area_of_residence_code` fixtures used a 3-character value ("D01"),
+        which fails the schema's own `min_length=4` (the column is `character(4)`; real values look
+        like "D024") -- fixed to a real 4-character code before the suite passed clean.
+  - [x] `ruff check .` / `mypy app tests` clean; `pytest -q` run twice back-to-back -- 411 passed both
+        times (up from 402: 9 new tests).
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verified live end to end against the running stack (rebuilt image, real Postgres, real
+        Oxigraph): `POST /referrals` for a brand-new patient at hospital 9001 returned
+        `{"status":"ok","pathway_number":"PW-9001-900016"}`; that referral then appeared correctly in
+        `GET /hospitals/9001/cohort/<today>` (`triage_status:"awaiting_triage"`, wait counters matching
+        the manual day-count, `cpc`/`crt_breached` both `null` as expected for an untriaged referral);
+        and `GET /referrals/9001/PW-9001-900016/wait-counters` (graph-backed, `wait_counters.rq`
+        unmodified) returned **identical** counters to the Postgres-backed cohort row -- direct
+        confirmation the graph projection landed correctly, not just that the call didn't error.
+        Cleaned up the manual verification row from both Postgres and the graph afterward (this
+        service has no DELETE endpoint by design, so cleanup used `psql`/a direct SPARQL `DELETE
+        WHERE` as the DB admin, not this service's own API).
+  - [x] `spec.md` FR11 added (with an explicit NFR3 amendment for the narrowed core.* INSERT grant)
+        and acceptance criterion 19 added; `README.md`'s endpoint table and write/read-direction
+        explanation updated.
+
+- [x] Task: Correct FR11's caller — clinician/hospital UI, not agent input (user correction)
+  - [x] Initial framing mislabeled `POST /referrals` as "agent input" (route `summary`, README's
+        "three cases" paragraph) — grouping it with FR9/FR10, which really are agent input (an agent
+        reading data before it judges something). User corrected: this endpoint is called by the
+        clinician/hospital UI when staff enter a new patient's referral, not by an agent. The
+        underlying implementation (Postgres-first write, then graph projection, no score/re-rank
+        triggered) was already correct — this was purely a mischaracterisation of *who calls it*, not
+        a functional bug.
+  - [x] Fixed everywhere the mislabel appeared: `routes.py`'s route `summary`/`description`
+        (`app/routes.py`), `spec.md` FR11's intro paragraph (now explicitly distinguishes this from
+        FR2's agent-output writes and FR9/FR10's agent-input reads), `README.md`'s endpoint table row,
+        "three cases" paragraph, and the "full picture" consumer walkthrough (now opens with the UI
+        calling `POST /referrals`, not the agents).
+  - [x] `ruff`/`mypy`/`pytest` re-run clean after the doc/description-only changes (no functional code
+        changed, so no new test needed).

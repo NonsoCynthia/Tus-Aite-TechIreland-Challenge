@@ -1,0 +1,8 @@
+{
+  "track_id": "retrieval-service_20260904",
+  "type": "feature",
+  "status": "done",
+  "description": "Retrieval service mediating Postgres core/agent and the Oxigraph graph for agents and the clinician/hospital UI; implements ADR-002 (Postgres-first writes, synchronous graph projection on success). FR1-FR11: write projector, read endpoints with inline evidence resolution, agent-input endpoints (referral context, cohort, scores-for-run) with computed CRT breach, and new-referral intake for the UI.",
+  "created_at": "2026-09-04T14:21:36Z",
+  "updated_at": "2026-09-04T19:41:35Z"
+}

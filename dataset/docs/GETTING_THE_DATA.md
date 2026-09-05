@@ -32,9 +32,14 @@ Once approved, make your own **read** token at
 
 ## 2. Three commands
 
+`docker-compose.yml` and `.env` live at the **repo root** (Postgres, pgAdmin, the loader, Oxigraph
+and the retrieval service are one compose project there) — run these from the root, or from inside
+`dataset/`, where `make` forwards to the same root targets:
+
 ```bash
+cd ..                     # repo root, if you're in dataset/
 cp .env.example .env      # then edit it, see below
-make up                   # Postgres and pgAdmin, ~1 min the first time
+make up                   # Postgres, pgAdmin, Oxigraph, retrieval; ~1 min the first time
 make load                 # downloads and loads, ~1 min
 ```
 
@@ -42,7 +47,7 @@ make load                 # downloads and loads, ~1 min
 
 ### What goes in `.env`
 
-`.env` is git-ignored, so your values stay on your machine.
+Root `.env` is git-ignored, so your values stay on your machine.
 
 | | Set it to |
 |---|---|

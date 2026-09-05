@@ -8,6 +8,10 @@
 > classes, properties, IRIs and shapes is
 > `conductor/kg/` — where that directory and this file disagree, the
 > track files win.
+>
+> **Updated 2026-09-04** for the retrieval service (Decision 6, ADR-002's implementation). The
+> Infrastructure and Setup sections' docker-compose description is corrected in place, not marked
+> superseded, since the two-project layout they described no longer exists at all.
 
 ## Languages
 
@@ -109,19 +113,22 @@ exactly which evidence nodes produced it, without leaving the store.
 **Deterministic scoring cores, LLM-generated rationale.** This is the central architectural decision
 and it is a compliance decision as much as a technical one.
 
-**Per ADR-002** (`conductor/tracks/explainable-agent-based-triage_20260828/decisions.md`): agents write
-to Postgres `agent.*`, not directly to the graph. A projection step, in the same declarative style as
-`kg/mappings/`, mirrors `agent.*` into `eat:Score`/`Decision`/`cites` triples so the graph still
-exposes the full audit trail — Postgres is the source of record it's projected from, same as cohort
-data under ADR-001.
+**Per ADR-002** (`conductor/tracks/explainable-agent-based-triage_20260828/decisions.md`): agents never
+write to Postgres or the graph directly — `retrieval-service_20260904` (already built) is the single
+write path. `POST /scores`/`/decisions`/`/overrides` write `agent.*` first, then synchronously project
+the matching `eat:Score`/`Decision`/`cites` triples into the graph on success — no batch mapping step,
+one code path per write, immediately after each Postgres commit.
 
 - **Urgency agent** — MTS and NEWS2 logic implemented as deterministic, unit-tested Python. Same
-  inputs always yield the same score. Writes to `agent.agent_scores` via `agent_rw`.
-- **Capacity agent** — deterministic constraint reasoning over the SimPy occupancy model. Same.
-- **Coordinating agent** — ranking is a **SPARQL query** over both sets of triples plus deterministic
-  tie-breaking (CPC, then CRT breach, then oldest referral first). Writes `agent.decisions`,
-  `decision_rankings` and `decision_citations` rows, projected into `Decision`/`RankedPlacement`/
-  `cites` triples.
+  inputs always yield the same score. Gathers its input via `GET /referrals/.../context`, writes via
+  `POST /scores`.
+- **Capacity agent** — deterministic constraint reasoning over the SimPy occupancy model. Same input/
+  output path as the urgency agent.
+- **Coordinating agent** — ranking runs over both agents' already-written scores (`GET /runs/.../
+  hospitals/.../scores`) and its cohort (`GET /hospitals/.../cohort/...`, which already carries CPC
+  and computed CRT breach) plus deterministic tie-breaking (CPC, then CRT breach, then oldest referral
+  first). Writes the full decision atomically via `POST /decisions`, which projects `Decision`/
+  `RankedPlacement`/`cites` triples as part of that same call.
 - **LLM layer** — takes the already-cited graph evidence for one ranked position and writes the
   human-readable rationale. It explains a decision it did not make. It cannot alter scores or ranks.
 
@@ -152,8 +159,16 @@ natural-language explainability the challenge is about. An LLM that produced the
 
 ## Infrastructure
 
-- **Docker Compose** — the dataset stack in `dataset/` runs `db` (Postgres) and `pgadmin`; the app
-  stack runs `oxigraph` and the FastAPI `app`.
+- **Docker Compose** — one compose project at the repo root runs everything: `db` (Postgres),
+  `pgadmin`, the `loader` (profile `tools`), `oxigraph`, and the `retrieval` service (Decision 6), on
+  one default network, addressable by service name (`db`, `oxigraph`, `retrieval`). A root `Makefile`
+  orchestrates the whole stack (`make up`, `make load`, `make kg-views`, `make retrieval-test`, ...);
+  `dataset/Makefile` forwards its targets there so `cd dataset && make up` still works.
+  *Superseded 2026-09-04:* this file previously described two separate compose projects
+  (`dataset/docker-compose.yml` for `db`/`pgadmin`, a root file for `oxigraph`/`app`). They were
+  merged into one project during `retrieval-service_20260904` — see that track's `plan.md` Phase 1
+  for why (the retrieval service needed to reach `db` by hostname across what were two independent
+  compose networks; consolidating was simpler than the external-network workaround first tried).
   **Postgres runs once, from the main checkout.** Never `docker compose up` in a second git worktree:
   the container name `/triage_db` is pinned and the second copy collides. Conductor workspaces
   connect to `localhost:5433`.
@@ -172,10 +187,11 @@ natural-language explainability the challenge is about. An LLM that produced the
 | `morph-kgc` | R2RML/RML materialisation from Postgres to RDF |
 | `pyshacl` | SHACL validation, structural and `sh:sparql` |
 | `owlrl` | OWL-RL closure at build time |
-| `psycopg` (v3, `[binary]`) | Postgres driver for Morph-KGC |
+| `psycopg` (v3, `[binary]`) | Postgres driver for Morph-KGC, and for the retrieval service's writes (Decision 6) |
 | `sqlalchemy` (**≥ 2.0**) | Required by Morph-KGC; older versions have no `postgresql+psycopg` dialect |
 | `rdflib` | RDF serialisation, SPARQL client helpers |
-| `SPARQLWrapper` or `httpx` | Talking to Oxigraph's SPARQL endpoints |
+| `SPARQLWrapper` or `httpx` | Talking to Oxigraph's SPARQL endpoints. The retrieval service uses `httpx` (async, matches its FastAPI handlers) |
+| `pydantic-settings` | Retrieval service's environment-variable config (Decision 6) |
 | `pyoxigraph` (**==0.3.22, pinned**) | In-memory RDF store for `kg/tests/test_wait_counters_sample.py`. `kg/queries/wait_counters.rq` documents a workaround for a version-specific engine quirk — don't bump without re-verifying it still applies |
 | `simpy` | Discrete-event bed occupancy and arrivals queue |
 | `pandas`, `numpy` | HIPE/NTPF calibration and synthetic generation |
@@ -288,6 +304,38 @@ the override graph, since a clinician may break `RULE-ORDER` knowingly.
 
 ---
 
+### Decision 6: Standalone retrieval service, bearer-token auth, one code path per write
+
+**Date:** 2026-09-04
+
+**Decision:** ADR-002 (where agent outputs get written — Postgres system of record, synchronous graph
+projection on success, `conductor/tracks/explainable-agent-based-triage_20260828/decisions.md`) is
+implemented as `retrieval/`, a **standalone FastAPI service** — its own container on the docker-compose
+network, not an in-process library the agents and UI import. Its port is **published to the host**,
+and because that means it's reachable from outside the trusted compose network, every endpoint
+requires a shared static `Authorization: Bearer` token, checked before any handler logic runs.
+
+**Rationale:** Decision 3 rejected a client/server split for the *clinician UI* specifically, to avoid
+cross-repo integration risk landing on Day 5. That reasoning doesn't transfer here: the retrieval
+service's callers (the urgency/capacity/coordinator agents, the clinician UI backend) are processes
+that need to share one write path regardless of language or deployment shape, and a standalone service
+callable over HTTP is the natural way to guarantee "one code path" when multiple future components
+need to hit it — an in-process library only enforces that discipline within a single process. The
+bearer token is the minimum viable authentication for a service that left the trusted network,
+scoped deliberately: one shared secret, no per-caller identity, no rotation — proportionate to a
+one-week prototype, not a production deployment (`product.md`'s own non-goal).
+
+**Trade-off accepted:** No production-grade auth (per-caller keys, rotation, TLS termination) — see
+`retrieval/README.md`'s NFR4. Every write endpoint does its own Postgres-then-graph sequence rather
+than reusing Morph-KGC's batch mapping files, which are the wrong tool for low-latency single-row
+writes (same reasoning as Decision 4's mapping-vs-loader split, applied to the write side instead of
+the read side). Two IRI-scheme gaps `conductor/kg/namespaces.md` didn't cover (citation-evidence
+target IRIs, Activity/Agent IRIs for `prov:wasGeneratedBy`) were filled with a documented convention
+during this work rather than left blocking — see `retrieval-service_20260904/plan.md` Phase 3 for the
+specifics; worth a second pair of eyes from whoever owns `conductor/kg/`.
+
+---
+
 ## Development Environment
 
 ### Prerequisites
@@ -300,31 +348,33 @@ the override graph, since a clinician may break `RULE-ORDER` knowingly.
 ### Setup
 
 ```bash
-# 1. Dataset: Postgres + pgAdmin, then load from Hugging Face
-cd dataset
+# 1. Whole stack -- Postgres, pgAdmin, Oxigraph, retrieval -- one compose project at the repo root
 cp .env.example .env          # add your own HF read token
 make up
 make load FETCH_PROFILE=full
 make verify
 
-# 2. Knowledge graph database objects
-cd ../kg
-cp .env.example .env          # loader password
-make kg-views                 # applies sql/001 and sql/002
+# 2. Knowledge graph database objects (from the repo root; delegates into kg/)
+cd kg && cp .env.example .env && cd ..   # loader password
+make kg-views                            # applies sql/001 and sql/002
 # then set the role password from kg/.env:
 #   ALTER ROLE kg_loader PASSWORD '<KG_LOADER_PASSWORD>';
-tests/test_loader_isolation.sh
+kg/tests/test_loader_isolation.sh
 
-# 3. Materialise and validate
+# 3. Materialise and validate (run from kg/ -- paths in each .ini are relative to cwd)
+cd kg
 python -m morph_kgc mappings/<track>.ini
 pyshacl -s shapes/structural.ttl -df nt out/<track>.nt
-
-# 4. App
 cd ..
-docker compose up -d          # oxigraph + app
-uv sync
-uv run uvicorn triage.web.app:app --reload
-uv run pytest
+
+# 4. Retrieval service (Decision 6) -- ADR-002's implementation, already built.
+#    Its bearer token and DB password live in the same root .env from step 1.
+docker compose exec db psql -U triage_admin -d triage \
+  -c "ALTER ROLE retrieval_rw PASSWORD '<value from .env>';"
+make retrieval-build && docker compose up -d retrieval
+make retrieval-test
+
+# 5. Clinician UI app -- not yet built (explainable-agent-based-triage_20260828)
 ```
 
 `make reset` in `dataset/` drops the `kg` schema and the loader role along with everything else. Run
@@ -335,11 +385,14 @@ uv run pytest
 | Variable | Purpose |
 |---|---|
 | `ANTHROPIC_API_KEY` | Rationale generation (or use `ant auth login`) |
-| `HF_TOKEN` | Your own read token for the gated dataset. `dataset/.env` |
-| `KG_LOADER_PASSWORD` | Password for the read-only `kg_loader` role. `kg/.env` |
+| `HF_TOKEN` | Your own read token for the gated dataset. Root `.env` — one file is authoritative for the whole docker-compose stack (Decision 6's note in Infrastructure above) |
+| `KG_LOADER_PASSWORD` | Password for the read-only `kg_loader` role. `kg/.env` (Morph-KGC runs on the host, outside the compose stack, so it keeps its own file) |
 | `KG_DB_URL` | `postgresql+psycopg://kg_loader:…@localhost:5433/triage`. `kg/.env` |
 | `OXIGRAPH_QUERY_URL` | Defaults to `http://localhost:7878/query` |
 | `OXIGRAPH_UPDATE_URL` | Defaults to `http://localhost:7878/update` |
+| `RETRIEVAL_DB_URL` | `postgresql://retrieval_rw:…@db:5432/triage`. Root `.env` |
+| `RETRIEVAL_BEARER_TOKENS` | Comma-separated shared bearer token(s), checked on every retrieval-service endpoint except `/health`. Root `.env` |
+| `RETRIEVAL_PORT` | Host port the retrieval service is published on. Defaults to `8000` |
 
 `kg/mappings/*.ini` carries the loader password and is git-ignored. No password belongs in a `.sql`
 or `.ttl` file.

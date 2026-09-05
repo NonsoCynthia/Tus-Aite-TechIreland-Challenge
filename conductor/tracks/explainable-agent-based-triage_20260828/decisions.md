@@ -7,43 +7,53 @@
 
 ---
 
-### ADR-002: Postgres is the write target for agent outputs, the graph projects it
+### ADR-002: Where agent outputs get written
 
 **Date:** 2026-09-04
 **Status:** accepted
 
 **Context:** Raised 2026-08-31 while reconciling `graph-foundation_20260826` against ADR-001 (see that
-track's `decisions.md`, item 3, and `spec.md`'s "Unresolved" section). Migration 006 already models
-the entire agent output surface in Postgres — `agent.agent_scores`, `agent_citations`, `decisions`,
-`decision_rankings`, `decision_citations`, `rule_checks`, `overrides` — with `agent_rw` holding INSERT
-on all of them, and `rule_checks` carrying a foreign key to `core.ref_rules`. The proposal (§9) says
-agents write scores back to the graph directly. Three options were on the table; team decided
-2026-09-04.
+track's `decisions.md` for the full options analysis carried forward from there). Migration 006
+already models the entire agent output surface in Postgres (`agent.agent_scores`, `agent_citations`,
+`decisions`, `decision_rankings`, `decision_citations`, `rule_checks`, `overrides`), with `agent_rw`
+holding `INSERT` on all of them. The proposal (§9) says agents write scores back to the graph "as graph
+nodes and edges... which is what keeps the trail auditable," but is silent on whether Postgres or the
+graph is authoritative. Three options were on the table: Postgres as record with the graph a copy,
+graph-only, or both independently — the last of these was rejected outright, since it repeats the exact
+divergence-risk failure mode that decisions 1 and 2 (the shared wait-counter fragment, the shared SHACL
+shape file) were explicitly designed to prevent.
 
-**Decision:** Postgres is the write target. Agents (urgency, capacity, coordinator) write `scored`
-rows, `Decision`/`decision_rankings`/`decision_citations` rows, and overrides directly to
-`agent.*` via `agent_rw`. The graph never receives a direct write from an agent.
+**Decision:** **Postgres is the system of record.** The graph receives a **synchronous, single-writer
+projection**: one code path writes to Postgres first, and only pushes the corresponding RDF triples
+(`eat:Score`, `eat:Decision`, `eat:RankedPlacement`, `eat:cites` + its four role subproperties) into
+the appropriate named graph (`…/kg/graph/run/{run_id}` or `…/kg/graph/overrides`) if that Postgres
+write succeeds. This does not reuse the Morph-KGC mapping files, which are built for batch runs, not
+low-latency single-row writes — it is a small, purpose-built writer applying the same deterministic IRI
+conventions from `conductor/kg/namespaces.md` via SPARQL Update, immediately after each Postgres
+commit.
 
-A projection step — the same pattern `kg/mappings/` already uses for `core.*` (declarative
-R2RML/Morph-KGC mappings, not a hand-written client) — mirrors `agent.*` into the graph as
-`eat:Score` nodes, `Decision` nodes, and `cites` edges. The audit trail is still walkable in the
-graph; Postgres is just the source of record it's projected from, exactly as ADR-001 already settled
-for cohort data.
+**Implementation:** `retrieval-service_20260904` — a standalone FastAPI service that is the single
+write path for every agent and clinician-UI output, implementing exactly this Postgres-then-graph
+sequence. See that track's `spec.md` FR2 for the endpoint-level contract, including how a Postgres
+commit that succeeds but a graph write that then fails is surfaced (never a silent success).
 
-**Rationale:** Consistent with ADR-001's one-source-of-record logic. Relational constraints do real
-work here that would otherwise need reimplementing in SHACL or application code: `dr_unique_position`
-makes two patients holding the same rank impossible, `dc_role_valid` constrains why evidence was
-cited, and the FK to `ref_rules` means a rule violation can never name a rule that doesn't exist.
-Extending the existing `dataset/` → `kg/` projection pattern to `agent.*` is also less new surface
-than standing up a second write path this week — one mapping style, one place bugs like the `"None"`
-literal gotcha (`conductor/kg/requirements.md` §4) get handled, instead of two.
+**Consequences:** Real transactional constraints (`dr_unique_position`, `dc_role_valid`, the FK from
+`rule_checks` to `core.ref_rules`) keep doing real work, for free, on the authoritative copy — this was
+option A's advantage and it is kept. The literal claim "the graph is where the audit trail lives" is
+now "the graph is a synchronous, faithful projection of the audit trail" — a real but small narrowing
+of the pitch, accepted because the alternative (graph-only) forfeits those constraints unless
+hand-rebuilt in application code or SHACL, and "both, independently" was rejected as a repeat of a
+failure mode this project has twice already designed against. A graph-projection failure after a
+successful Postgres commit is a detectable, recoverable inconsistency (the row stands, the failure is
+reported) rather than data loss — but it is a new failure mode this codebase did not previously have,
+and retry/reconciliation beyond detect-and-report is explicitly out of scope for
+`retrieval-service_20260904`.
 
-**Trade-off accepted:** the graph is a query surface over Postgres, not the write target the proposal
-originally described. This doesn't cost the audit-trail claim — `cites` edges still exist in the graph
-and are still walkable backward from any ranked position — but the pitch language should say "the
-graph exposes the audit trail" rather than "the graph is the write target," since it no longer is.
-
-**Follow-on work this creates:** a sixth mapping file (`kg/mappings/agent_outputs.rml.ttl` or similar)
-projecting `agent.agent_scores` / `decisions` / `decision_rankings` / `decision_citations` /
-`overrides` into `eat:Score` / `Decision` / `cites` triples. This is new scope relative to the
-original `plan.md` phase list — see the note added to Phase 3.
+**Note on a since-superseded write-up:** `origin/main` briefly recorded a different resolution to this
+same question — Postgres as write target with a *batch* Morph-KGC-style mapping file
+(`kg/mappings/agent_outputs.rml.ttl`, never built) projecting `agent.*` into the graph, rather than a
+synchronous per-write projection. That version was written independently of
+`retrieval-service_20260904` and predates its delivery; this merge keeps the synchronous-projection
+decision above because it is what was actually built, tested (411 tests), and is now the real write
+path every agent and the clinician UI use — recording an ADR that contradicted the shipped service
+would leave this document wrong the moment it merged.
