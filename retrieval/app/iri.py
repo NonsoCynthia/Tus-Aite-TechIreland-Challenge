@@ -33,12 +33,26 @@ UNIT_NS = "http://qudt.org/vocab/unit/"
 # for that evidence class's own template in namespaces.md #4. 'observation'
 # maps to the per-column Observation class ('obs/...'), not ObservationEvent
 # -- the CHECK constraint's value is singular and per-measurement.
+#
+# 'score'/'referral_state'/'rule' (ADR-009) are decision_citations-only --
+# agent_citations' CHECK ac_evidence_type_valid (006_outputs.sql) still
+# rejects them, by design (see schemas.DecisionEvidenceType). They exist so a
+# RankedPlacement can cite a Score node (the urgency/capacity role's honest
+# evidence is the agent's own scored judgement, not the raw clinical facts
+# behind it -- kg/ontology/eat.ttl's citesUrgencyEvidence/citesCapacityEvidence
+# carry no rdfs:range, so this was never disallowed, just unreachable) or a
+# ReferralState/Rule node for the timeframe role (kg/ontology/eat.ttl's
+# citesTimeframeEvidence has rdfs:range unionOf(eat:ReferralState eat:Rule)
+# explicitly -- this was already ontology-sanctioned before this change).
 _EVIDENCE_SEGMENT = {
     "observation": "obs",
     "condition": "condition",
     "triage_event": "triage-event",
     "bed_status": "bed-status",
     "clinic_session": "clinic-session",
+    "score": "score",
+    "referral_state": "referral-state",
+    "rule": "rule",
 }
 
 
@@ -191,15 +205,23 @@ def override_iri(hospital_hipe: str, as_of_date: str, pathway_number: str, overr
 def evidence_iri(evidence_type: str, evidence_key: str) -> str:
     """Citation target IRI (agent_citations/decision_citations).
 
-    Not in namespaces.md's template table -- the four evidence classes each
-    have their own multi-part composite key, and the citation tables only
-    store a flat (evidence_type, evidence_key) pair. Convention, confirmed
-    with the track owner rather than invented silently: the citing caller
-    supplies `evidence_key` as the exact composite-key suffix from that
-    evidence type's own template in namespaces.md #4 (e.g. for
-    'observation': "{hospital_hipe}/{pathway_number}/{obs_datetime}/{column}"
-    to match `obs/...`). This function only does the evidence_type -> path
-    segment lookup and appends evidence_key verbatim.
+    Not in namespaces.md's template table -- the evidence classes each have
+    their own multi-part composite key, and the citation tables only store a
+    flat (evidence_type, evidence_key) pair. Convention, confirmed with the
+    track owner rather than invented silently: the citing caller supplies
+    `evidence_key` as the exact composite-key suffix from that evidence
+    type's own template in namespaces.md #4 (e.g. for 'observation':
+    "{hospital_hipe}/{pathway_number}/{obs_datetime}/{column}" to match
+    `obs/...`; for 'score': "{run_id}/{hospital_hipe}/{pathway_number}/
+    {agent_name}" to match `score/...`, same suffix `score_iri` builds; for
+    'referral_state': "{hospital_hipe}/{pathway_number}/{valid_from}" to
+    match `referral-state/...`, same suffix `referral_state_iri` builds; for
+    'rule': just the rule_id, to match `rule/...`, same suffix `rule_iri`
+    builds). This function only does the evidence_type -> path segment
+    lookup and appends evidence_key verbatim -- it never calls score_iri/
+    referral_state_iri/rule_iri itself, so a caller citing one of those three
+    types is responsible for matching the real node's IRI exactly (same
+    contract as every other evidence_type here).
     """
     try:
         segment = _EVIDENCE_SEGMENT[evidence_type]

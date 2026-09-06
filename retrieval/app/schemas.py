@@ -9,6 +9,15 @@ is also what backs spec.md NFR2 on the read side: a read endpoint can only
 ever return evidence-free placements/scores if one somehow got written
 without going through this validation.
 
+One exception to "mirrors exactly": DecisionCitationIn.evidence_type
+(DecisionEvidenceType) is wider than ScoreCitationIn.evidence_type
+(EvidenceType) -- agent.decision_citations carries no evidence_type CHECK at
+all (only dc_role_valid, on role), unlike agent.agent_citations'
+ac_evidence_type_valid. ADR-009 uses that room to let a RankedPlacement cite
+a Score, ReferralState, or Rule node, which the ontology already permits
+(see DecisionEvidenceType's own comment) but which a Score can never
+honestly cite (a score doesn't cite another score).
+
 Every field below carries a `description` (and, where the value's shape
 isn't self-evident, an `examples`) -- these render in /docs (Swagger UI) so
 an agent or UI developer reading the schema, not just this file, can tell
@@ -25,6 +34,22 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from . import iri
 
 EvidenceType = Literal["observation", "condition", "triage_event", "bed_status", "clinic_session"]
+# ADR-009: what a RankedPlacement cites is a strict superset of what a Score
+# cites -- a placement's urgency/capacity evidence is honestly the agent's
+# own Score node (kg/ontology/eat.ttl's citesUrgencyEvidence/
+# citesCapacityEvidence carry no rdfs:range, so this was never disallowed),
+# and its timeframe evidence is a ReferralState or Rule node, not a
+# triage_event (citesTimeframeEvidence's rdfs:range is explicitly
+# unionOf(eat:ReferralState eat:Rule)). Deliberately NOT folded into
+# EvidenceType: agent.agent_citations' CHECK ac_evidence_type_valid
+# (006_outputs.sql) only allows the five clinical/capacity values above, so
+# widening the shared Literal would let ScoreCitationIn accept a value
+# Postgres always rejects (a 422 becoming an avoidable 400). decision_
+# citations carries no such CHECK, so DecisionCitationIn is free to be wider.
+DecisionEvidenceType = Literal[
+    "observation", "condition", "triage_event", "bed_status", "clinic_session",
+    "score", "referral_state", "rule",
+]
 CitationRole = Literal["urgency", "capacity", "timeframe", "multi_list"]
 AgentName = Literal["urgency", "capacity"]
 Sex = Literal["M", "F", "U"]
@@ -117,7 +142,15 @@ class DecisionCitationIn(BaseModel):
     `eat:cites*` edge (a specific role subproperty, not the base
     `eat:cites`) from the `RankedPlacement` node to this evidence node."""
 
-    evidence_type: EvidenceType = Field(description="See ScoreCitationIn.evidence_type.")
+    evidence_type: DecisionEvidenceType = Field(
+        description=(
+            "Wider than ScoreCitationIn.evidence_type (ADR-009): also accepts 'score' "
+            "(cite the urgency/capacity agent's own Score node -- the honest evidence for "
+            "those roles), 'referral_state', and 'rule' (cite a ReferralState or Rule node "
+            "for the timeframe role, e.g. a CRT breach -- see EvidenceType/"
+            "DecisionEvidenceType's own comments)."
+        ),
+    )
     evidence_key: str = Field(
         description="See ScoreCitationIn.evidence_key -- same format rules apply."
     )

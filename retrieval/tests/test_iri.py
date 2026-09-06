@@ -67,6 +67,21 @@ def test_evidence_iri_maps_type_to_segment() -> None:
     )
 
 
+def test_evidence_iri_decision_only_types_match_their_own_builders() -> None:
+    # ADR-009: 'score'/'referral_state'/'rule' are citable evidence_types for
+    # DecisionCitationIn only. evidence_iri() does a segment lookup and
+    # appends evidence_key verbatim -- it never calls score_iri/
+    # referral_state_iri/rule_iri, so this guards against the two drifting
+    # apart (e.g. a segment rename in one place but not the other).
+    assert iri.evidence_iri("score", "run-0001/9001/PW-9001-000007/urgency") == iri.score_iri(
+        "run-0001", "9001", "PW-9001-000007", "urgency"
+    )
+    assert iri.evidence_iri(
+        "referral_state", "9001/PW-9001-000007/2026-09-04"
+    ) == iri.referral_state_iri("9001", "PW-9001-000007", "2026-09-04")
+    assert iri.evidence_iri("rule", "RULE-CRT-URGENT") == iri.rule_iri("RULE-CRT-URGENT")
+
+
 def test_evidence_iri_rejects_unknown_type() -> None:
     import pytest
 
