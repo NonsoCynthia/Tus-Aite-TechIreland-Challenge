@@ -15,11 +15,11 @@ by observation, not by "should work".
 Nothing here is guessed at. Every shape this agent produces is read from the source that validates
 it.
 
-- [ ] 1.1 Read `EvidenceType` and `CitationRole` enums from `retrieval/app/schemas.py`; record the
+- [x] 1.1 Read `EvidenceType` and `CitationRole` enums from `retrieval/app/schemas.py`; record the
       exact permitted values in this track's `decisions.md`
-- [ ] 1.2 Read `iri.validate_segment` to establish what an `evidence_key` may contain, so citation
+- [x] 1.2 Read `iri.validate_segment` to establish what an `evidence_key` may contain, so citation
       keys are built to pass it rather than discovered to fail it
-- [ ] 1.3 Capture a real cohort response (`GET /hospitals/9004/cohort/2026-08-30`) as a committed
+- [x] 1.3 Capture a real cohort response (`GET /hospitals/9004/cohort/2026-08-30`) as a committed
       test fixture; note that it contains `cpc: null`, `crt_breached: null`, and heavily breached
       waits, all of which the ranking must handle
 - [ ] 1.4 Build a synthetic score fixture covering: both scores present, urgency only, capacity
@@ -32,14 +32,28 @@ it.
 
 ## Phase 2 — CPC bands and tails (Tier 1)
 
-- [ ] 2.1 Test: `severity_rank` mapping matches `core.ref_codes` exactly (1→1, 3→2, 2→3, 4→none)
-- [ ] 2.2 Test: sorting on raw `cpc` produces a *different*, wrong order than sorting on
+- [x] 2.1 Test: `severity_rank` mapping matches `core.ref_codes` exactly (1→1, 3→2, 2→3, 4→none)
+- [x] 2.2 Test: sorting on raw `cpc` produces a *different*, wrong order than sorting on
       `severity_rank` — the regression test for the NTPF code trap, asserting the bug is absent
-- [ ] 2.3 Test: `cpc: null` and Excluded referrals both rank after every categorised referral
-- [ ] 2.4 Test: the two tail groups stay distinguishable and are not merged
-- [ ] 2.5 Test: no referral is ever dropped — every cohort member appears exactly once in the output
-- [ ] 2.6 Implement band resolution and tail assignment
+- [x] 2.3 Test: `cpc: null` and Excluded referrals both rank after every categorised referral
+- [x] 2.4 Test: the two tail groups stay distinguishable and are not merged
+- [x] 2.5 Test: no referral is ever dropped — every cohort member appears exactly once in the output
+- [x] 2.6 Implement band resolution and tail assignment
 - [ ] 2.7 Verification: run against the Phase 1 cohort fixture, confirm band counts by eye
+
+      **Observed (2026-09-06):**
+      - Ran the five band tests against both hand-built cohorts and the real 9004/2026-08-30
+        fixture (500 referrals, 95 null-CPC). All pass.
+      - Mutation check: swapping `SEVERITY_RANK`'s 3 and 2 values produced exactly 2 failed, 3
+        passed — `test_severity_rank_matches_core_ref_codes` and
+        `test_semi_urgent_outranks_routine_ntpf_code_trap` both caught it, the three tail/drop
+        tests correctly did not. Reverted; all green again.
+      - The real fixture exposed a defect the hand-built fixtures shared with the implementation:
+        `SEVERITY_RANK` was keyed by `str` while the cohort endpoint returns `cpc` as `int` or
+        `None`, so `_resolve_band` would have raised `KeyError` on the first live referral.
+        Re-keyed to `int` and added `test_real_cohort_fixture_bands_resolve_cleanly`.
+      - Gates: `ruff format --check`, `ruff check` and `mypy` all clean on `coordinator/`.
+        `test_citation_contract` remains deliberately failing per ADR-009.
 
 ## Phase 3 — Scarcity, α, priority (Tier 1)
 
