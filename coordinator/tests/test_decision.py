@@ -45,6 +45,7 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
+from retrieval.app.schemas import DecisionIn
 
 from coordinator.app.citations import ROLE_EVIDENCE_TYPES
 from coordinator.app.decision import (
@@ -56,7 +57,6 @@ from coordinator.app.decision import (
     build_rationale_summary,
     interpret_decision_response,
 )
-from retrieval.app.schemas import DecisionIn
 
 # Verbs product-guidelines.md's Verbs table names as implying system action
 # on the patient, or a diagnostic/corrective claim -- rationale_summary
