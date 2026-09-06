@@ -11,6 +11,7 @@ import pytest
 from tests.fixtures import (
     VALID_AGENT_NAMES,
     VALID_CITATION_ROLES,
+    VALID_DECISION_EVIDENCE_TYPES,
     VALID_EVIDENCE_TYPES,
     VALID_RULE_IDS,
     make_decision,
@@ -89,10 +90,13 @@ class TestDecisionConstraints:
 
     @pytest.mark.parametrize("seed", SEEDS)
     def test_citation_roles_valid(self, seed: int) -> None:
-        # agent.decision_citations CHECK dc_role_valid
+        # role: agent.decision_citations CHECK dc_role_valid. evidence_type:
+        # no matching DB CHECK exists for decision_citations (ADR-009) -- this
+        # mirrors app.schemas.DecisionEvidenceType, the service-level contract
+        # that fills that gap, not a SQL constraint.
         for ranking in make_decision(seed).rankings:
             for evidence_type, _key, role in ranking.citations:
-                assert evidence_type in VALID_EVIDENCE_TYPES
+                assert evidence_type in VALID_DECISION_EVIDENCE_TYPES
                 assert role in VALID_CITATION_ROLES
 
     @pytest.mark.parametrize("seed", SEEDS)
