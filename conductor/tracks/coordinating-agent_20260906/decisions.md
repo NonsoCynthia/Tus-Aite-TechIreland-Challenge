@@ -361,3 +361,47 @@ all top-20 positions were breached, with `wait_normalised` mostly above 0.7.
 **Status:** Open, referred to the responsible-AI/compliance lead and to clinical input. The code
 currently implements **(a)** because that is what FR3 specifies. No decision written under (a)
 should be presented as final until this is resolved.
+
+---
+
+### ADR-012: The `timeframe` role cites both the `ReferralState` and the `Rule`
+
+**Date:** 2026-09-06
+**Status:** accepted
+
+**Context:** Per ADR-009's resolution, `DecisionCitationIn.evidence_type` (`DecisionEvidenceType`)
+carries `referral_state` and `rule`, not just `referral_state`. Before this decision, the `timeframe`
+role cited only the `ReferralState` — the referral's wait itself — leaving unstated what threshold
+that wait was being measured against. A citation reading "waited 41 days" without naming "against a
+28-day CRT" is honest about the fact but silent about the standard the fact is being judged by, and a
+clinician or auditor cannot check the coordinator's breach determination against `core.ref_rules`
+without that second citation. The gap was not hypothetical: `retrieval/app/schemas.py`'s own comment
+on `DecisionEvidenceType` already anticipated it — `citesTimeframeEvidence`'s ontology range is
+`unionOf(eat:ReferralState eat:Rule)`, not `ReferralState` alone, so the pairing was sanctioned before
+this agent used it.
+
+**Decision:** `coordinator.app.citations.ROLE_EVIDENCE_TYPES` is restructured from a one-to-one
+`role -> evidence_type` mapping to `role -> tuple[evidence_type, ...]`, since one role (`timeframe`)
+now legitimately uses two. `build_citations` (`coordinator/app/decision.py`) emits a `referral_state`
+citation for every referral's `timeframe` role, plus a `rule` citation — evidence_key the bare
+`rule_id`, per `rule/{rule_id}`'s single-segment template in `namespaces.md` #4 — when
+`coordinator.app.citations.applicable_rule_id` finds one applies: `RULE-CRT-URGENT` for urgent
+(cpc=1), `RULE-CRT-SEMI` for semi-urgent (cpc=3), `RULE-TRIAGE-TURNAROUND` for `awaiting_triage`
+referrals. A referral with none of those (Routine, Excluded, or an uncategorised referral not
+awaiting triage) cites only the `ReferralState` — no rule is invented for a referral that has none,
+mirroring ADR-006's insistence that missing information is stated, not defaulted.
+
+**Rationale:** Citing both is more honest than citing the `ReferralState` alone: it names the fact
+(how long someone waited) and the standard (what threshold that wait is judged against) as two
+separate, independently-checkable claims, exactly the shape `product-guidelines.md` asks
+rationale text to have ("say which rule fired, by name"). It also costs nothing against
+`RankingIn.citations`' `min_length=1` — the constraint was already satisfied by `referral_state`
+alone — and nothing against the ontology, which already permitted it.
+
+**Trade-off accepted:** `applicable_rule_id` duplicates `coordinator.app.rule_checks`' CPC/status
+branching (though not its pass/fail evaluation, which additionally needs the wait itself) —
+deciding *which* rule applies is now expressed in two places rather than one. Accepted because the
+two call sites want different things from the same fact (a citation needs only applicability; a rule
+check needs applicability plus the outcome), and forcing a shared function would either make
+`build_citations` depend on wait data it doesn't otherwise need or make `evaluate_referral_rules`
+return partial results for citation-only callers.

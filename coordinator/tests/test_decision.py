@@ -9,12 +9,14 @@ Expected API of the not-yet-written `coordinator.app.decision`:
 - `build_citations(referral, *, legacy_citations=False)`: returns
   `DecisionCitationIn`-shaped dicts (`evidence_type`, `evidence_key`,
   `role`) for one ranked referral. Default mode emits `urgency` (evidence_
-  type `"score"`) and `timeframe` (evidence_type `"referral_state"`) per
-  ADR-009, plus `capacity` (pass-through of the capacity agent's own
-  citations, already valid `bed_status`/`clinic_session` evidence). Every
-  `evidence_type` comes from `coordinator.app.citations.ROLE_EVIDENCE_
-  TYPES`, never duplicated inline. `legacy_citations=True` instead copies
-  the urgency agent's own citations onto the `urgency` role and omits
+  type `"score"`) and, per ADR-012, `timeframe` as **one or two**
+  citations: a `"referral_state"` always, plus a `"rule"` naming the
+  applicable CRT/turnaround rule where one applies -- also `capacity`
+  (pass-through of the capacity agent's own citations, already valid
+  `bed_status`/`clinic_session` evidence). Every `evidence_type` comes
+  from `coordinator.app.citations.ROLE_EVIDENCE_TYPES` (a tuple per role),
+  never duplicated inline. `legacy_citations=True` instead copies the
+  urgency agent's own citations onto the `urgency` role and omits
   `timeframe` entirely (ADR-009's fallback, since `RankingIn.citations`
   only requires `min_length=1`, not one per role).
 - `build_rationale_summary(referral)`: the coordinator's own short,
@@ -45,7 +47,6 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
-from retrieval.app.schemas import DecisionIn
 
 from coordinator.app.citations import ROLE_EVIDENCE_TYPES
 from coordinator.app.decision import (
@@ -57,6 +58,7 @@ from coordinator.app.decision import (
     build_rationale_summary,
     interpret_decision_response,
 )
+from retrieval.app.schemas import DecisionIn
 
 # Verbs product-guidelines.md's Verbs table names as implying system action
 # on the patient, or a diagnostic/corrective claim -- rationale_summary
@@ -130,14 +132,44 @@ def test_citation_roles_map_to_evidence_types_from_the_shared_constant() -> None
     """Citation roles map correctly to the four subproperties, and each
     role's evidence_type comes from `ROLE_EVIDENCE_TYPES`
     (`coordinator/app/citations.py`) -- never duplicated inline (spec.md
-    FR7, ADR-009)."""
+    FR7, ADR-009). `ROLE_EVIDENCE_TYPES` maps each role to a *tuple* of
+    evidence types (ADR-012): `timeframe` may use either of two."""
     citations = build_citations(_referral("PW-1"))
 
     roles_seen = {c["role"] for c in citations}
     assert roles_seen == {"urgency", "capacity", "timeframe"}
 
     for citation in citations:
-        assert citation["evidence_type"] == ROLE_EVIDENCE_TYPES[citation["role"]]
+        assert citation["evidence_type"] in ROLE_EVIDENCE_TYPES[citation["role"]]
+
+
+def test_timeframe_role_cites_both_referral_state_and_rule_when_applicable() -> None:
+    """THE ADR-012 TEST.
+
+    A breached urgent referral's `timeframe` citations include both a
+    `referral_state` (the wait itself) and a `rule` naming
+    `RULE-CRT-URGENT` (what threshold that wait is measured against) --
+    the pairing the ontology's `citesTimeframeEvidence` range
+    (`unionOf(eat:ReferralState eat:Rule)`) already sanctioned.
+    """
+    citations = build_citations(_referral("PW-1", cpc=1))
+
+    timeframe_citations = [c for c in citations if c["role"] == "timeframe"]
+    evidence_types = {c["evidence_type"] for c in timeframe_citations}
+    assert evidence_types == {"referral_state", "rule"}
+
+    rule_citation = next(c for c in timeframe_citations if c["evidence_type"] == "rule")
+    assert rule_citation["evidence_key"] == "RULE-CRT-URGENT"
+
+
+def test_timeframe_role_cites_only_referral_state_when_no_rule_applies() -> None:
+    """A Routine referral (no CRT, not awaiting triage) cites only the
+    `ReferralState` for `timeframe` -- no rule is invented for it."""
+    citations = build_citations(_referral("PW-1", cpc=2, triage_status="triaged"))
+
+    timeframe_citations = [c for c in citations if c["role"] == "timeframe"]
+    evidence_types = {c["evidence_type"] for c in timeframe_citations}
+    assert evidence_types == {"referral_state"}
 
 
 def test_legacy_citations_fallback_uses_urgency_agent_citations_and_omits_timeframe() -> None:

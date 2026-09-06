@@ -29,8 +29,11 @@ Referral dicts mirror the shape of `retrieval.app.db.get_cohort` rows plus
 `severity_rank`/`band` (as `coordinator.app.bands.order_by_band` adds).
 """
 
+import json
+from pathlib import Path
 from typing import Any
 
+from coordinator.app.citations import applicable_rule_id
 from coordinator.app.rule_checks import (
     RULE_CRT_SEMI_DAYS,
     RULE_CRT_URGENT_DAYS,
@@ -39,6 +42,8 @@ from coordinator.app.rule_checks import (
     check_tiebreak,
     evaluate_referral_rules,
 )
+
+_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "cohort_9004_2026-08-30.json"
 
 
 def _referral(pathway_number: str, **overrides: Any) -> dict[str, Any]:
@@ -149,6 +154,33 @@ def test_routine_and_excluded_referrals_get_no_crt_rule() -> None:
 
     assert _rule_ids(evaluate_referral_rules(routine)) == set()
     assert _rule_ids(evaluate_referral_rules(excluded)) == set()
+
+
+def test_applicable_rule_id_matches_evaluate_referral_rules_on_real_cohort() -> None:
+    """THE ADR-012 DRIFT TEST.
+
+    ADR-012 deliberately duplicates rule applicability between
+    `coordinator.app.citations.applicable_rule_id` (what a `timeframe`
+    citation names) and `coordinator.app.rule_checks.evaluate_referral_
+    rules` (what a rule check actually evaluates) -- the trade-off is
+    accepted, but nothing else catches the two drifting apart. A
+    placement citing one rule while its own rule check evaluates another
+    would be silently wrong: the audit trail and the compliance check
+    would disagree about which threshold applies.
+
+    Checked against every referral in the real 9004/2026-08-30 fixture,
+    not hand-built cases -- the two functions must agree on which rule(s)
+    apply for all 500 real referrals, not just the cases each was
+    individually tested against.
+    """
+    with _FIXTURE_PATH.open() as f:
+        cohort = json.load(f)["referrals"]
+
+    for referral in cohort:
+        evaluated_rule_ids = _rule_ids(evaluate_referral_rules(referral))
+        rule_id = applicable_rule_id(referral)
+        expected_rule_ids = {rule_id} if rule_id is not None else set()
+        assert evaluated_rule_ids == expected_rule_ids, referral["pathway_number"]
 
 
 def test_rule_order_and_tiebreak_pass_on_a_correctly_ordered_list() -> None:

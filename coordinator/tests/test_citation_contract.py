@@ -6,9 +6,8 @@ Tier 1 test, written before implementation, per
 
 from typing import get_args
 
-from retrieval.app.schemas import DecisionEvidenceType
-
 from coordinator.app.citations import ROLE_EVIDENCE_TYPES
+from retrieval.app.schemas import DecisionEvidenceType
 
 
 def test_role_evidence_types_are_valid_evidence_types() -> None:
@@ -28,12 +27,16 @@ def test_role_evidence_types_are_valid_evidence_types() -> None:
     `DecisionEvidenceType` -- the five original values plus `"score"`,
     `"referral_state"`, and `"rule"` (the last is one more than this
     coordinator emits; `citesTimeframeEvidence`'s ontology range already
-    permits a `Rule`, so retrieval left room for it).
+    permits a `Rule`, so retrieval left room for it). Per ADR-012, the
+    coordinator now uses that room: `timeframe` cites both `referral_state`
+    and `rule`, so `ROLE_EVIDENCE_TYPES` maps each role to a *tuple* of
+    evidence types rather than one.
 
-    This test therefore now validates `ROLE_EVIDENCE_TYPES` against
-    `DecisionEvidenceType`, the enum a `RankedPlacement` citation is
-    actually checked against, not `EvidenceType`, which only governs
-    `ScoreCitationIn` and was never the right enum for this test to import.
+    This test therefore now validates every evidence type in every role's
+    tuple against `DecisionEvidenceType`, the enum a `RankedPlacement`
+    citation is actually checked against, not `EvidenceType`, which only
+    governs `ScoreCitationIn` and was never the right enum for this test
+    to import.
 
     This test and `test_decision.py`'s
     `test_assembled_payload_validates_against_the_real_decision_in` are
@@ -44,8 +47,9 @@ def test_role_evidence_types_are_valid_evidence_types() -> None:
     """
     valid_evidence_types = get_args(DecisionEvidenceType)
 
-    for role, evidence_type in ROLE_EVIDENCE_TYPES.items():
-        assert evidence_type in valid_evidence_types, (
-            f"evidence_type {evidence_type!r} for role {role!r} is not "
-            f"in DecisionEvidenceType {valid_evidence_types!r}"
-        )
+    for role, evidence_types in ROLE_EVIDENCE_TYPES.items():
+        for evidence_type in evidence_types:
+            assert evidence_type in valid_evidence_types, (
+                f"evidence_type {evidence_type!r} for role {role!r} is not "
+                f"in DecisionEvidenceType {valid_evidence_types!r}"
+            )

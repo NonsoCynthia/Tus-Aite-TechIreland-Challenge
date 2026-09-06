@@ -2,10 +2,13 @@
 
 Per ADR-009 (`conductor/tracks/coordinating-agent_20260906/decisions.md`),
 the coordinator's real evidence for the `urgency`/`timeframe` citation
-roles (a `Score` node and a `ReferralState`) is not yet an accepted
-`EvidenceType` in `retrieval.app.schemas` -- a change request is open. This
-module builds against the intended enum by default, and offers a
-`legacy_citations` fallback that validates against today's `EvidenceType`.
+roles (a `Score` node, a `ReferralState`, and -- per ADR-012 -- a `Rule`)
+validates against `retrieval.app.schemas.DecisionEvidenceType`, resolved via
+a separate, wider `Literal` from `ScoreCitationIn`'s `EvidenceType` rather
+than a widened shared one. This module builds against that by default, and
+offers a `legacy_citations` fallback that cites the urgency agent's own
+evidence directly and omits `timeframe` entirely -- still a legitimate,
+tested choice, just no longer the only mode that validates.
 
 Per spec.md FR8, `rationale_summary` is the coordinator's own short,
 deterministic note -- never LLM output -- following `conductor/product-
@@ -20,7 +23,7 @@ under, and make a `207` (partial success) impossible to mistake for a `200`.
 from enum import Enum
 from typing import Any, Final
 
-from coordinator.app.citations import ROLE_EVIDENCE_TYPES
+from coordinator.app.citations import ROLE_EVIDENCE_TYPES, applicable_rule_id
 from coordinator.app.priority import ALPHA_MAX, ALPHA_MIN, CapacityDirection
 
 CPC_BAND_LABELS: Final[dict[int | None, str]] = {
@@ -43,12 +46,18 @@ def build_citations(
 ) -> list[dict[str, Any]]:
     """Builds the `DecisionCitationIn`-shaped citations for one referral.
 
-    Default mode emits `urgency` (evidence_type `"score"`) and
-    `timeframe` (evidence_type `"referral_state"`) per ADR-009, plus
-    `capacity` (a pass-through of the capacity agent's own citations,
-    already valid `bed_status`/`clinic_session` evidence). Every
-    `evidence_type` is read from `ROLE_EVIDENCE_TYPES`, never hardcoded
-    here.
+    Default mode emits `urgency` (evidence_type `"score"`) and, per
+    ADR-012, **two** `timeframe` citations: the `ReferralState` carrying
+    the wait itself (evidence_type `"referral_state"`), and, where a
+    CRT/turnaround rule applies to this referral, the `Rule` it is
+    measured against (evidence_type `"rule"`) -- so the audit trail names
+    both how long someone waited and what threshold that wait is judged
+    against. A referral with no applicable rule (Routine, Excluded, or
+    null-CPC not awaiting triage) cites only the `ReferralState`; no rule
+    is invented for it. Also emits `capacity` (a pass-through of the
+    capacity agent's own citations, already valid `bed_status`/
+    `clinic_session` evidence). Every `evidence_type` is read from
+    `ROLE_EVIDENCE_TYPES`, never hardcoded here.
 
     `legacy_citations=True` instead copies the urgency agent's own
     citations onto the `urgency` role and omits `timeframe` entirely
@@ -57,8 +66,8 @@ def build_citations(
 
     Args:
         referral: A ranked referral dict carrying `run_id`,
-            `hospital_hipe`, `pathway_number`, `referral_date`,
-            `urgency_citations` and `capacity_citations`.
+            `hospital_hipe`, `pathway_number`, `referral_date`, `cpc`,
+            `triage_status`, `urgency_citations` and `capacity_citations`.
         legacy_citations: Whether to use the fallback citation set.
 
     Returns:
@@ -92,16 +101,27 @@ def build_citations(
         f"{referral['hospital_hipe']}/{referral['pathway_number']}/{referral['referral_date']}"
     )
     urgency_citation = {
-        "evidence_type": ROLE_EVIDENCE_TYPES["urgency"],
+        "evidence_type": ROLE_EVIDENCE_TYPES["urgency"][0],
         "evidence_key": score_evidence_key,
         "role": "urgency",
     }
-    timeframe_citation = {
-        "evidence_type": ROLE_EVIDENCE_TYPES["timeframe"],
-        "evidence_key": referral_state_evidence_key,
-        "role": "timeframe",
-    }
-    return [urgency_citation, timeframe_citation, *capacity_citations]
+    timeframe_citations = [
+        {
+            "evidence_type": ROLE_EVIDENCE_TYPES["timeframe"][0],
+            "evidence_key": referral_state_evidence_key,
+            "role": "timeframe",
+        }
+    ]
+    rule_id = applicable_rule_id(referral)
+    if rule_id is not None:
+        timeframe_citations.append(
+            {
+                "evidence_type": ROLE_EVIDENCE_TYPES["timeframe"][1],
+                "evidence_key": rule_id,
+                "role": "timeframe",
+            }
+        )
+    return [urgency_citation, *timeframe_citations, *capacity_citations]
 
 
 _RATIONALE_DECIMAL_PLACES = 3
