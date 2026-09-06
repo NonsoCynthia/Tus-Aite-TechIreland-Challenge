@@ -98,6 +98,14 @@ ordering only ever happens within a band.
 never leaves the ordering entirely. Both are `modelled` parameters in the dataset's labelling sense:
 deliberate choices with a stated reason, not fitted quantities. No published source sets them.
 
+**Superseded in part by ADR-010:** `wait_normalised` is no longer min-max normalisation of
+`adjusted_wait_days` within band. The real 9004 cohort showed min-max compresses most of the queue
+into a narrow low band while a handful of outliers occupy the top, defeating the purpose of
+normalising at all. `wait_normalised` is now the referral's percentile rank within its band — see
+ADR-010 for the data and the replacement. The rest of this ADR's reasoning (capacity in the
+weights, not the values; scarcity computed once per decision; `α_min`/`α_max` values) is unaffected
+and stands as written above.
+
 **Rationale:** This is the move the scarce-resource-allocation literature makes. Under crisis
 standards of care, the excess mortality that first-come-first-served would produce is mitigated by
 shifting to formal triage protocols based on patient status and potential benefit, and
@@ -249,3 +257,38 @@ triage happened, not how long someone waited against their CRT.
 **Trade-off accepted:** The coordinator ships against an enum that does not yet validate, so early
 runs surface a `422` until the retrieval service is updated — an explicit, tracked gap rather than a
 silently wrong citation.
+
+---
+
+### ADR-010: `wait_normalised` uses percentile rank within band, not min-max
+
+**Date:** 2026-09-06
+**Status:** accepted
+
+**Context:** ADR-005 specified min-max normalisation of `adjusted_wait_days` within band. The real
+9004/2026-08-30 cohort shows why that fails. Every band runs from 0 to roughly 870 days with a
+median around 150-180, so min-max puts the median referral at about 0.18 and compresses the bulk of
+the queue into the bottom fifth of the range while a handful of 800+ day referrals occupy the top.
+Per band (min/median/max, in days): `cpc 1` (n=131) 0/158/849, `cpc 2` (n=141) 0/179/893, `cpc 3`
+(n=133) 0/151/871, null (n=95) 0/135/887. The distribution is right-skewed by construction — the
+generator draws from NTPF's published band distribution, and that skew is a preserved property of
+the data, not an artefact.
+
+**Decision:** `wait_normalised` is the referral's percentile rank among the waits in its own band,
+scaled 0 to 1. Ties share a percentile — this is specified and tested, since letting rank depend on
+input order would break NFR4 determinism.
+
+**Rationale:** Percentile rank measures position among peers rather than distance from the single
+longest waiter, so one outlier cannot flatten the band. It restores a full 0-1 spread, without which
+`α` has nothing to trade and ADR-005's mechanism is decorative. It is also directly explainable —
+"waited longer than 70% of others in their category" — which matters because it reaches the
+clinician through `rationale_summary` (FR8).
+
+**Rejected alternative:** log-scaled min-max, which keeps magnitude and puts the median near 0.55,
+but produces a number no clinician can state plainly. Recorded here as the fallback if magnitude is
+later judged clinically necessary.
+
+**Trade-off accepted:** Percentile rank discards magnitude, so a 400-day and an 800-day wait become
+adjacent ranks when nothing sits between them. In bands of 130+ referrals from a continuous
+distribution this is rare, and the ordering remains correct, only not proportionate.
+`wait_normalised` is used for sorting and is never displayed as a number.
