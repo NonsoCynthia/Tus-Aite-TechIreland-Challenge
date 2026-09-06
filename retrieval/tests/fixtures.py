@@ -18,6 +18,12 @@ from datetime import date, timedelta
 
 VALID_AGENT_NAMES = ("urgency", "capacity")
 VALID_EVIDENCE_TYPES = ("observation", "condition", "triage_event", "bed_status", "clinic_session")
+# ADR-009: decision_citations.evidence_type carries no CHECK (unlike
+# agent_citations' ac_evidence_type_valid, which VALID_EVIDENCE_TYPES above
+# mirrors) -- app.schemas.DecisionEvidenceType is this project's own,
+# ontology-backed superset, mirrored here for the same reason
+# VALID_EVIDENCE_TYPES mirrors the SQL CHECK.
+VALID_DECISION_EVIDENCE_TYPES = VALID_EVIDENCE_TYPES + ("score", "referral_state", "rule")
 VALID_CITATION_ROLES = ("urgency", "capacity", "timeframe", "multi_list")
 
 # Must exist in core.ref_rules -- agent.rule_checks.rule_id is a hard FK to it
@@ -45,12 +51,21 @@ def _pathway_number(rng: random.Random, hospital_hipe: str) -> str:
 
 
 def _evidence_key(
-    rng: random.Random, evidence_type: str, hospital_hipe: str, pathway_number: str
+    rng: random.Random,
+    evidence_type: str,
+    hospital_hipe: str,
+    pathway_number: str,
+    *,
+    run_id: str | None = None,
 ) -> str:
     """The composite-key suffix app.iri.evidence_iri expects -- shaped to
     match each evidence class's own template in namespaces.md #4, not an
     opaque placeholder. See app/iri.py's evidence_iri docstring for the
     confirmed convention this mirrors.
+
+    `run_id` is only needed for the 'score' evidence_type (ADR-009,
+    decision-citation-only) -- callers citing clinical evidence types never
+    pass it.
     """
     if evidence_type == "observation":
         obs_datetime = (_BASE_DATE - timedelta(days=rng.randint(0, 10))).isoformat()
@@ -69,6 +84,15 @@ def _evidence_key(
         clinic_code = f"CL{rng.randint(1, 20):02d}"
         session_date = (_BASE_DATE - timedelta(days=rng.randint(0, 10))).isoformat()
         return f"{hospital_hipe}/{clinic_code}/{session_date}"
+    if evidence_type == "score":
+        assert run_id is not None, "'score' evidence_key needs run_id"
+        agent_name = rng.choice(VALID_AGENT_NAMES)
+        return f"{run_id}/{hospital_hipe}/{pathway_number}/{agent_name}"
+    if evidence_type == "referral_state":
+        valid_from = (_BASE_DATE - timedelta(days=rng.randint(0, 10))).isoformat()
+        return f"{hospital_hipe}/{pathway_number}/{valid_from}"
+    if evidence_type == "rule":
+        return rng.choice(VALID_RULE_IDS)
     raise ValueError(f"unknown evidence_type: {evidence_type!r}")
 
 
@@ -158,11 +182,11 @@ def make_decision(
         n_citations = rng.randint(1, 2)
         citation_list: list[tuple[str, str, str]] = []
         for _ in range(n_citations):
-            evidence_type = rng.choice(VALID_EVIDENCE_TYPES)
+            evidence_type = rng.choice(VALID_DECISION_EVIDENCE_TYPES)
             citation_list.append(
                 (
                     evidence_type,
-                    _evidence_key(rng, evidence_type, hospital_hipe, pathway_number),
+                    _evidence_key(rng, evidence_type, hospital_hipe, pathway_number, run_id=run_id),
                     rng.choice(VALID_CITATION_ROLES),
                 )
             )

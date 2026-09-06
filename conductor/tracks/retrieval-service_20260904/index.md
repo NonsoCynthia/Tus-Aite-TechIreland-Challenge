@@ -56,9 +56,16 @@ Deliberately does not recompute scores or re-rank; that stays the agents' judgem
 labelled "agent input" (grouped with FR9/FR10). Corrected everywhere — it's clinician/hospital UI input,
 not agent input; no functional change, description/labelling only.
 
-**Final state:** 411 tests, 97% coverage on `app/`, 19 acceptance criteria met against the running
-system, `ruff`/`mypy` clean. See [`retrieval/README.md`](../../../retrieval/README.md) for the full
-endpoint list, consumer walkthrough, and how to run it.
+**Reopened, ADR-009.** `coordinating-agent_20260906` raised a real gap at their own Phase 1: `EvidenceType`
+could express what a `Score` cites but not what a `RankedPlacement` cites (the agent's own `Score` node for
+urgency/capacity; a `ReferralState`/`Rule` node, not a `triage_event`, for a CRT-breach-driven timeframe
+position). Added a separate `DecisionEvidenceType` for `DecisionCitationIn.evidence_type` only
+(`ScoreCitationIn` unchanged) — see [`decisions.md`](./decisions.md) for the full reasoning, including two
+things the ontology already sanctioned that the original request missed.
+
+**Final state:** 411 tests (+ new evidence-type coverage), 97% coverage on `app/`, 19 acceptance criteria
+met against the running system, `ruff`/`mypy` clean. See [`retrieval/README.md`](../../../retrieval/README.md)
+for the full endpoint list, consumer walkthrough, and how to run it.
 
 Completing this track resolves the blocker recorded against
 [`explainable-agent-based-triage_20260828`](../explainable-agent-based-triage_20260828/index.md) — its
@@ -69,6 +76,7 @@ than writing to Postgres or the graph directly.
 
 - [Specification](./spec.md) — requirements (FR1-FR11) and 19 acceptance criteria
 - [Plan](./plan.md) — nine phases plus two post-completion sections, TDD-structured
+- [Decisions](./decisions.md) — ADR-009 (decision-citation evidence types)
 - [Metadata](./metadata.json)
 
 ## Phases

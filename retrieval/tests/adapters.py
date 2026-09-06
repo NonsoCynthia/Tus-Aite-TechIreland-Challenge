@@ -12,6 +12,7 @@ from app.schemas import (
     AgentName,
     CitationRole,
     DecisionCitationIn,
+    DecisionEvidenceType,
     DecisionIn,
     EvidenceType,
     OverrideIn,
@@ -64,7 +65,7 @@ def to_decision_in(payload: DecisionPayload) -> DecisionIn:
                 rationale_summary=ranking.rationale_summary,
                 citations=[
                     DecisionCitationIn(
-                        evidence_type=cast(EvidenceType, et),
+                        evidence_type=cast(DecisionEvidenceType, et),
                         evidence_key=key,
                         role=cast(CitationRole, role),
                     )
