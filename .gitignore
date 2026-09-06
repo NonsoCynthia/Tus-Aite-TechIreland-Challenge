@@ -13,3 +13,5 @@ kg/.venv/
 
 **/.env
 **/.venv/
+**/.pytest_cache/
+**/.coverage

@@ -1,0 +1,6 @@
+# Bounds on first install; pin exact versions once the install is known good,
+# matching retrieval/requirements.txt's convention.
+pydantic>=2.9
+pydantic-settings>=2.5
+httpx>=0.27
+PyYAML>=6.0

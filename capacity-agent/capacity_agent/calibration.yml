@@ -1,0 +1,40 @@
+# Capacity agent scoring weights (spec.md FR2) -- committed, inspectable
+# config rather than hidden constants, per product.md's Calibration
+# Configuration principle. A compliance reviewer or clinician can read and
+# adjust these without touching code; capacity_agent.calibration validates
+# them before a run.
+#
+# capacity_score is a resource-PRESSURE score, same polarity as the urgency
+# agent's score: 0.0 = ample capacity, no constraint pressure; 1.0 = severe
+# constraint pressure (see capacity_agent/scoring.py's module docstring for
+# the full rationale -- this is a documented design decision, not specified
+# by proposal/spec.md, recorded in this track's decisions.md).
+
+# ward_pressure = occupancy_weight * (occupancy_pct / 100)
+#               + escalation_weight * escalation_component
+# Must sum to 1.0.
+occupancy_weight: 0.6
+escalation_weight: 0.4
+
+# escalation_component is the weighted sum of which of these trolley/surge
+# flags are non-zero on the ward's latest BedStatus snapshot (graph-foundation
+# _20260826's own finding: overcrowding is carried on these fields, never on
+# occupancy_pct alone, which the bs_occupancy_range CHECK caps at 100 by
+# construction). Weights must sum to 1.0.
+escalation_triggers:
+  surge_capacity_in_use: 0.4
+  delayed_transfers_of_care: 0.3
+  awaiting_admission_over_24h: 0.2
+  outliers: 0.1
+
+# capacity_score = ward_weight * ward_pressure + clinic_weight * clinic_pressure
+# (renormalised over whichever signal is actually available -- see
+# scoring.py:score_capacity). Must sum to 1.0.
+ward_weight: 0.7
+clinic_weight: 0.3
+
+# Free-text identifier written to agent_scores.method / agent_version --
+# bump when the weights above change, so a historical score stays
+# reproducible against the calibration that actually produced it.
+method: "capacity-ward-clinic-pressure-v1"
+agent_version: "capacity-agent-0.1.0"
