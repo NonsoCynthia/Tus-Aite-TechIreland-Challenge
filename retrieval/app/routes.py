@@ -131,7 +131,19 @@ async def create_override(payload: OverrideIn) -> JSONResponse | dict[str, str]:
     except psycopg.Error as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    as_of_date = db.get_decision_as_of_date(payload.decision_id)
+    try:
+        as_of_date = db.get_decision_as_of_date(payload.decision_id)
+    except (psycopg.Error, ValueError) as exc:
+        # decision_id is FK-enforced against agent.decisions (migration 006), so
+        # insert_override succeeding already guarantees the row exists -- a
+        # failure here is a fresh connection/transient error, not a missing
+        # decision. The override row already committed, so this is the same
+        # partial-failure shape as a graph-push failure, not a fresh 400/500.
+        logger.exception(
+            "could not resolve decision as_of_date after Postgres commit: override %s",
+            payload.override_id,
+        )
+        return _projection_failed_response(str(exc))
     triples = graph.override_triples(payload, as_of_date)
     try:
         await graph.push_triples(triples, iri.overrides_graph())

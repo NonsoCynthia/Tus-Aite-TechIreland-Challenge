@@ -94,7 +94,10 @@ def _wrap_wait_counters_query(referral_iri: str, as_of_date: date) -> str:
 async def wait_counters(
     hospital_hipe: str, pathway_number: str, as_of_date: date = Query(...)
 ) -> dict[str, Any]:
-    referral = iri.referral_iri(hospital_hipe, pathway_number)
+    try:
+        referral = iri.referral_iri(hospital_hipe, pathway_number)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     query = _wrap_wait_counters_query(referral, as_of_date)
     bindings = await _sparql_select(query)
     if not bindings:
@@ -270,7 +273,10 @@ async def evidence_for_placement(
     pathway_number: str,
     role: CitationRole | None = None,
 ) -> dict[str, Any]:
-    placement = iri.placement_iri(hospital_hipe, as_of_date.isoformat(), pathway_number)
+    try:
+        placement = iri.placement_iri(hospital_hipe, as_of_date.isoformat(), pathway_number)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     return {
         "placement": iri.short(placement),
         "evidence": await _evidence_for_placement(placement, role),
@@ -293,7 +299,10 @@ async def evidence_for_placement(
     ),
 )
 async def get_decision(hospital_hipe: str, as_of_date: date) -> dict[str, Any]:
-    decision = iri.decision_iri(hospital_hipe, as_of_date.isoformat())
+    try:
+        decision = iri.decision_iri(hospital_hipe, as_of_date.isoformat())
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     query = (
         f"PREFIX eat: <{iri.EAT_NS}>\n"
         "SELECT ?placement ?position ?referral WHERE {\n"

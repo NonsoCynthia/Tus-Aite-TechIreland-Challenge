@@ -10,6 +10,8 @@ convention rather than left unimplemented -- see the docstring on each.
 
 from __future__ import annotations
 
+import re
+
 EAT_NS = "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#"
 EATD_NS = "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/"
 GRAPH_BASE = "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/graph/"
@@ -52,6 +54,23 @@ _EVIDENCE_SEGMENT = {
     "referral_state": "referral-state",
     "rule": "rule",
 }
+
+
+# Every *_iri() builder below embeds caller-supplied identifiers straight into
+# a SPARQL IRIREF (`<...>`) with no further escaping -- namespaces.md's
+# templates assume plain identifiers, not arbitrary text. IRIREF's own grammar
+# forbids control chars, whitespace, and <>"{}|^`\ inside the angle brackets;
+# validate_segment() enforces exactly that set so a caller-supplied value (a
+# pathway_number, run_id, etc. -- from a validated Pydantic payload on the
+# write side, or a raw URL path parameter on the read side) can never break
+# out of the `<...>` token and inject or corrupt arbitrary triples.
+_UNSAFE_SEGMENT_CHARS = re.compile(r'[\x00-\x20<>"{}|^`\\]')
+
+
+def validate_segment(value: str) -> str:
+    if not value or _UNSAFE_SEGMENT_CHARS.search(value):
+        raise ValueError(f"value is not safe to embed in an IRI: {value!r}")
+    return value
 
 
 def eat(term: str) -> str:
@@ -111,27 +130,30 @@ def short(value: str) -> str:
 
 
 def referral_iri(hospital_hipe: str, pathway_number: str) -> str:
-    return eatd(f"referral/{hospital_hipe}/{pathway_number}")
+    return eatd(f"referral/{validate_segment(hospital_hipe)}/{validate_segment(pathway_number)}")
 
 
 def referral_state_iri(hospital_hipe: str, pathway_number: str, valid_from: str) -> str:
-    return eatd(f"referral-state/{hospital_hipe}/{pathway_number}/{valid_from}")
+    return eatd(
+        f"referral-state/{validate_segment(hospital_hipe)}/{validate_segment(pathway_number)}/"
+        f"{validate_segment(valid_from)}"
+    )
 
 
 def patient_iri(hospital_hipe: str, patient_id: str) -> str:
-    return eatd(f"patient/{hospital_hipe}/{patient_id}")
+    return eatd(f"patient/{validate_segment(hospital_hipe)}/{validate_segment(patient_id)}")
 
 
 def person_iri(ihi_number: str) -> str:
-    return eatd(f"person/{ihi_number}")
+    return eatd(f"person/{validate_segment(ihi_number)}")
 
 
 def hospital_iri(hospital_hipe: str) -> str:
-    return eatd(f"hospital/{hospital_hipe}")
+    return eatd(f"hospital/{validate_segment(hospital_hipe)}")
 
 
 def service_iri(hospital_hipe: str, specialty_hipe: str) -> str:
-    return eatd(f"service/{hospital_hipe}/{specialty_hipe}")
+    return eatd(f"service/{validate_segment(hospital_hipe)}/{validate_segment(specialty_hipe)}")
 
 
 def concept_iri(code_table: str, code_value: int) -> str:
@@ -141,31 +163,43 @@ def concept_iri(code_table: str, code_value: int) -> str:
     never literals. Referenced only, never re-minted with its own type/
     label triples here -- the batch mapping (reference_layer.rml.ttl)
     already projects the full ConceptScheme for every code_table."""
-    return eatd(f"{code_table}/{code_value}")
+    return eatd(f"{validate_segment(code_table)}/{code_value}")
 
 
 def rule_iri(rule_id: str) -> str:
-    return eatd(f"rule/{rule_id}")
+    return eatd(f"rule/{validate_segment(rule_id)}")
 
 
 def score_iri(run_id: str, hospital_hipe: str, pathway_number: str, agent_name: str) -> str:
-    return eatd(f"score/{run_id}/{hospital_hipe}/{pathway_number}/{agent_name}")
+    return eatd(
+        f"score/{validate_segment(run_id)}/{validate_segment(hospital_hipe)}/"
+        f"{validate_segment(pathway_number)}/{validate_segment(agent_name)}"
+    )
 
 
 def decision_iri(hospital_hipe: str, as_of_date: str) -> str:
-    return eatd(f"decision/{hospital_hipe}/{as_of_date}")
+    return eatd(f"decision/{validate_segment(hospital_hipe)}/{validate_segment(as_of_date)}")
 
 
 def placement_iri(hospital_hipe: str, as_of_date: str, pathway_number: str) -> str:
-    return eatd(f"placement/{hospital_hipe}/{as_of_date}/{pathway_number}")
+    return eatd(
+        f"placement/{validate_segment(hospital_hipe)}/{validate_segment(as_of_date)}/"
+        f"{validate_segment(pathway_number)}"
+    )
 
 
 def rule_check_iri(run_id: str, hospital_hipe: str, pathway_number: str, rule_id: str) -> str:
-    return eatd(f"rule-check/{run_id}/{hospital_hipe}/{pathway_number}/{rule_id}")
+    return eatd(
+        f"rule-check/{validate_segment(run_id)}/{validate_segment(hospital_hipe)}/"
+        f"{validate_segment(pathway_number)}/{validate_segment(rule_id)}"
+    )
 
 
 def override_iri(hospital_hipe: str, as_of_date: str, pathway_number: str, override_id: str) -> str:
-    return eatd(f"override/{hospital_hipe}/{as_of_date}/{pathway_number}/{override_id}")
+    return eatd(
+        f"override/{validate_segment(hospital_hipe)}/{validate_segment(as_of_date)}/"
+        f"{validate_segment(pathway_number)}/{validate_segment(override_id)}"
+    )
 
 
 def evidence_iri(evidence_type: str, evidence_key: str) -> str:
@@ -193,7 +227,7 @@ def evidence_iri(evidence_type: str, evidence_key: str) -> str:
         segment = _EVIDENCE_SEGMENT[evidence_type]
     except KeyError as exc:
         raise ValueError(f"unknown evidence_type: {evidence_type!r}") from exc
-    return eatd(f"{segment}/{evidence_key}")
+    return eatd(f"{segment}/{validate_segment(evidence_key)}")
 
 
 def agent_iri(agent_name: str) -> str:
@@ -203,7 +237,7 @@ def agent_iri(agent_name: str) -> str:
     already a separate literal property (eat:agentVersion /
     coordinator_version), so it doesn't belong in the identity IRI too.
     """
-    return eatd(f"agent/{agent_name}")
+    return eatd(f"agent/{validate_segment(agent_name)}")
 
 
 def score_activity_iri(run_id: str, agent_name: str) -> str:
@@ -211,7 +245,7 @@ def score_activity_iri(run_id: str, agent_name: str) -> str:
     in that run shares the one execution that produced them, per
     prov:wasGeneratedBy's cardinality-1-per-node (not cardinality-1 overall).
     """
-    return eatd(f"activity/{run_id}/{agent_name}")
+    return eatd(f"activity/{validate_segment(run_id)}/{validate_segment(agent_name)}")
 
 
 def decision_activity_iri(run_id: str, hospital_hipe: str, as_of_date: str) -> str:
@@ -220,11 +254,14 @@ def decision_activity_iri(run_id: str, hospital_hipe: str, as_of_date: str) -> s
     share this same activity -- they're produced by the same coordinator run,
     not a separate rule-checking agent.
     """
-    return eatd(f"activity/{run_id}/coordinator/{hospital_hipe}/{as_of_date}")
+    return eatd(
+        f"activity/{validate_segment(run_id)}/coordinator/{validate_segment(hospital_hipe)}/"
+        f"{validate_segment(as_of_date)}"
+    )
 
 
 def run_graph(run_id: str) -> str:
-    return f"{GRAPH_BASE}run/{run_id}"
+    return f"{GRAPH_BASE}run/{validate_segment(run_id)}"
 
 
 def overrides_graph() -> str:

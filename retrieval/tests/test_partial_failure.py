@@ -14,7 +14,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from app import graph
+from app import db, graph
 from app.config import settings
 from app.main import app
 from tests.adapters import to_decision_in, to_override_in, to_score_in
@@ -104,6 +104,41 @@ def test_override_row_persists_when_graph_projection_fails(
     monkeypatch.setattr(graph, "push_triples", _boom)
 
     override_payload = to_override_in(make_override(3, decision=decision))
+    response = client.post(
+        "/overrides", json=override_payload.model_dump(mode="json"), headers=auth_headers
+    )
+
+    assert response.status_code == 207
+    assert response.json()["status"] == "postgres_committed_graph_projection_failed"
+    with _pg_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM agent.overrides WHERE override_id = %s",
+            (override_payload.override_id,),
+        ).fetchone()
+    assert row is not None
+
+
+def test_override_row_persists_when_as_of_date_lookup_fails(
+    client: TestClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """decision_id is FK-enforced against agent.decisions (migration 006), so
+    a successful insert_override guarantees the row exists -- a failure in
+    the as_of_date lookup that follows is a fresh connection/transient error,
+    not a missing decision. Before this fix, that raised uncaught out of
+    create_override (routes.py) as a bare 500, with no indication the
+    override row had already committed; it must report the same 207
+    partial-failure contract as a graph-push failure instead."""
+    run_id = _run_id()
+    decision = make_decision(5, run_id=run_id, cohort_size=1)
+    decision_payload = to_decision_in(decision)
+    client.post("/decisions", json=decision_payload.model_dump(mode="json"), headers=auth_headers)
+
+    def _boom(decision_id: str) -> object:
+        raise psycopg.OperationalError("simulated connection failure")
+
+    monkeypatch.setattr(db, "get_decision_as_of_date", _boom)
+
+    override_payload = to_override_in(make_override(5, decision=decision))
     response = client.post(
         "/overrides", json=override_payload.model_dump(mode="json"), headers=auth_headers
     )

@@ -97,6 +97,54 @@ def test_overrides_graph() -> None:
     assert iri.overrides_graph() == f"{GRAPH_BASE}overrides"
 
 
+def test_validate_segment_rejects_sparql_iriref_breakout_chars() -> None:
+    import pytest
+
+    # `>` closes a SPARQL IRIREF early -- a caller-supplied value containing
+    # one could otherwise break out of `<...>` and inject arbitrary SPARQL
+    # into an INSERT DATA/SELECT built by string interpolation (graph.py,
+    # reads.py). Each of IRIREF's own forbidden characters is checked.
+    for bad in [
+        "9001> } INSERT DATA { <http://evil> <http://evil> <http://evil>",
+        'PW-1"',
+        "PW-1{",
+        "PW-1}",
+        "PW-1|",
+        "PW-1^",
+        "PW-1`",
+        "PW-1\\",
+        "PW-1\n",
+        "PW-1 with space",
+        "",
+    ]:
+        with pytest.raises(ValueError):
+            iri.validate_segment(bad)
+
+
+def test_validate_segment_accepts_ordinary_identifiers_and_percent_encoding() -> None:
+    for good in [
+        "9001",
+        "PW-9001-000007",
+        "run-2026-09-04-001",
+        "9001/PW-9001-000007/2026-08-16%2009%3A16%3A00/hr",
+    ]:
+        assert iri.validate_segment(good) == good
+
+
+def test_iri_builders_reject_an_injection_attempt_in_any_segment() -> None:
+    import pytest
+
+    payload = "9001> } INSERT DATA { GRAPH <http://evil> { <http://e> <http://e> <http://e> } } #"
+    with pytest.raises(ValueError):
+        iri.referral_iri(payload, "PW-9001-000007")
+    with pytest.raises(ValueError):
+        iri.referral_iri("9001", payload)
+    with pytest.raises(ValueError):
+        iri.score_iri("run-0001", "9001", "PW-9001-000007", payload)
+    with pytest.raises(ValueError):
+        iri.evidence_iri("observation", payload)
+
+
 def test_no_iri_contains_an_unescaped_prefixed_form() -> None:
     # Every function here returns a full IRI string, so none of them can
     # produce the "eatd:referral/9001/..." form namespaces.md #3 forbids in
