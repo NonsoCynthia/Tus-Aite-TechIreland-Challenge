@@ -21,7 +21,7 @@ from enum import Enum
 from typing import Any, Final
 
 from coordinator.app.citations import ROLE_EVIDENCE_TYPES
-from coordinator.app.priority import CapacityDirection
+from coordinator.app.priority import ALPHA_MAX, ALPHA_MIN, CapacityDirection
 
 CPC_BAND_LABELS: Final[dict[int | None, str]] = {
     1: "Urgent",
@@ -104,17 +104,54 @@ def build_citations(
     return [urgency_citation, timeframe_citation, *capacity_citations]
 
 
-def build_rationale_summary(referral: dict[str, Any]) -> str:
+_RATIONALE_DECIMAL_PLACES = 3
+
+
+def _alpha_weight_phrase(alpha: float, alpha_min: float, alpha_max: float) -> str:
+    """Describes alpha in plain language a clinician can act on.
+
+    Args:
+        alpha: The urgency/wait weight in force for this decision.
+        alpha_min: The lower bound alpha was drawn from.
+        alpha_max: The upper bound alpha was drawn from.
+
+    Returns:
+        A phrase naming where alpha sits in its range, not its numeric
+        value -- the number itself is a parameter, not something a
+        clinician can act on. The numeric value stays in
+        `coordinator_version` for audit, so nothing is lost.
+    """
+    midpoint = (alpha_min + alpha_max) / 2
+    if alpha >= midpoint:
+        return "urgency weighted more heavily than waiting time, reflecting pressure on capacity"
+    return "urgency and waiting time weighted more evenly, reflecting slack in capacity"
+
+
+def build_rationale_summary(
+    referral: dict[str, Any],
+    *,
+    alpha_min: float = ALPHA_MIN,
+    alpha_max: float = ALPHA_MAX,
+) -> str:
     """Builds the coordinator's own short, deterministic rationale.
 
-    States only band, breach status, the two scores and the weight in
-    force -- nothing beyond what `build_citations` cites for this
-    referral. Follows `conductor/product-guidelines.md`'s verb rules: the
-    system ranks and explains, it never admits, schedules or acts.
+    States only band, breach status (with its magnitude, if breached),
+    the two scores and the weight in force -- nothing beyond what
+    `build_citations` cites for this referral. Follows `conductor/
+    product-guidelines.md`'s verb rules: the system ranks and explains,
+    it never admits, schedules or acts.
+
+    Displayed numbers are rounded to `_RATIONALE_DECIMAL_PLACES` for
+    readability only -- this never touches the values used in the sort
+    key or written to `RankingIn` fields.
 
     Args:
         referral: A ranked referral dict carrying `cpc`, `crt_breached`,
-            `urgency_score`, `capacity_score` and `alpha`.
+            `urgency_score`, `capacity_score`, `alpha`, and (when
+            `crt_breached` is `True`) `adjusted_wait_days` and
+            `crt_threshold_days`.
+        alpha_min: The lower alpha bound in force for this decision.
+        alpha_max: The upper alpha bound in force for this decision.
 
     Returns:
         A single deterministic sentence.
@@ -123,17 +160,21 @@ def build_rationale_summary(referral: dict[str, Any]) -> str:
 
     crt_breached = referral.get("crt_breached")
     if crt_breached is True:
-        breach_clause = "outside the applicable CRT window"
+        days_over = referral["adjusted_wait_days"] - referral["crt_threshold_days"]
+        breach_clause = f"outside the applicable CRT window by {days_over} days"
     elif crt_breached is False:
         breach_clause = "within the applicable CRT window"
     else:
         breach_clause = "no CRT window applies to this category"
 
+    urgency_score = round(referral["urgency_score"], _RATIONALE_DECIMAL_PLACES)
+    capacity_score = round(referral["capacity_score"], _RATIONALE_DECIMAL_PLACES)
+    weight_phrase = _alpha_weight_phrase(referral["alpha"], alpha_min, alpha_max)
+
     return (
         f"Ranked. {band_label} category, {breach_clause}. "
-        f"Urgency score {referral['urgency_score']}, capacity score "
-        f"{referral['capacity_score']}, urgency weighted at {referral['alpha']} "
-        f"for this decision."
+        f"Urgency score {urgency_score}, capacity score {capacity_score}, "
+        f"{weight_phrase} for this decision."
     )
 
 

@@ -39,12 +39,12 @@ never called; `interpret_decision_response` is tested against bare status
 codes, not a live response.
 """
 
+import re
 from datetime import date
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
-from retrieval.app.schemas import DecisionIn
 
 from coordinator.app.citations import ROLE_EVIDENCE_TYPES
 from coordinator.app.decision import (
@@ -56,6 +56,7 @@ from coordinator.app.decision import (
     build_rationale_summary,
     interpret_decision_response,
 )
+from retrieval.app.schemas import DecisionIn
 
 # Verbs product-guidelines.md's Verbs table names as implying system action
 # on the patient, or a diagnostic/corrective claim -- rationale_summary
@@ -94,6 +95,8 @@ def _referral(pathway_number: str, **overrides: Any) -> dict[str, Any]:
         "cpc": 1,
         "band": 1,
         "crt_breached": True,
+        "adjusted_wait_days": 41,
+        "crt_threshold_days": 28,
         "referral_date": "2026-08-01",
         "urgency_score": 0.8,
         "capacity_score": 0.4,
@@ -212,7 +215,6 @@ def test_rationale_summary_states_only_what_ranking_used() -> None:
 
     assert "0.8" in summary
     assert "0.4" in summary
-    assert "0.7" in summary
     assert "1" in summary or "urgent" in summary.lower()
 
 
@@ -247,6 +249,50 @@ def test_rationale_summary_never_contains_a_raw_cpc_code() -> None:
             # weight "0.7" is fine, but a bare/standalone digit token
             # naming the cpc code itself must never appear.
             assert f"CPC {raw_code}" not in summary
+
+
+def test_rationale_summary_rounds_displayed_floats_to_three_decimal_places() -> None:
+    """Displayed scores are rounded to 3 decimal places for readability --
+    floating-point noise like `0.6333333333333333` or `0.7000000000000001`
+    must never reach a clinical screen. Rounding is display-only: it must
+    not touch the values that enter the sort key or `RankingIn` fields
+    (checked separately by `build_ranking`'s own tests, which assert the
+    unrounded scores)."""
+    referral = _referral(
+        "PW-1",
+        urgency_score=0.6333333333333333,
+        capacity_score=0.7000000000000001,
+        alpha=0.6666666666666667,
+    )
+    summary = build_rationale_summary(referral)
+
+    for match in re.findall(r"\d+\.\d+", summary):
+        decimal_places = len(match.split(".")[1])
+        assert decimal_places <= 3, f"{match!r} in rationale has more than 3 decimal places"
+
+
+def test_rationale_summary_never_names_the_bare_alpha_value() -> None:
+    """`rationale_summary` describes alpha in plain language a clinician
+    can act on, never the internal numeric parameter -- the number stays
+    in `coordinator_version` for audit (spec.md FR8, FR9)."""
+    distinctive_alpha = 0.734
+    referral = _referral("PW-1", alpha=distinctive_alpha)
+    summary = build_rationale_summary(referral)
+
+    assert str(distinctive_alpha) not in summary
+    assert "weighted" in summary.lower()
+
+
+def test_rationale_summary_names_days_over_threshold_for_a_breach() -> None:
+    """A breached referral's summary names its days over threshold,
+    sourced from `adjusted_wait_days` against `crt_threshold_days` --
+    "outside the CRT window" alone doesn't distinguish a referral 1 day
+    over from one 800 days over."""
+    referral = _referral("PW-1", crt_breached=True, adjusted_wait_days=41, crt_threshold_days=28)
+    summary = build_rationale_summary(referral)
+
+    assert "13" in summary
+    assert "days" in summary.lower()
 
 
 @pytest.mark.parametrize(
