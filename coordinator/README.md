@@ -22,6 +22,14 @@ deterministic note).
 Full spec, plan and ADRs:
 [`conductor/tracks/coordinating-agent_20260906/`](../conductor/tracks/coordinating-agent_20260906/).
 
+## Documentation
+
+| | |
+|---|---|
+| [docs/RUNNING_THE_COORDINATOR.md](docs/RUNNING_THE_COORDINATOR.md) | **Start here.** Everything needed to go from a fresh clone to a ranked, inspectable decision |
+| [docs/HOW_THE_COORDINATOR_WAS_BUILT.md](docs/HOW_THE_COORDINATOR_WAS_BUILT.md) | The tech stack and why each piece, the design decisions, what the build disproved, what is still open |
+| [docs/BUILDING_AN_AGENT_WITH_CONDUCTOR.md](docs/BUILDING_AN_AGENT_WITH_CONDUCTOR.md) | The process this agent was built with, for the urgency/capacity/rationale agents to follow |
+
 ## Running
 
 This agent has no server process -- it is a CLI, run once per hospital-day:
@@ -104,6 +112,47 @@ touched.
   `test_assembled_payload_fails_real_decision_in_validation_today` is the same signal from the
   opposite side -- it passes today and is expected to go red on the same event, which is the
   handoff working as intended, not a regression.)
+
+## Pending decisions
+
+None of these is an engineering task. Condensed from
+[`docs/HOW_THE_COORDINATOR_WAS_BUILT.md` §7](docs/HOW_THE_COORDINATOR_WAS_BUILT.md#7-what-is-still-open)
+— see there and
+[the track's `decisions.md`](../conductor/tracks/coordinating-agent_20260906/decisions.md) for the
+full reasoning.
+
+**ADR-007 — capacity sign convention**
+- Owned by: the capacity agent's author.
+- Meanwhile: `--capacity-direction` is required with no default; every decision records which
+  convention it used.
+- Risk if unresolved: read backwards, urgency is weighted *least* when the hospital is under most
+  pressure, with every number still in range and every ranking still plausible.
+- On resolution: the convention becomes the documented default; the flag stays required, but the
+  guesswork disappears.
+
+**ADR-009 — the `EvidenceType` change request**
+- Owned by: the retrieval service's author.
+- Meanwhile: `--legacy-citations` cites the urgency agent's own evidence directly (validates today,
+  one hop shallower than intended); default mode cites the `Score`/`ReferralState` nodes it should,
+  and fails validation until the enum is widened.
+- Risk if unresolved: the audit trail stays one hop shallower than designed; no correctness risk.
+- On resolution: two tests flip in opposite directions on the same event (see above);
+  `--legacy-citations` is removed from the documented invocation.
+
+**ADR-011 — CRT breach as a hard tier above clinical priority**
+- Owned by: clinical and compliance review.
+- Meanwhile: the code implements the hard tier, per FR3 — within a band, every breached referral
+  outranks every non-breached one at any score.
+- Risk if unresolved: never decided on purpose (FR3 predates scoring, ADR-004 inserted priority
+  below it unasked); in the real 9004 cohort this puts 14 non-breached urgent referrals below 117
+  breached ones regardless of urgency score.
+- On resolution, one of three:
+  1. *Keep the hard tier* — no code change; the rationale text states plainly that breach is a tier,
+     not a factor.
+  2. *Fold breach magnitude into `priority`* — `crt_breached` leaves the sort key; days-over-CRT
+     becomes a normalised term in `priority` alongside urgency and wait.
+  3. *Tier only beyond a margin* — `crt_breached` becomes "breached by more than N days"; smallest
+     change of the three.
 
 ## Tests
 
