@@ -186,3 +186,58 @@ score is ranked normally, since capacity affects only the cohort-level weight (A
 
 **Trade-off accepted:** One layer of indirection that would be unnecessary in a finished system,
 kept because it is also what makes the ranking logic unit-testable without network I/O (NFR5).
+
+---
+
+### Reference: `EvidenceType` and `CitationRole` (from `retrieval/app/schemas.py`)
+
+**Date:** 2026-09-06
+**Status:** recorded (task 1.1) — read directly from source, not guessed
+
+`retrieval/app/schemas.py` lines 27–28:
+
+```python
+EvidenceType = Literal["observation", "condition", "triage_event", "bed_status", "clinic_session"]
+CitationRole = Literal["urgency", "capacity", "timeframe", "multi_list"]
+```
+
+- **`EvidenceType`** permitted values: `observation`, `condition`, `triage_event`, `bed_status`,
+  `clinic_session`.
+- **`CitationRole`** permitted values: `urgency`, `capacity`, `timeframe`, `multi_list` — matching
+  the four `eat:cites` role subproperties named in FR7.
+
+Used at `evidence_type` (line 37, `ScoreCitationIn`; line 120, referenced by the ranking citation
+schema) and `role` (line 124). Any citation the coordinator builds must use exactly one of each of
+these value sets; `iri.validate_segment` (task 1.2) governs the `evidence_key` format separately.
+
+---
+
+### ADR-009: What a `RankedPlacement` cites, given `EvidenceType` can't express it
+
+**Date:** 2026-09-06
+**Status:** **open** — pending the retrieval service change
+
+**Context:** `retrieval/app/schemas.py` defines `EvidenceType` as a closed `Literal` of five
+primary-input types (`observation`, `condition`, `triage_event`, `bed_status`, `clinic_session`).
+Roles and types are independent axes, so of the four `CitationRole` values, `urgency` and
+`timeframe` have no evidence type that fits. The coordinator's real evidence for a position is the
+urgency `Score` node and the `ReferralState` carrying the wait against the CRT. Both are already
+minted — `namespaces.md` defines both IRI templates, `iri.py` already builds both (`score_iri`,
+`referral-state`) — only the `Literal` omits them. A change request has been raised with the
+retrieval service's author.
+
+**Decision:** Build against the proposed enum. The coordinator emits `score` and `referral_state`
+citations. `POST /decisions` will reject them with `422` until the `Literal` is widened, which is
+visible rather than silent. A `--legacy-citations` flag falls back to copying the urgency agent's
+own citations onto the placement for the `urgency` role and omitting `timeframe` entirely, so there
+is a working path if the change is declined.
+
+**Consequences:** The fallback loses one hop of provenance — the audit trail reads "ranked here
+because of these vitals" rather than "because of this score, which cited these vitals". Omitting
+`timeframe` is safe because `RankingIn.citations` requires `min_length=1`, not one per role. Citing
+a `triage_event` for `timeframe` was rejected as inaccurate, not merely imprecise: it records when
+triage happened, not how long someone waited against their CRT.
+
+**Trade-off accepted:** The coordinator ships against an enum that does not yet validate, so early
+runs surface a `422` until the retrieval service is updated — an explicit, tracked gap rather than a
+silently wrong citation.
