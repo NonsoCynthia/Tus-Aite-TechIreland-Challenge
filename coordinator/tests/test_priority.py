@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from coordinator.app.bands import order_by_band
 from coordinator.app.priority import (
     ALPHA_MAX,

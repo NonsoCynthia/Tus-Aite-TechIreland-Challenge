@@ -6,8 +6,9 @@ Tier 1 test, written before implementation, per
 
 from typing import get_args
 
-from coordinator.app.citations import ROLE_EVIDENCE_TYPES
 from retrieval.app.schemas import EvidenceType
+
+from coordinator.app.citations import ROLE_EVIDENCE_TYPES
 
 
 def test_role_evidence_types_are_valid_evidence_types() -> None:
@@ -28,6 +29,13 @@ def test_role_evidence_types_are_valid_evidence_types() -> None:
     real `EvidenceType` Literal imported from source. If this test is
     green, either the retrieval service enum was widened (good — update
     ADR-009's status) or the test was weakened (not good — revert it).
+
+    This test and `test_decision.py`'s
+    `test_assembled_payload_fails_real_decision_in_validation_today` are
+    the same signal seen from opposite sides: this one fails today and
+    goes green when the change lands; that one passes today and goes red.
+    Seeing one newly green and the other newly red at the same time is
+    the change landing, not a second problem.
     """
     valid_evidence_types = get_args(EvidenceType)
 
