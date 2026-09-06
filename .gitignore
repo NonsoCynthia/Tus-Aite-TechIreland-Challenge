@@ -12,4 +12,6 @@ kg/.env
 kg/.venv/
 
 **/.env
-**/.venv/
+**/.venv/.coverage
+.coverage.*
+htmlcov/
