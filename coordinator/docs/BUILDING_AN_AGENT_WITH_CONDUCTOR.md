@@ -141,6 +141,11 @@ A deliberately failing test is a legitimate commit. Say in the docstring what a 
 change of state *means*, in both directions — otherwise someone hits a red test on a green
 day and does something unhelpful.
 
+On the coordinator, this is not hypothetical: when ADR-009 landed, both tests flipped exactly
+as their docstrings predicted — the tracking test went green, its mirror in `test_decision.py`
+went red and was inverted to assert success. That is the evidence the technique works, not
+just the theory of it.
+
 ## Step 4 — Per phase: tests first, then implementation
 
 Two prompts per phase, never one.

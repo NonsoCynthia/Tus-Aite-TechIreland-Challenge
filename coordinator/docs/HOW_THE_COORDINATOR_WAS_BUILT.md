@@ -259,14 +259,31 @@ Both IRI templates already exist — `conductor/kg/namespaces.md` defines `Score
 machinery. Roles and evidence types are independent axes in the service, which is how two of
 the four roles ended up with no type that fits them.
 
-A change request is open (ADR-009). Meanwhile `--legacy-citations` provides a working path,
-and two tests track the request from opposite sides.
+A change request was opened (ADR-009). While it was open, `--legacy-citations` provided a
+working path, and two tests tracked the request from opposite sides.
+
+**Resolved, but not as requested (PR #7).** `EvidenceType` itself was not widened. Instead
+`retrieval.app.schemas` added a separate, wider `DecisionEvidenceType` for
+`DecisionCitationIn.evidence_type` — the original five values plus `score`, `referral_state`,
+and one beyond the original ask, `rule`. `EvidenceType` stays exactly as it was, still backing
+`ScoreCitationIn.evidence_type`. The reason for the split: `agent.agent_citations` carries a
+hard `CHECK` (`ac_evidence_type_valid`) enforcing exactly the original five values, so widening
+the shared `Literal` would have let Pydantic accept a value Postgres always rejects — an
+avoidable `422` turning into a `400`. `agent.decision_citations` carries no such `CHECK` (only
+`dc_role_valid`, on `role`), so `DecisionCitationIn` was free to be wider without that risk.
+`rule` was added beyond the original ask because the ontology already permits it:
+`citesTimeframeEvidence`'s `rdfs:range` is `unionOf(eat:ReferralState eat:Rule)`, not
+`ReferralState` alone. The finding itself stands — `EvidenceType` genuinely could not express
+what a `RankedPlacement` cites, roles and evidence types genuinely are independent axes, and
+that gap was real, not assumed. See §7 for what changed in this agent as a result.
 
 ## 5. Known limitations
 
-**5.1 No live end-to-end run has happened.** `agent.agent_scores` is empty; the urgency and
-capacity agents are built in parallel. Every verification in this track used synthetic scores
-and therefore checks ordering mechanics, never clinical output.
+**5.1 No live end-to-end run has happened.** `agent.agent_scores` is still empty. The capacity
+agent now exists (`capacity-agent/`, merged as PR #8) and documents its score's polarity
+(§7); only the urgency agent remains unbuilt and is what still blocks a real run. Every
+verification in this track so far used synthetic scores and therefore checks ordering
+mechanics, never clinical output.
 
 **5.2 Excluded referrals never occur in data `v1.1`.** `core.triage_events` contains only
 categories 1 (1,248), 2 (1,586) and 3 (1,378) across 4,212 rows. The Excluded tail branch is
@@ -284,8 +301,8 @@ and exit-code plumbing; the branch selection behind it is tested through
 **5.5 A `207` is detected and reported, never retried.** Postgres committed, the graph
 projection failed, the row stands and the graph is behind. Out of scope per ADR-002.
 
-**5.6 Three items are open.** See §7 — until they are resolved, no output should be treated
-as final.
+**5.6 One item is open.** ADR-007 and ADR-009 are resolved; ADR-011 is not. See §7 — until it
+is resolved, no output should be treated as clinically final on the point it raises.
 
 ## 6. What is verified, and how
 
@@ -297,12 +314,16 @@ python -m mypy --config-file coordinator/mypy.ini --explicit-package-bases coord
 python -m pytest coordinator/tests/ --cov=coordinator/app --cov-report=term-missing -q
 ```
 
-Run **separately**, never chained with `&&` — pytest exits non-zero because of the
-deliberately failing ADR-009 test, and everything after the first `&&` silently never runs.
+Run **separately** rather than chained with `&&`. This mattered while ADR-009's tracking test
+was deliberately failing: pytest exited non-zero, and everything after the first `&&` silently
+never ran — on this track it hid a broken mypy invocation for a whole phase. The suite is now
+fully green, so `&&` would no longer silently skip anything on that account, but running the
+gates separately stays the safer default for the same reason it always is: any one of them can
+fail for a new reason tomorrow.
 
 | | Result |
 |---|---|
-| Tests | 73 total, 72 passing, **1 deliberately failing** |
+| Tests | 73 total, **73 passing** |
 | Tier 1 coverage | **100%** on `bands`, `citations`, `priority`, `ranking`, `rule_checks`, `decision` — against a Tier 1 gate of 80% |
 | mypy | 18 files clean, `disallow_untyped_defs = True` |
 | ruff | check and format both clean at 100 columns |
@@ -323,52 +344,47 @@ Two numbers from the manual verifications, both on synthetic scores:
 
 - Scarcity and α invert correctly across the two conventions: `availability` gives scarcity
   0.75 / α 0.80, `pressure` gives 0.25 / 0.60, summing to exactly 1.0.
-- The default-citation payload fails `DecisionIn` validation with **1000 errors** across 500
-  rankings — two per ranking, every one a `literal_error` on `evidence_type` naming `score`
-  and `referral_state`, and nothing else complaining. That is ADR-009 diagnosed precisely
-  rather than assumed.
+- **Historical, not current behaviour:** while ADR-009 was open, the default-citation payload
+  failed `DecisionIn` validation with **1000 errors** across 500 rankings — two per ranking,
+  every one a `literal_error` on `evidence_type` naming `score` and `referral_state`, and
+  nothing else complaining. That precise, single-cause failure is how ADR-009 was diagnosed
+  rather than assumed. Since PR #7 added `DecisionEvidenceType` (§4.3, §7), the same payload
+  validates cleanly; this number is kept here as the evidence behind that diagnosis, not as
+  something a current run would reproduce.
 
 ## 7. What is still open
 
-Three items, none of which is an engineering task. Each is recorded as an ADR with status
-**open**, states what the code does meanwhile, and names what changes when it resolves.
+### Resolved since this was written
 
-### ADR-007 — the capacity sign convention
-
-**Owned by:** the capacity agent's author.
-
-**The risk:** read backwards, `scarcity` inverts, α inverts, and the system weights clinical
+**ADR-007 — the capacity sign convention.** Owned by the capacity agent's author. The risk
+while open: read backwards, `scarcity` inverts, α inverts, and the system weights clinical
 urgency *least* when the hospital is under most pressure — with every number in range and
-every ranking plausible. No test catches that.
+every ranking plausible, and no test catching it. **Answer:** the capacity agent (`capacity-
+agent/`, PR #8) documents `capacity_score` as a resource-pressure score — `0.0` = ample
+capacity, `1.0` = severe constraint pressure — in `capacity-agent/capacity_agent/scoring.py`'s
+module docstring and `capacity-agent/README.md`, so that both agents' scores share one
+polarity. `pressure` is therefore the correct value for this system. `--capacity-direction`
+stays required regardless — an explicit choice recorded per decision is still worth having —
+but `pressure` is now the documented default guidance in `RUNNING_THE_COORDINATOR.md` and the
+README, and a decision written under it no longer needs to be treated as provisional on this
+point.
 
-**Meanwhile:** `--capacity-direction` is required with no default; the agent refuses to start
-without it, and the configured value is recorded in `coordinator_version` on every decision,
-so any ranking ever written is traceable to the assumption it was made under.
+**ADR-009 — the `EvidenceType` change request.** Owned by the retrieval service's author.
+While open, `--legacy-citations` copied the urgency agent's own citations for the `urgency`
+role and omitted `timeframe`, which validated; the audit trail was one hop shallower than
+intended. **Resolved, not as requested (PR #7):** see §4.3 for the full account — a separate
+`DecisionEvidenceType` was added rather than `EvidenceType` being widened, plus `rule` beyond
+the original ask. `test_citation_contract.py` went green; `test_decision.py`'s validation test
+was inverted to assert success rather than failure, exactly as its docstring predicted (see
+`BUILDING_AN_AGENT_WITH_CONDUCTOR.md` §3). `--legacy-citations` still works and is kept as a
+legitimate, tested choice, just no longer the only mode that validates.
 
-**When answered:** record the convention in ADR-007 and set it as the documented default in
-`RUNNING_THE_COORDINATOR.md` and the README. The flag stays required — an explicit choice
-recorded per decision is worth keeping — but the guesswork disappears, and any decision
-written under the wrong convention can be identified from its `coordinator_version` and
-re-run. **No decision this agent writes should be treated as final until this is answered.**
-
-### ADR-009 — the `EvidenceType` change request
-
-**Owned by:** the retrieval service's author. Two values to add to a `Literal` plus their
-segment lookups; the IRI machinery already exists.
-
-**Meanwhile:** `--legacy-citations` copies the urgency agent's own citations for the
-`urgency` role and omits `timeframe`, which validates today. The audit trail is one hop
-shallower than it should be — it shows the vitals behind a position rather than the score
-that produced it.
-
-**When it lands:** two tests flip in opposite directions on the same event.
-`test_citation_contract.py` goes green; `test_decision.py`'s
-`test_assembled_payload_fails_real_decision_in_validation_today` goes red. Invert that second
-assertion to require validation, drop the legacy companion test, remove `--legacy-citations`
-from the documented invocation, close ADR-009, and re-run any decision written in legacy mode
-so the audit trail cites the Score and ReferralState nodes directly.
+### Still open
 
 ### ADR-011 — CRT breach is a hard tier above clinical priority
+
+The only item left. It is recorded as an ADR with status **open**, states what the code does
+meanwhile, and names what changes when it resolves.
 
 **Owned by:** clinical and compliance review.
 
