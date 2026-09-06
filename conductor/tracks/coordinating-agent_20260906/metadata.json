@@ -1,0 +1,8 @@
+{
+  "track_id": "coordinating-agent_20260906",
+  "type": "feature",
+  "status": "pending",
+  "description": "Coordinating agent: ranks one hospital-day cohort deterministically and writes it via POST /decisions. Carved out of explainable-agent-based-triage_20260828 FR3/FR6 so it can be built independently of the in-parallel urgency and capacity agents. FR1-FR11: cohort acquisition, a replaceable score-source seam, CPC band resolution by severity_rank (never the raw code), cohort-level scarcity modulating the urgency/waiting weight, the full sort key with deterministic total order, CPC/CRT rule checks, citation construction, and atomic decision write-back with 207 handling. No LLM anywhere; determinism is a tested property.",
+  "created_at": "2026-09-06T00:00:00Z",
+  "updated_at": "2026-09-06T08:13:52Z"
+}

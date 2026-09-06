@@ -8,10 +8,11 @@ venv/
 kg/.env
 kg/out/
 kg/mappings/*.ini
-kg/.env
 kg/.venv/
 
 **/.env
+.coverage.*
+htmlcov/
 **/.venv/
 **/.pytest_cache/
 **/.coverage
