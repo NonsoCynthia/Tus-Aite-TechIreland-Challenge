@@ -48,9 +48,28 @@ Recorded in full in `decisions.md`, ADR-003 to ADR-008:
 
 ## Status
 
-Phases 2 to 5 are unblocked today: they need the cohort endpoint, which is live, and scores, which
-come from fixtures behind the seam of ADR-008. Only the final live-integration verification (task
-6.6) waits on the urgency and capacity agents producing real output.
+Phases 1-6 are built: cohort/score fetching, CPC bands (ADR-003/004), scarcity/α/priority
+(ADR-005/010), the full sort key and rule checks, citations and decision assembly (ADR-008/009),
+and the CLI (`python -m coordinator`). 73 tests, 72 passing; the one failure is deliberate — see
+below. Tier 1 (`bands.py`, `priority.py`, `ranking.py`, `rule_checks.py`) is at **100% coverage**,
+well over the ≥80% bar. `ruff check`, `ruff format --check` and `mypy` are all clean.
 
-**ADR-007 is open.** Until the capacity direction is confirmed with its author and recorded, no
-decision this agent writes should be treated as final.
+Two tasks remain, and neither is work this track can do itself:
+
+- **Task 6.6** (a full run against live scores) waits on the urgency and capacity agents existing
+  and producing real output.
+- **Task 6.7** (compliance review of the first real output) waits on the responsible-AI/compliance
+  lead, already asked via the ADR-011 message below — and, transitively, on 6.6.
+
+**Three ADRs are open, and each blocks something specific:**
+
+- **ADR-007** (capacity sign convention unconfirmed) — blocks treating **any** decision this agent
+  writes as final. Both conventions are implemented behind `--capacity-direction`; which one is
+  correct for the real capacity agent is still unknown.
+- **ADR-009** (default citations don't validate against today's `EvidenceType`) — blocks using the
+  default citation mode against the live retrieval service; `--legacy-citations` is the working path
+  until the change request lands. Tracked by a test that fails on purpose (see `coordinator/
+  README.md`).
+- **ADR-011** (CRT breach is a hard tier above clinical priority, not a decision anyone made on
+  purpose) — blocks calling the ranking clinically final; referred to the responsible-AI/compliance
+  lead and to clinical input, and is what task 6.7 is waiting to review.

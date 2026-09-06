@@ -89,27 +89,46 @@ it.
 
 ## Phase 5 — Citations, decision assembly, write-back (Tier 2)
 
-- [ ] 5.1 Test: every ranking carries ≥1 citation (contract: `min_length=1`)
-- [ ] 5.2 Test: citation roles map correctly to the four subproperties
-- [ ] 5.3 Test: `coordinator_version` encodes capacity direction, α bounds and score source
-- [ ] 5.4 Test: `rationale_summary` states only what the ranking used and makes no uncited claim
-- [ ] 5.5 Test: the assembled payload validates against `DecisionIn` (import the real model — do
+- [x] 5.1 Test: every ranking carries ≥1 citation (contract: `min_length=1`)
+- [x] 5.2 Test: citation roles map correctly to the four subproperties
+- [x] 5.3 Test: `coordinator_version` encodes capacity direction, α bounds and score source
+- [x] 5.4 Test: `rationale_summary` states only what the ranking used and makes no uncited claim
+- [x] 5.5 Test: the assembled payload validates against `DecisionIn` (import the real model — do
       not reimplement it)
-- [ ] 5.6 Test: `200`, `207`, `400`, `422` each handled; `207` surfaced distinctly from success
-- [ ] 5.7 Implement the retrieval client, citation construction and decision assembly
-- [ ] 5.8 Verification: `--dry-run` against the live service, payload inspected before any write
+- [x] 5.6 Test: `200`, `207`, `400`, `422` each handled; `207` surfaced distinctly from success
+- [x] 5.7 Implement the retrieval client, citation construction and decision assembly
+- [x] 5.8 Verification: `--dry-run` against the live service, payload inspected before any write
+
+      **Observed (2026-09-06):** ran a full `--dry-run` decision (500 positions) against the live
+      9004/2026-08-30 cohort, synthetic scores. The `--legacy-citations` payload validated against
+      the real `DecisionIn` across all 500 positions with no errors. The default-citations payload
+      failed with exactly 1000 `literal_error`s (2 per position) — every single one naming
+      `evidence_type` for `"score"` or `"referral_state"`, nothing else complaining — confirming
+      ADR-009's diagnosis precisely rather than some other, unrelated validation problem. Reading
+      the printed `rationale_summary` text as a clinician would surfaced three wording defects,
+      since fixed: floating-point noise in the displayed scores, a bare numeric `alpha` a clinician
+      can't act on, and a CRT breach clause that didn't say by how many days.
 
 ## Phase 6 — CLI and integration (Tier 3)
 
-- [ ] 6.1 Smoke test: CLI runs end to end against the fixture score source without raising
-- [ ] 6.2 Implement `main()` and argument parsing
-- [ ] 6.3 `ruff check`, `ruff format --check`, `mypy` clean on Tier 1 and 2
-- [ ] 6.4 Tier 1 coverage ≥80% confirmed
-- [ ] 6.5 README for the coordinator: how to run it, what each configuration flag changes
+- [x] 6.1 Smoke test: CLI runs end to end against the fixture score source without raising
+- [x] 6.2 Implement `main()` and argument parsing
+- [x] 6.3 `ruff check`, `ruff format --check`, `mypy` clean on Tier 1 and 2
+- [x] 6.4 Tier 1 coverage ≥80% confirmed
+
+      **Observed (2026-09-06):** `coordinator/app/bands.py`, `priority.py`, `ranking.py`,
+      `rule_checks.py` — 125/125 statements covered, **100%** (comfortably over the ≥80% bar).
+- [x] 6.5 README for the coordinator: how to run it, what each configuration flag changes
 - [ ] 6.6 Verification: full run against live scores **once the urgency and capacity agents have
       written some** — blocked on those tracks, and the only task here that is
+
+      **Waiting on:** the urgency and capacity agents to exist and produce real scores. Nothing in
+      this track can close this task.
 - [ ] 6.7 Compliance review of the first real output against CPC/CRT rules, per `workflow.md`'s
       cadence: as soon as the agent produces output, not on Day 6
+
+      **Waiting on:** the responsible-AI/compliance lead, already asked via the ADR-011 message —
+      and, transitively, on 6.6 producing a first real output to review.
 
 ---
 
