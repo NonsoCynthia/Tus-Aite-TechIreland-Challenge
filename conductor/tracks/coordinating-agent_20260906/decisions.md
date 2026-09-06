@@ -292,3 +292,38 @@ later judged clinically necessary.
 adjacent ranks when nothing sits between them. In bands of 130+ referrals from a continuous
 distribution this is rare, and the ordering remains correct, only not proportionate.
 `wait_normalised` is used for sorting and is never displayed as a number.
+
+---
+
+### ADR-011: CRT breach is a hard tier above priority, not a weighted factor
+
+**Date:** 2026-09-06
+**Status:** **OPEN** — needs a clinical decision, not an engineering one
+
+**Context:** The sort key is `(severity_rank, crt_breached desc, priority desc, referral_date asc,
+pathway_number asc)`. Because `crt_breached` sits above `priority`, it is a hard tier: within a
+band, every breached referral outranks every non-breached one at any score values. A referral with
+urgency 0.99 one day inside its 28-day CRT ranks below one with urgency 0.05 one day past it. `α`
+cannot affect this — it only orders within a breach tier.
+
+This was not a decision anyone made. FR3 specified CPC then CRT breach then oldest-first at a time
+when scores were not in the ordering at all; ADR-004 later put priority into the chain, which made
+the relative standing of breach and clinical urgency a live question that has never been asked.
+
+The data makes it acute. Per `dataset/docs/HOW_THE_DATA_WAS_MADE.md`, NTPF's published bands imply
+91.2% of urgent referrals breach the 28-day CRT and the generator produces 90.0%. So the breached
+tier holds almost the entire urgent band, and the few non-breached urgent referrals — the recent
+ones, who may be the acutely unwell — sit at the bottom of it. Observed in the Phase 4 verification:
+all top-20 positions were breached, with `wait_normalised` mostly above 0.7.
+
+**Options:**
+
+- **(a)** Keep breach as a hard tier, on the grounds that a CRT is an obligation rather than a
+  preference.
+- **(b)** Fold breach magnitude into the priority score so a sufficiently high urgency can outweigh
+  a marginal breach.
+- **(c)** Keep the tier but only for breaches beyond some margin.
+
+**Status:** Open, referred to the responsible-AI/compliance lead and to clinical input. The code
+currently implements **(a)** because that is what FR3 specifies. No decision written under (a)
+should be presented as final until this is resolved.
