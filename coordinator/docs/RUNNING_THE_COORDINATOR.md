@@ -135,9 +135,9 @@ it, so a wrong decision is not simply overwritten by a right one.
 | `--hospital` | 4-character HIPE code. `9001`–`9004` are the public hospitals with waiting lists; `9101`/`9102` are private, capacity only, and return an empty cohort |
 | `--as-of` | The hospital-day to rank. The dataset spans **2026-08-17 to 2026-08-30** inclusive, 14 days |
 | `--run-id` | Ties this decision to the scores it was built from. Must match the `run_id` the urgency and capacity agents used |
-| `--capacity-direction` | **Required, no default.** `availability` (1.0 = most capacity free) or `pressure` (1.0 = maximum pressure). See §5 |
+| `--capacity-direction` | **Required, no default.** `availability` (1.0 = most capacity free) or `pressure` (1.0 = maximum pressure). Pass `pressure` against this system's capacity agent (confirmed, ADR-007). See §5 |
 | `--score-source` | `live` (default) reads `GET /runs/.../scores`; `fixture` reads committed test fixtures |
-| `--legacy-citations` | Falls back to citations that validate against today's `EvidenceType`. **Currently required for any real post** — see §5 |
+| `--legacy-citations` | Falls back to citations that cite the urgency agent's own evidence directly rather than its `Score` node. Both modes validate today (ADR-009 resolved) — see §5 |
 | `--alpha-min` / `--alpha-max` | Bounds on the urgency/waiting weight. Defaults 0.5 and 0.9 |
 | `--dry-run` | Assemble and print; post nothing |
 
@@ -153,24 +153,38 @@ it, so a wrong decision is not simply overwritten by a right one.
 
 An undocumented status code raises rather than being silently accepted.
 
-## 5. Two things that will bite
+## 5. Two things that used to bite
 
 **`--capacity-direction` has no default and the agent refuses to start without it.** This is
-deliberate (ADR-007). `capacity_score` is a 0–1 float whose direction is owned by the
-capacity agent and, at the time of writing, undocumented. Read backwards, `scarcity` inverts,
-α inverts, and the system weights clinical urgency *least* when the hospital is under most
-pressure — with every number still in range and every ranking still superficially plausible.
-No test catches that. A loud refusal is the cheapest version of the problem.
+deliberate (ADR-007) and stays true even now that the convention is known: `capacity_score`
+is a 0–1 float whose direction is a choice, not a law of nature, and a future capacity agent
+could make a different one. Read backwards, `scarcity` inverts, α inverts, and the system
+weights clinical urgency *least* when the hospital is under most pressure — with every number
+still in range and every ranking still superficially plausible. No test catches that. A loud
+refusal is the cheapest version of the problem.
+
+**ADR-007 is now resolved: pass `pressure`.** The capacity agent documents `capacity_score`
+as a resource-pressure score — `0.0` = ample capacity, `1.0` = severe constraint pressure —
+in `capacity-agent/capacity_agent/scoring.py`'s module docstring and `capacity-agent/
+README.md` line 14, so that both agents' scores share one polarity. The flag stays required
+regardless — an explicit choice recorded per decision is worth keeping — but `pressure` is
+now the documented default guidance, and a decision written under it does not need to be
+treated as provisional on this point.
 
 The configured value is recorded in `coordinator_version` on every decision, so any ranking
 ever written is traceable to the assumption it was made under.
 
-**Default citations do not validate today.** The coordinator's honest evidence for a ranked
-position is the urgency `Score` node and the `ReferralState` carrying the wait against the
-CRT. Neither is a member of the retrieval service's `EvidenceType`, so a default-mode post
-fails with `422` and one `literal_error` per citation (ADR-009). Until that enum is widened,
-use `--legacy-citations`, which copies the urgency agent's own citations for the `urgency`
-role and omits `timeframe` entirely.
+**Default citations used not to validate; they do now.** The coordinator's honest evidence
+for a ranked position is the urgency `Score` node and the `ReferralState` carrying the wait
+against the CRT. ADR-009 is resolved (PR #7): rather than widening the five-value
+`EvidenceType` `ScoreCitationIn` uses (Postgres' `ac_evidence_type_valid` CHECK on
+`agent.agent_citations` enforces exactly those five), the retrieval service added a separate,
+wider `DecisionEvidenceType` for `DecisionCitationIn` — the same five values plus `"score"`,
+`"referral_state"`, and one beyond the original ask, `"rule"` (the ontology's
+`citesTimeframeEvidence` already permits a `Rule` there). Default-mode posts validate today.
+`--legacy-citations` still works and is still a legitimate choice — it costs one hop of
+provenance, citing the urgency agent's own evidence directly rather than its `Score` node —
+but it is no longer the *only* mode that validates.
 
 ## 6. Checking it worked
 
@@ -178,11 +192,10 @@ role and omits `timeframe` entirely.
 python -m pytest coordinator/tests/ -q
 ```
 
-**One test fails deliberately** —
-`test_citation_contract.py::test_role_evidence_types_are_valid_evidence_types`. It is the
-tracking mechanism for the ADR-009 change request and turns green when that lands. Do not fix
-it. Its mirror in `test_decision.py` goes red on the same event; the two together are one
-signal, not two problems.
+**All tests pass.** `test_citation_contract.py::test_role_evidence_types_are_valid_evidence_types`
+used to fail on purpose, as the tracking mechanism for the ADR-009 change request; now that it
+has landed (PR #7), that test — and its mirror in `test_decision.py`, which used to pass
+because validation failed — both assert the resolved state and both pass.
 
 The gates, run **separately** — `&&` short-circuits on pytest's non-zero exit and you will
 never see mypy run:
@@ -209,10 +222,10 @@ of 131 Urgent, 133 Semi-Urgent, 141 Routine and 95 uncategorised, in that order.
 | `role "retrieval_rw" does not exist` | Migration 009 never ran on this volume. See §2 |
 | `KeyError: 3` from band resolution | `cpc` arrives from the endpoint as `int` or `None`, never `str`. Do not coerce with `str(cpc)` — that would accept `"03"` and `3.0` silently |
 | `Source file found twice under different module names` from mypy | Use the documented invocation in §6. `coordinator/__init__.py` makes the package root unambiguous |
-| mypy appears to pass but never ran | You chained the gates with `&&`. Pytest exits non-zero because of the deliberate failure. Run them separately |
+| mypy appears to pass but never ran | You chained the gates with `&&` and an earlier one exited non-zero. Run them separately |
 | `ruff format` unwraps lines you just wrapped | `coordinator/ruff.toml` sets 100 columns; `conductor/code_styleguides/python.md` says 80. The `.toml` wins because the formatter reads it. This disagreement is unresolved across the repo |
-| `coordinator: error: --capacity-direction is required` | Correct. That is ADR-007 working. Pass `availability` or `pressure` |
-| `422` with `literal_error` on `evidence_type` | Expected in default citation mode. Use `--legacy-citations` (§5) |
+| `coordinator: error: --capacity-direction is required` | Correct. That is ADR-007 working. Pass `pressure` against this system's capacity agent (confirmed) |
+| `422` with `literal_error` on `evidence_type` | Should not happen against a current retrieval service (ADR-009 resolved). If you see this, check you're running against a merged `retrieval` with `DecisionEvidenceType` (`retrieval/app/schemas.py`), not a stale checkout |
 | Empty cohort, no error | Either the hospital is private (`9101`/`9102`, capacity only, no queue) or the date is outside 2026-08-17 to 2026-08-30 |
 | `ModuleNotFoundError: retrieval` | Run from the repo root. The coordinator imports the retrieval service's schemas directly rather than reimplementing them |
 | `ModuleNotFoundError: coordinator` | Also run from the repo root. `python -m coordinator` resolves the package from the working directory |
@@ -229,4 +242,4 @@ of 131 Urgent, 133 Semi-Urgent, 141 Routine and 95 uncategorised, in that order.
 | Retrieval service | `retrieval-service_20260904` |
 | ruff | see `coordinator/requirements-dev.txt`; config `coordinator/ruff.toml`, 100 columns |
 | mypy | config `coordinator/mypy.ini`, `disallow_untyped_defs = True` |
-| Tests | 73 total, 72 passing, 1 deliberately failing |
+| Tests | 73 total, 73 passing |

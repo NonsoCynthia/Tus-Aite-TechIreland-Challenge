@@ -335,34 +335,32 @@ def test_rationale_summary_across_every_band_and_breach_combination(
         assert verb not in lowered, f"forbidden verb {verb!r} found in: {summary!r}"
 
 
-def test_assembled_payload_fails_real_decision_in_validation_today() -> None:
+def test_assembled_payload_validates_against_the_real_decision_in() -> None:
     """THE ADR-009 TEST.
 
     A decision assembled with the coordinator's default (non-legacy)
-    citations -- evidence_type `"score"`/`"referral_state"` -- is
-    expected to FAIL validation against the real `DecisionIn` model
-    imported from `retrieval.app.schemas`, TODAY, because that service's
-    `EvidenceType` Literal does not yet include those two values
-    (ADR-009). This is not a bug in the coordinator: it is the tracked
-    consequence of an open change request against the retrieval service.
+    citations -- evidence_type `"score"`/`"referral_state"` -- validates
+    against the real `DecisionIn` model imported from
+    `retrieval.app.schemas`, imported and used directly, never mocked.
 
-    Do NOT make this test pass by weakening the assertion or mocking
-    `DecisionIn` -- it must import and use the real model.
-
-    NOTE THE POLARITY: this test passes *because* validation fails. When
-    `retrieval.app.schemas.EvidenceType` is widened, the payload will
-    validate, no ValidationError will be raised, and this test will FAIL.
-    That failure is the signal that the change request landed. The fix at
-    that point is to invert this test into an assertion that the payload
-    validates, drop the legacy-citations companion test if it is no longer
-    needed, and close ADR-009 -- not to investigate a regression.
+    HISTORY, NOT A LIVE WARNING: this test used to assert the opposite --
+    that validation FAILED -- because `EvidenceType` did not yet accept
+    `"score"`/`"referral_state"`. That change request landed (PR #7), but
+    not by widening `EvidenceType` itself: `DecisionCitationIn.
+    evidence_type` now uses a separate, wider `DecisionEvidenceType`
+    (`retrieval/app/schemas.py`), while `EvidenceType` stays at its
+    original five values for `ScoreCitationIn` (Postgres' `ac_evidence_
+    type_valid` CHECK on `agent.agent_citations` enforces exactly those
+    five). This test was inverted to match: it now asserts success,
+    where it used to assert `pytest.raises(ValidationError)`.
 
     This test and `test_citation_contract.py`'s
-    `test_role_evidence_types_are_valid_evidence_types` are the same
-    signal seen from opposite sides: that one fails today and goes green
-    when the change lands; this one passes today and goes red. Seeing one
-    newly green and the other newly red at the same time is the change
-    landing, not a second problem.
+    `test_role_evidence_types_are_valid_evidence_types` were the same
+    signal seen from opposite sides while ADR-009 was open: that one used
+    to fail and went green on this change; this one used to pass (because
+    validation failed) and went red on the same change. Both flips
+    happened together, as expected, and are recorded here rather than
+    live warnings any reader still needs to act on.
     """
     ranking = build_ranking(_referral("PW-1"))
     payload = build_decision(
@@ -380,15 +378,18 @@ def test_assembled_payload_fails_real_decision_in_validation_today() -> None:
         rankings=[ranking],
     )
 
-    with pytest.raises(ValidationError):
-        DecisionIn(**payload)
+    validated = DecisionIn(**payload)
+    assert validated.decision_id == "dec-1"
+    assert len(validated.rankings) == 1
 
 
-def test_legacy_citations_payload_validates_against_the_real_decision_in() -> None:
-    """The `--legacy-citations` fallback payload validates against the
-    real `DecisionIn` model TODAY, since it only uses evidence types
-    already accepted by `EvidenceType` (ADR-009's working path while the
-    change request is pending)."""
+def test_legacy_citations_payload_still_validates_against_the_real_decision_in() -> None:
+    """The `--legacy-citations` fallback payload also validates against
+    the real `DecisionIn` model. It is no longer the *only* mode that
+    validates (ADR-009 is resolved; default mode does too, see above),
+    but the flag itself is kept -- it costs one hop of provenance (citing
+    the urgency agent's own evidence directly rather than its `Score`
+    node) and remains a legitimate, tested choice, not dead code."""
     ranking = build_ranking(_referral("PW-1"), legacy_citations=True)
     payload = build_decision(
         decision_id="dec-1",

@@ -156,8 +156,8 @@ code.
 
 ### ADR-007: `capacity_score` direction is required configuration
 
-**Date:** 2026-09-06
-**Status:** **open** — awaiting the capacity agent's author
+**Date:** 2026-09-06 — resolved 2026-09-06 (capacity agent merged, PR #8)
+**Status:** **resolved** — `pressure` confirmed
 
 **Context:** `RankingIn.capacity_score` is a 0–1 float with no documented direction. Whether 1.0
 means "most beds free" or "maximum pressure" is owned by the capacity agent, which is being built in
@@ -172,8 +172,18 @@ refuses to start unconfigured rather than guessing. Accepted values: `availabili
 in `coordinator_version` on every decision, so any ranking ever written is traceable to the
 assumption it was made under.
 
-**To close this ADR:** confirm the convention with the capacity agent's author, record it here, and
-set the project default. Until then no decision written by this agent should be treated as final.
+**Resolved:** the capacity agent documents `capacity_score` as a **pressure** score — `0.0` = ample
+capacity, `1.0` = severe constraint pressure — in `capacity-agent/capacity_agent/scoring.py`'s
+module docstring and `capacity-agent/README.md` line 14. Their reasoning: both agent scores share
+one polarity, so a higher number always means more reason to prioritise, for either agent. `pressure`
+is therefore the correct value of `--capacity-direction` for this system's actual capacity agent.
+
+**What changes:** the flag stays **required** — an explicit choice recorded per decision is still
+worth having, and nothing about this resolution makes guessing safe for a differently-authored
+capacity agent in the future. What changes is the *documented default guidance*: `coordinator/
+README.md` and `coordinator/docs/RUNNING_THE_COORDINATOR.md` now name `pressure` as the value to
+pass against this system's capacity agent, and the "no decision should be treated as final" warnings
+tied to this ADR are removed — decisions written under `pressure` can now be trusted on this point.
 
 **Trade-off accepted:** An extra required flag, and a startup failure for anyone who forgets it. A
 loud failure is the cheapest possible version of this problem; the alternative is a silently
@@ -230,8 +240,8 @@ these value sets; `iri.validate_segment` (task 1.2) governs the `evidence_key` f
 
 ### ADR-009: What a `RankedPlacement` cites, given `EvidenceType` can't express it
 
-**Date:** 2026-09-06
-**Status:** **open** — pending the retrieval service change
+**Date:** 2026-09-06 — resolved 2026-09-06 (retrieval service change merged, PR #7)
+**Status:** **resolved** — via a separate `DecisionEvidenceType`, not a widened `EvidenceType`
 
 **Context:** `retrieval/app/schemas.py` defines `EvidenceType` as a closed `Literal` of five
 primary-input types (`observation`, `condition`, `triage_event`, `bed_status`, `clinic_session`).
@@ -248,15 +258,39 @@ visible rather than silent. A `--legacy-citations` flag falls back to copying th
 own citations onto the placement for the `urgency` role and omitting `timeframe` entirely, so there
 is a working path if the change is declined.
 
+**Resolved, but not as requested:** `retrieval/app/schemas.py` did not widen `EvidenceType` itself.
+Instead it added a separate `DecisionEvidenceType` (line 49), carrying the original five clinical
+values plus `"score"`, `"referral_state"` — **and** `"rule"`, one beyond what this ADR asked for.
+`EvidenceType` stays at five values and now backs only `ScoreCitationIn.evidence_type`;
+`DecisionCitationIn.evidence_type` (what a `RankedPlacement` cites) uses `DecisionEvidenceType`. The
+reason for the split: `agent.agent_citations` carries a hard `CHECK` constraint
+(`ac_evidence_type_valid`, `006_outputs.sql`) enforcing exactly the original five values — widening
+the shared `Literal` would let `ScoreCitationIn` accept a value Postgres always rejects (turning an
+avoidable `422` into a `400`). `agent.decision_citations` carries no such `CHECK` (only `dc_role_
+valid`, on `role`), so `DecisionCitationIn` was free to be wider without that risk.
+
+`"rule"` was added beyond the original ask because the ontology already permits it:
+`citesTimeframeEvidence`'s `rdfs:range` is `unionOf(eat:ReferralState eat:Rule)`, not `ReferralState`
+alone, so a placement's `timeframe` citation may honestly point at either. This coordinator does not
+yet emit `rule`-typed timeframe citations — `referral_state` remains what `build_citations` builds —
+but the type is now available if a future timeframe citation needs to point at the rule itself
+rather than the referral's wait state.
+
+**What changes:** the coordinator now imports `DecisionEvidenceType` (not `EvidenceType`) wherever it
+validates or tests placement citations. The default (non-legacy) citation mode — `score` for
+`urgency`, `referral_state` for `timeframe` — now validates against the real `DecisionIn` model with
+no error. `--legacy-citations` is no longer required for a payload to validate; see the track's plan
+for whether the fallback is still worth keeping.
+
 **Consequences:** The fallback loses one hop of provenance — the audit trail reads "ranked here
 because of these vitals" rather than "because of this score, which cited these vitals". Omitting
 `timeframe` is safe because `RankingIn.citations` requires `min_length=1`, not one per role. Citing
 a `triage_event` for `timeframe` was rejected as inaccurate, not merely imprecise: it records when
 triage happened, not how long someone waited against their CRT.
 
-**Trade-off accepted:** The coordinator ships against an enum that does not yet validate, so early
-runs surface a `422` until the retrieval service is updated — an explicit, tracked gap rather than a
-silently wrong citation.
+**Trade-off accepted:** The coordinator shipped against an enum that did not yet validate, so early
+runs surfaced a `422` until the retrieval service was updated — an explicit, tracked gap rather than
+a silently wrong citation. That gap is now closed.
 
 ---
 

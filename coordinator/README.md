@@ -47,11 +47,15 @@ python -m coordinator \
 
 `--capacity-direction` is **required, with no default**, and the CLI refuses to start without it.
 `capacity_score` is a 0-1 float whose direction (does 1.0 mean "most capacity free" or "maximum
-pressure"?) is owned by the capacity agent's author, not this one -- read backwards, the whole
-system's behaviour under load inverts while every number stays in range and the ranking stays
-superficially plausible, and no test catches it without the convention being stated. A loud startup
-failure is the cheapest version of that problem; the alternative is a silently inverted priority
-system. See ADR-007.
+pressure"?) is a choice, not a law of nature -- read backwards, the whole system's behaviour under
+load inverts while every number stays in range and the ranking stays superficially plausible, and no
+test catches it without the convention being stated. A loud startup failure is the cheapest version
+of that problem; the alternative is a silently inverted priority system.
+
+**Pass `pressure`.** ADR-007 is resolved: the capacity agent documents `capacity_score` as a
+resource-pressure score (`0.0` = ample capacity, `1.0` = severe constraint pressure), so both
+agents' scores share one polarity. The flag stays required regardless -- an explicit choice
+recorded per decision is worth keeping even now that the convention is known.
 
 `--dry-run` prints the assembled decision instead of posting it, so a ranking can always be
 inspected before anything is written.
@@ -63,9 +67,9 @@ inspected before anything is written.
 | `--hospital` | *(required)* | Which hospital's cohort to rank. |
 | `--as-of` | *(required)* | Which hospital-day to rank. |
 | `--run-id` | *(required)* | Which agent run the scores come from -- ties this decision to a specific urgency/capacity run. |
-| `--capacity-direction` | *(required, no default)* | `availability` (`scarcity = 1 - capacity`) or `pressure` (`scarcity = capacity`). Inverts the direction of every capacity-driven weighting in the decision (ADR-005/ADR-007). Recorded in `coordinator_version`. |
+| `--capacity-direction` | *(required, no default)* | `availability` (`scarcity = 1 - capacity`) or `pressure` (`scarcity = capacity`). Inverts the direction of every capacity-driven weighting in the decision (ADR-005/ADR-007). Recorded in `coordinator_version`. **Pass `pressure`** against this system's capacity agent (confirmed, ADR-007). |
 | `--score-source` | `live` | `live` calls `GET /runs/.../scores`; `fixture` uses a deterministic, made-up score generator for development when the urgency/capacity agents haven't written anything yet (ADR-008). Recorded in `coordinator_version` so a decision written from stub scores can never be mistaken for a real one. |
-| `--legacy-citations` | off | Switches citation construction to the ADR-009 fallback (see below) -- the only mode that validates against the retrieval service **today**. |
+| `--legacy-citations` | off | Switches citation construction to the ADR-009 fallback (see below) -- cites the urgency agent's own evidence directly rather than its `Score` node. Both modes validate against the retrieval service today (ADR-009 resolved). |
 | `--alpha-min` | `0.5` | Lower bound on `alpha`, the urgency/wait weight -- urgency never counts for less than waiting time even at zero scarcity. |
 | `--alpha-max` | `0.9` | Upper bound on `alpha` -- waiting time never drops out of the ordering entirely even at maximum scarcity. |
 | `--dry-run` | off | Prints the assembled decision instead of posting it. Nothing is written. |
@@ -91,53 +95,56 @@ touched.
 
 ## Things this README needs you to know before you trust any output
 
-- **ADR-007 is open.** The capacity sign convention (`availability` vs. `pressure`) has not been
-  confirmed with the capacity agent's author. Until it is, no decision this agent writes should be
-  treated as final -- it may be running under the wrong convention, silently.
+- **ADR-007 is resolved: `pressure`.** The capacity agent documents `capacity_score` as a
+  resource-pressure score, confirmed in `capacity-agent/capacity_agent/scoring.py` and
+  `capacity-agent/README.md` line 14. `--capacity-direction` stays required -- an explicit choice
+  recorded per decision is worth keeping -- but a decision written under `pressure` no longer needs
+  to be treated as provisional on this point.
 - **ADR-011 is open.** The sort key puts CRT breach above priority as a hard tier: within a band,
   every breached referral outranks every non-breached one at any score values. This was an
   incidental consequence of combining an older tie-break rule with a later scoring change, not a
   decision anyone made on purpose, and it is referred to the responsible-AI/compliance lead and to
   clinical input, unresolved.
-- **ADR-009: the default citation mode does not validate today.** The coordinator's real evidence
-  for the `urgency`/`timeframe` citation roles is a `Score` node and a `ReferralState`, neither of
-  which is yet an accepted `evidence_type` in the retrieval service's schema. A change request is
-  open. `--legacy-citations` is the working path in the meantime -- it validates today, at the cost
-  of one hop of provenance (it cites the urgency agent's own evidence directly, and omits the
-  `timeframe` role entirely).
-- **One test fails on purpose.** `test_citation_contract.py::test_role_evidence_types_are_valid_evidence_types`
-  fails today and is meant to -- it is the tracking mechanism for the ADR-009 change request, not a
-  bug. Do not "fix" it by weakening the assertion; it turns green on its own once the retrieval
-  service's `EvidenceType` is widened. (`test_decision.py`'s
-  `test_assembled_payload_fails_real_decision_in_validation_today` is the same signal from the
-  opposite side -- it passes today and is expected to go red on the same event, which is the
-  handoff working as intended, not a regression.)
+- **ADR-009 is resolved, but not as originally requested.** The retrieval service did not widen
+  `EvidenceType`; it added a separate, wider `DecisionEvidenceType` for placement citations (the
+  original five clinical values plus `"score"`, `"referral_state"`, and `"rule"`), while
+  `EvidenceType` stays at five values for score citations (Postgres' `ac_evidence_type_valid` CHECK
+  requires it). Default-mode citations validate today. `--legacy-citations` still works and is still
+  a legitimate choice, at the cost of one hop of provenance -- it is just no longer the *only* mode
+  that validates.
 
 ## Pending decisions
 
-None of these is an engineering task. Condensed from
+Only ADR-011 remains open below; ADR-007 and ADR-009 are recorded here for the historical
+reasoning, now resolved. None of the three was, or is, an engineering task. Condensed from
 [`docs/HOW_THE_COORDINATOR_WAS_BUILT.md` §7](docs/HOW_THE_COORDINATOR_WAS_BUILT.md#7-what-is-still-open)
 — see there and
 [the track's `decisions.md`](../conductor/tracks/coordinating-agent_20260906/decisions.md) for the
 full reasoning.
 
-**ADR-007 — capacity sign convention**
+**ADR-007 — capacity sign convention — RESOLVED: `pressure`**
 - Owned by: the capacity agent's author.
-- Meanwhile: `--capacity-direction` is required with no default; every decision records which
-  convention it used.
-- Risk if unresolved: read backwards, urgency is weighted *least* when the hospital is under most
-  pressure, with every number still in range and every ranking still plausible.
-- On resolution: the convention becomes the documented default; the flag stays required, but the
-  guesswork disappears.
+- Meanwhile *(while open)*: `--capacity-direction` was required with no default; every decision
+  recorded which convention it used.
+- Risk that was open: read backwards, urgency would be weighted *least* when the hospital is under
+  most pressure, with every number still in range and every ranking still plausible.
+- Resolved: the capacity agent documents `pressure`, confirmed in `capacity-agent/capacity_agent/
+  scoring.py` and `capacity-agent/README.md` line 14. `pressure` is now the documented default
+  guidance; the flag stays required regardless.
 
-**ADR-009 — the `EvidenceType` change request**
+**ADR-009 — the `EvidenceType` change request — RESOLVED: via `DecisionEvidenceType`, not a widened `EvidenceType`**
 - Owned by: the retrieval service's author.
-- Meanwhile: `--legacy-citations` cites the urgency agent's own evidence directly (validates today,
-  one hop shallower than intended); default mode cites the `Score`/`ReferralState` nodes it should,
-  and fails validation until the enum is widened.
-- Risk if unresolved: the audit trail stays one hop shallower than designed; no correctness risk.
-- On resolution: two tests flip in opposite directions on the same event (see above);
-  `--legacy-citations` is removed from the documented invocation.
+- Meanwhile *(while open)*: `--legacy-citations` cited the urgency agent's own evidence directly
+  (validated then, one hop shallower than intended); default mode cited the `Score`/`ReferralState`
+  nodes it should, and failed validation until resolved.
+- Risk that was open: the audit trail stayed one hop shallower than designed; no correctness risk.
+- Resolved (PR #7), but not as requested: rather than widening `EvidenceType`, the retrieval service
+  added a separate, wider `DecisionEvidenceType` for placement citations only — the original five
+  values plus `"score"`, `"referral_state"`, and one more than asked, `"rule"` (the ontology's
+  `citesTimeframeEvidence` already permits a `Rule` there). `EvidenceType` itself stays at five
+  values, since `ScoreCitationIn` is still bound by Postgres' `ac_evidence_type_valid` CHECK, which
+  `agent.decision_citations` carries no equivalent of. Default-mode citations now validate;
+  `--legacy-citations` remains a legitimate, working choice, just no longer the only one.
 
 **ADR-011 — CRT breach as a hard tier above clinical priority**
 - Owned by: clinical and compliance review.
