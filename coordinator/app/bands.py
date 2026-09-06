@@ -6,7 +6,7 @@ non-compensatory band boundary: no score may move a referral across a
 band, and ordering is by `severity_rank`, never the raw `cpc` code value.
 
 Per ADR-006, referrals with no `severity_rank` -- `cpc: null` and Excluded
-(`cpc: "4"`) -- are ranked after every categorised referral, as two
+(`cpc: 4`) -- are ranked after every categorised referral, as two
 distinguishable groups, never merged.
 
 This module resolves bands only. Within-band ordering by priority (urgency,
@@ -15,23 +15,28 @@ wait, breach status) is Phase 3/4's job (spec.md FR5) and is not done here.
 
 from typing import Any, Final
 
-SEVERITY_RANK: Final[dict[str, int]] = {
-    "1": 1,  # Urgent
-    "3": 2,  # Semi-Urgent
-    "2": 3,  # Routine
-    # "4" (Excluded) intentionally omitted: it has no severity_rank.
+SEVERITY_RANK: Final[dict[int, int]] = {
+    1: 1,  # Urgent
+    3: 2,  # Semi-Urgent
+    2: 3,  # Routine
+    # 4 (Excluded) intentionally omitted: it has no severity_rank.
 }
 """Maps the NTPF `cpc` code (`core.ref_codes`) to its clinical severity
 rank, lower is more urgent. This is the only place these values live
 (ADR-003); `cpc` itself is never used as a sort key.
+
+Keyed by `int`, matching the type `GET /hospitals/.../cohort/...` actually
+returns for `cpc` (int or `None`) -- confirmed against the live fixture,
+task 1.3. Deliberately not `str(cpc)`-coerced: that would silently accept
+malformed values like `"03"` or `3.0` that are not the real `cpc` type.
 """
 
 _NULL_CPC_BAND: Final[str] = "uncategorised"
 _EXCLUDED_BAND: Final[str] = "excluded"
-_EXCLUDED_CPC: Final[str] = "4"
+_EXCLUDED_CPC: Final[int] = 4
 
 
-def _resolve_band(cpc: str | None) -> tuple[int | None, str]:
+def _resolve_band(cpc: int | None) -> tuple[int | None, int | str]:
     """Resolves one referral's severity_rank and band label.
 
     Args:
@@ -72,9 +77,7 @@ def order_by_band(referrals: list[dict[str, Any]]) -> list[dict[str, Any]]:
     annotated = []
     for referral in referrals:
         severity_rank, band = _resolve_band(referral.get("cpc"))
-        annotated.append(
-            {**referral, "severity_rank": severity_rank, "band": band}
-        )
+        annotated.append({**referral, "severity_rank": severity_rank, "band": band})
 
     # Tails sort after every categorised band: categorised referrals get
     # rank 0 in this key (their real severity_rank breaks ties among

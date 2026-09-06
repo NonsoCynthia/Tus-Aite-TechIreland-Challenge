@@ -34,6 +34,4 @@ intentional and tracked by `test_citation_contract.py`.
 # type segment (e.g. `score/...`), so `evidence_key` below is the suffix
 # only, not the full IRI path.
 SCORE_EVIDENCE_KEY_TEMPLATE = "{run_id}/{hospital_hipe}/{pathway_number}/{agent}"
-REFERRAL_STATE_EVIDENCE_KEY_TEMPLATE = (
-    "{hospital_hipe}/{pathway_number}/{valid_from}"
-)
+REFERRAL_STATE_EVIDENCE_KEY_TEMPLATE = "{hospital_hipe}/{pathway_number}/{valid_from}"
