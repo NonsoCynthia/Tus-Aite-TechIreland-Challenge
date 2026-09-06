@@ -183,7 +183,7 @@ Two tasks remain open. **6.6**, the live end-to-end run, waits on the urgency an
 agents producing real scores — `agent.agent_scores` is still empty. **6.7**, the compliance
 review, waits on the responsible-AI lead and has been requested.
 
-## 4. Three things the build disproved
+## 4. Four things the build disproved
 
 Each was an assumption written into the spec or the code. Each was checked against real data
 and failed.
@@ -276,6 +276,53 @@ avoidable `422` turning into a `400`. `agent.decision_citations` carries no such
 `ReferralState` alone. The finding itself stands — `EvidenceType` genuinely could not express
 what a `RankedPlacement` cites, roles and evidence types genuinely are independent axes, and
 that gap was real, not assumed. See §7 for what changed in this agent as a result.
+
+### 4.4 A rule check that "cannot fail by construction" checked the wrong construction
+
+`check_tiebreak` grouped referrals by `(severity_rank, triage_status)` and required
+`referral_date` to be non-decreasing within that group. The real sort key (spec.md FR5) is
+`(severity_rank, crt_breached desc, priority desc, referral_date asc, pathway_number asc)` —
+`crt_breached` and `priority` sit *between* the band and `referral_date`. The sort key's actual
+promise is "oldest-first among referrals also tied on `crt_breached` and `priority`"; the check
+was verifying "oldest-first across the whole band", a stronger claim the ranking never made and
+routinely violates on real data whenever two same-band referrals differ in breach status or
+score. `RULE-TIEBREAK` returned `False` on the real 9004 cohort's very first non-trivial run:
+`PW-9004-000440` (2025-08-03, breached, priority 0.857) correctly ranked ahead of
+`PW-9004-000054` (2025-07-01, also breached, priority 0.836) — right by the sort key, flagged
+as a violation by the check. Grouping on `severity_rank` alone carried a second latent error:
+the two ADR-006 tail groups (uncategorised, Excluded) both have `severity_rank=None`, so the
+check would treat them as one group the moment both appeared together, despite never being the
+same group.
+
+**Why this stayed invisible for as long as it did:** `rule_checks` was not wired into decision
+assembly at all until immediately before this was found (§7 — `build_ranking` never called
+`evaluate_referral_rules`/`check_tiebreak`), so `--dry-run` always showed `"rule_checks": []`
+and the wrong answer never reached a payload anyone would read. Two bugs — one hiding the
+check, one making it wrong — produced the same observable output as no bug at all, right up
+until the first was fixed and the second became visible. Independently, neither test suite had
+caught it before that either: `test_rule_checks.py`'s hand-built cases never varied
+`crt_breached`/`priority` within a tied `severity_rank`/`triage_status` group, so the check's
+narrow, correct grouping and its broad, wrong one happened to agree on every hand-built case;
+`test_decision.py`'s assembly tests used single hand-crafted rankings, never a real list dense
+enough for the two groupings to diverge.
+
+Fixed by grouping on `(band, triage_status, crt_breached, priority)` — every key that sorts
+before `referral_date`, plus `triage_status` per FR10's own wording ("same category and
+status") — with `band` replacing `severity_rank` so the tail groups are never conflated.
+Mutation-checked afterward the same way `SEVERITY_RANK` and `applicable_rule_id` were: reverting
+the grouping to the old `(severity_rank, triage_status)` form over the real cohort produced
+**1 failed, 76 passed** — only the real-cohort assembly test in `test_decision.py` caught it;
+every hand-built case in `test_rule_checks.py` stayed green, confirming the asymmetry above
+rather than assuming it. Restored, back to 77 passed.
+
+**The general lesson:** a rule check that "cannot fail by construction" is only unfalsifiable if
+it checks the thing the construction actually guarantees. That property does not follow from
+the check and the sort key being written from the same spec, or from each being internally
+self-consistent — this pair was each consistent on its own terms and still disagreed with each
+other. Verifying the claim means reading the check and the sort key against each other, term by
+term, on purpose; nothing else catches this class of mismatch, because a wrong check still
+returns a stable, plausible-looking boolean, and a test suite built from cases too small to
+exercise every term of the sort key will never disagree with it either. Recorded as ADR-013.
 
 ## 5. Known limitations
 

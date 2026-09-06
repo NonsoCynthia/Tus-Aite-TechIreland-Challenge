@@ -32,6 +32,7 @@ from coordinator.app.decision import (
 )
 from coordinator.app.priority import ALPHA_MAX, ALPHA_MIN
 from coordinator.app.ranking import rank_cohort
+from coordinator.app.rule_checks import check_order, check_tiebreak
 
 SEMANTIC_VERSION = "0.1.0"
 
@@ -363,8 +364,18 @@ def main(argv: list[str] | None = None) -> int:
         print("No referrals could be ranked (no urgency scores available).")
         return _EXIT_OK
 
+    # RULE-ORDER/RULE-TIEBREAK are whole-list properties (spec.md FR10):
+    # computed once over the full ranked list, then attached to every
+    # placement -- never per-referral in isolation.
+    order_passed = check_order(result.rankings)
+    tiebreak_passed = check_tiebreak(result.rankings)
     rankings = [
-        build_ranking(referral, legacy_citations=args.legacy_citations)
+        build_ranking(
+            referral,
+            legacy_citations=args.legacy_citations,
+            order_passed=order_passed,
+            tiebreak_passed=tiebreak_passed,
+        )
         for referral in result.rankings
     ]
     coordinator_version = build_coordinator_version(

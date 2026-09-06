@@ -188,10 +188,10 @@ def test_rule_order_and_tiebreak_pass_on_a_correctly_ordered_list() -> None:
     ordered list, after the full ordering exists, and pass on correctly
     ordered output (spec.md FR10)."""
     ranked = [
-        _referral("P-1", cpc=1, severity_rank=1, referral_date="2026-01-01"),
-        _referral("P-2", cpc=1, severity_rank=1, referral_date="2026-01-05"),
-        _referral("P-3", cpc=3, severity_rank=2, referral_date="2026-01-02"),
-        _referral("P-4", cpc=3, severity_rank=2, referral_date="2026-01-03"),
+        _referral("P-1", cpc=1, severity_rank=1, band=1, referral_date="2026-01-01"),
+        _referral("P-2", cpc=1, severity_rank=1, band=1, referral_date="2026-01-05"),
+        _referral("P-3", cpc=3, severity_rank=2, band=3, referral_date="2026-01-02"),
+        _referral("P-4", cpc=3, severity_rank=2, band=3, referral_date="2026-01-03"),
     ]
 
     assert check_order(ranked) is True

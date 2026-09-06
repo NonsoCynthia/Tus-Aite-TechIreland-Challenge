@@ -405,3 +405,58 @@ two call sites want different things from the same fact (a citation needs only a
 check needs applicability plus the outcome), and forcing a shared function would either make
 `build_citations` depend on wait data it doesn't otherwise need or make `evaluate_referral_rules`
 return partial results for citation-only callers.
+
+---
+
+### ADR-013: `check_tiebreak` checked a claim the sort key never made
+
+**Date:** 2026-09-06
+**Status:** accepted (bug fixed)
+
+**Context:** `check_tiebreak` grouped referrals by `(severity_rank, triage_status)` and required
+`referral_date` to be non-decreasing within that group. The real sort key (spec.md FR5) is
+`(severity_rank, crt_breached desc, priority desc, referral_date asc, pathway_number asc)` —
+`crt_breached` and `priority` sit *between* the band and `referral_date`. So the sort key's actual
+promise is "oldest-first among referrals also tied on `crt_breached` and `priority`", not
+"oldest-first within the whole band". `check_tiebreak` was checking the second, stronger claim,
+which the ranking never made and routinely violates on real data: two referrals sharing a band and
+status but differing in `crt_breached` or `priority` are correctly ordered by score, not by date, and
+`check_tiebreak` called that a violation. Confirmed against the real 9004 cohort: `RULE-TIEBREAK`
+returned `False` on the very first non-trivial run, e.g. `PW-9004-000440` (2025-08-03, `crt_breached`
+`True`, priority 0.857) ranked ahead of `PW-9004-000054` (2025-07-01, same `crt_breached`, priority
+0.836) — correct by the sort key, flagged as a violation by the check.
+
+Grouping on `severity_rank` alone carried a second latent error: the two ADR-006 tail groups
+(uncategorised, Excluded) both have `severity_rank=None`, so they would be treated as one group the
+moment both appeared in a decision together, despite never being the same group.
+
+**Why this stayed invisible:** `rule_checks` was not wired into decision assembly at all until the
+task before this one (`build_ranking` never called `evaluate_referral_rules`/`check_tiebreak`), so a
+`--dry-run` always showed `"rule_checks": []` and the wrong `RULE-TIEBREAK` result never reached a
+payload where anyone would read it. Wiring the two bugs together, at the same time, is why neither
+was visible on its own: an unwired check and a wrong check produce the same observable output —
+nothing — right up until the wiring is fixed and the wrong check's answer is suddenly readable.
+Separately, neither test suite caught it before that: `test_rule_checks.py`'s hand-built cases never
+varied `crt_breached`/`priority` within a tied `severity_rank`/`triage_status` group, so the check's
+narrower, correct grouping and its broader, wrong one agree on every hand-built case; the assembly
+tests in `test_decision.py` built single hand-crafted rankings, never a real list dense enough for the
+mismatch to appear.
+
+**Decision:** `check_tiebreak` groups on `(band, triage_status, crt_breached, priority)` — every key
+that sorts before `referral_date` in the real sort key, plus `triage_status` per FR10's own wording
+("same category and status") — and `band` replaces `severity_rank` so the two tail groups are never
+conflated.
+
+**The general lesson:** a rule check that "cannot fail by construction" is only unfalsifiable if it
+checks the thing the construction actually guarantees. That property does not follow from writing the
+check and the sort key from the same spec, or from both being internally self-consistent — this pair
+was each internally consistent and still didn't agree with each other. Verifying the claim means
+reading the check and the sort key against each other, term by term, deliberately; nothing else
+catches this class of mismatch, because a check that is wrong in this way still returns a stable,
+plausible-looking boolean, and a test suite built from cases too small to exercise every term of the
+sort key will never disagree with it either.
+
+**Trade-off accepted:** None beyond the cost already accepted in ADR-012 — the mutation check for this
+fix (breaking the grouping key deliberately) is caught only by the real-cohort assembly test in
+`test_decision.py`, not by any hand-built case in `test_rule_checks.py`; that asymmetry is now
+recorded rather than assumed away.

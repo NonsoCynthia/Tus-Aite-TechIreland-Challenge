@@ -116,20 +116,37 @@ def check_tiebreak(ranked_referrals: list[dict[str, Any]]) -> bool:
     """`RULE-TIEBREAK`: same category and status ordered oldest-first.
 
     Evaluated over the whole ordered list, not per referral -- true iff,
-    within each run of referrals sharing the same `severity_rank` and
-    `triage_status`, `referral_date` is non-decreasing.
+    within each run of referrals tied on every key that sorts *before*
+    `referral_date` in the full sort key (spec.md FR5: `band`,
+    `crt_breached`, `priority`) and sharing the same `triage_status`,
+    `referral_date` is non-decreasing.
+
+    Two referrals in the same CPC band are correctly **not** required to
+    be date-ordered against each other if their `crt_breached` or
+    `priority` differ: the sort key puts `crt_breached desc` and
+    `priority desc` ahead of `referral_date asc`, so "oldest first" only
+    ever applies as the tiebreak of last resort, among referrals equal on
+    everything that outranks date. Grouping by `severity_rank` alone
+    (rather than `band`) would also wrongly conflate the two tail groups
+    (ADR-006), which share `severity_rank=None` but are never the same
+    group.
 
     Args:
         ranked_referrals: The decision's referrals, in ranked order, each
-            carrying `severity_rank`, `triage_status` and `referral_date`.
+            carrying `band`, `triage_status`, `crt_breached`, `priority`
+            and `referral_date`.
 
     Returns:
         `True` if no same-category, same-status referral is ranked ahead
-        of an older one.
+        of an older one, among referrals otherwise tied.
     """
     for current, following in zip(ranked_referrals, ranked_referrals[1:], strict=False):
-        same_severity = current.get("severity_rank") == following.get("severity_rank")
-        same_status = current.get("triage_status") == following.get("triage_status")
-        if same_severity and same_status and current["referral_date"] > following["referral_date"]:
+        same_group = (
+            current.get("band") == following.get("band")
+            and current.get("triage_status") == following.get("triage_status")
+            and current.get("crt_breached") == following.get("crt_breached")
+            and current.get("priority") == following.get("priority")
+        )
+        if same_group and current["referral_date"] > following["referral_date"]:
             return False
     return True

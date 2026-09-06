@@ -25,6 +25,7 @@ from typing import Any, Final
 
 from coordinator.app.citations import ROLE_EVIDENCE_TYPES, applicable_rule_id
 from coordinator.app.priority import ALPHA_MAX, ALPHA_MIN, CapacityDirection
+from coordinator.app.rule_checks import evaluate_referral_rules
 
 CPC_BAND_LABELS: Final[dict[int | None, str]] = {
     1: "Urgent",
@@ -233,7 +234,50 @@ def build_coordinator_version(
     )
 
 
-def build_ranking(referral: dict[str, Any], *, legacy_citations: bool = False) -> dict[str, Any]:
+def build_rule_checks(
+    referral: dict[str, Any], *, order_passed: bool = True, tiebreak_passed: bool = True
+) -> list[dict[str, Any]]:
+    """Assembles the full `RuleCheckIn` list for one ranked position (FR10).
+
+    Combines this referral's own CRT/turnaround checks
+    (`coordinator.app.rule_checks.evaluate_referral_rules`) with the
+    `RULE-ORDER`/`RULE-TIEBREAK` result. Those two are properties of the
+    *whole ordered list*, not of one referral, and must be computed once
+    per decision (`coordinator.app.rule_checks.check_order`/
+    `check_tiebreak` over every ranked referral) -- this function does not
+    and cannot compute them itself, only attach the result FR10 says every
+    ranked position carries.
+
+    Args:
+        referral: A ranked referral dict carrying `cpc`,
+            `adjusted_wait_days`, `triage_status`, `days_awaiting_triage`.
+        order_passed: The whole-decision `RULE-ORDER` result. Defaults to
+            `True` (the only value real output can ever have by
+            construction of FR3/FR5) so referral-focused tests don't need
+            to compute it -- callers assembling a real decision must still
+            pass the actual `check_order` result over the full ranked
+            list, never rely on this default silently.
+        tiebreak_passed: The whole-decision `RULE-TIEBREAK` result. Same
+            caveat as `order_passed`.
+
+    Returns:
+        A list of `RuleCheckIn`-shaped dicts (`rule_id`, `passed`,
+        `detail`).
+    """
+    return [
+        *evaluate_referral_rules(referral),
+        {"rule_id": "RULE-ORDER", "passed": order_passed, "detail": None},
+        {"rule_id": "RULE-TIEBREAK", "passed": tiebreak_passed, "detail": None},
+    ]
+
+
+def build_ranking(
+    referral: dict[str, Any],
+    *,
+    legacy_citations: bool = False,
+    order_passed: bool = True,
+    tiebreak_passed: bool = True,
+) -> dict[str, Any]:
     """Assembles one `RankingIn`-shaped dict for a ranked referral.
 
     Args:
@@ -241,6 +285,11 @@ def build_ranking(referral: dict[str, Any], *, legacy_citations: bool = False) -
             `coordinator.app.ranking.rank_cohort`, plus
             `urgency_citations`/`capacity_citations`.
         legacy_citations: Whether to use the ADR-009 fallback citation set.
+        order_passed: The whole-decision `RULE-ORDER` result -- see
+            `build_rule_checks`. Callers assembling a real decision must
+            pass the actual result, not rely on the default.
+        tiebreak_passed: The whole-decision `RULE-TIEBREAK` result -- see
+            `build_rule_checks`.
 
     Returns:
         A dict shaped like `retrieval.app.schemas.RankingIn`.
@@ -254,7 +303,9 @@ def build_ranking(referral: dict[str, Any], *, legacy_citations: bool = False) -
         "capacity_score": referral["capacity_score"],
         "rationale_summary": build_rationale_summary(referral),
         "citations": build_citations(referral, legacy_citations=legacy_citations),
-        "rule_checks": referral.get("rule_checks", []),
+        "rule_checks": build_rule_checks(
+            referral, order_passed=order_passed, tiebreak_passed=tiebreak_passed
+        ),
     }
 
 

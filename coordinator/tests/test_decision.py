@@ -41,14 +41,17 @@ never called; `interpret_decision_response` is tested against bare status
 codes, not a live response.
 """
 
+import json
 import re
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
 from coordinator.app.citations import ROLE_EVIDENCE_TYPES
+from coordinator.app.cli import fixture_scores, merge_scores_into_cohort
 from coordinator.app.decision import (
     DecisionPostOutcome,
     build_citations,
@@ -58,7 +61,11 @@ from coordinator.app.decision import (
     build_rationale_summary,
     interpret_decision_response,
 )
+from coordinator.app.ranking import rank_cohort
+from coordinator.app.rule_checks import check_order, check_tiebreak
 from retrieval.app.schemas import DecisionIn
+
+_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "cohort_9004_2026-08-30.json"
 
 # Verbs product-guidelines.md's Verbs table names as implying system action
 # on the patient, or a diagnostic/corrective claim -- rationale_summary
@@ -170,6 +177,82 @@ def test_timeframe_role_cites_only_referral_state_when_no_rule_applies() -> None
     timeframe_citations = [c for c in citations if c["role"] == "timeframe"]
     evidence_types = {c["evidence_type"] for c in timeframe_citations}
     assert evidence_types == {"referral_state"}
+
+
+def test_dry_run_assembly_over_real_cohort_produces_populated_rule_checks() -> None:
+    """THE RULE-CHECKS WIRING TEST.
+
+    Regression test for the bug where `build_ranking` never called
+    `coordinator.app.rule_checks.evaluate_referral_rules`, so every real
+    `--dry-run` placement carried `"rule_checks": []` despite
+    `rule_checks.py` being fully implemented and separately tested. Every
+    existing rule-check test calls the evaluator directly and never
+    checks the result reaches the assembled payload -- this is the test
+    that would have caught the gap.
+
+    Reproduces the CLI's real pipeline (`coordinator.app.cli.
+    fixture_scores`/`merge_scores_into_cohort`, then `rank_cohort`, then
+    the whole-list `check_order`/`check_tiebreak`, then `build_ranking`)
+    over the real 500-referral 9004/2026-08-30 fixture -- not a hand-built
+    single referral, which would not have caught a wiring gap.
+    """
+    with _FIXTURE_PATH.open() as f:
+        cohort = json.load(f)["referrals"]
+
+    scores = fixture_scores(cohort)
+    merged = merge_scores_into_cohort(cohort, scores, run_id="run-test")
+    result = rank_cohort(merged, capacity_direction="pressure")
+
+    order_passed = check_order(result.rankings)
+    tiebreak_passed = check_tiebreak(result.rankings)
+    assert order_passed is True
+    assert tiebreak_passed is True
+
+    rankings = [
+        build_ranking(referral, order_passed=order_passed, tiebreak_passed=tiebreak_passed)
+        for referral in result.rankings
+    ]
+
+    # Non-empty on every single placement -- the bug this test guards
+    # against was "rule_checks": [] on all 500.
+    assert all(len(r["rule_checks"]) > 0 for r in rankings)
+
+    rule_ids_by_pathway = {
+        r["pathway_number"]: {c["rule_id"] for c in r["rule_checks"]} for r in rankings
+    }
+
+    urgent_count = semi_urgent_count = 0
+    for referral in result.rankings:
+        rule_ids = rule_ids_by_pathway[referral["pathway_number"]]
+
+        # RULE-ORDER/RULE-TIEBREAK attach to every placement (spec.md
+        # FR10: "per ranked position, emits RuleCheckIn results" -- both
+        # whole-list checks are results every position carries).
+        assert "RULE-ORDER" in rule_ids
+        assert "RULE-TIEBREAK" in rule_ids
+
+        cpc = referral.get("cpc")
+        if cpc == 1:
+            assert "RULE-CRT-URGENT" in rule_ids
+            urgent_count += 1
+        elif cpc == 3:
+            assert "RULE-CRT-SEMI" in rule_ids
+            semi_urgent_count += 1
+        elif referral.get("triage_status") == "awaiting_triage":
+            assert "RULE-TRIAGE-TURNAROUND" in rule_ids
+        else:
+            # Routine, Excluded, or uncategorised-and-not-awaiting-triage:
+            # no CRT/turnaround rule invented for it.
+            assert not rule_ids & {
+                "RULE-CRT-URGENT",
+                "RULE-CRT-SEMI",
+                "RULE-TRIAGE-TURNAROUND",
+            }
+
+    # Sanity: the real fixture actually exercises the urgent/semi-urgent
+    # bands this test asserts on (131/133 referrals respectively).
+    assert urgent_count == 131
+    assert semi_urgent_count == 133
 
 
 def test_legacy_citations_fallback_uses_urgency_agent_citations_and_omits_timeframe() -> None:
