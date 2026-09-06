@@ -180,9 +180,7 @@ def test_real_cohort_fixture_bands_resolve_cleanly() -> None:
         (i for i, b in enumerate(bands_in_order) if b in tail_bands),
         len(bands_in_order),
     )
-    banded_after_tail = [
-        b for b in bands_in_order[first_tail_index:] if b not in tail_bands
-    ]
+    banded_after_tail = [b for b in bands_in_order[first_tail_index:] if b not in tail_bands]
     assert not banded_after_tail
 
     # This fixture has no Excluded (cpc=4) referrals (see fixtures/

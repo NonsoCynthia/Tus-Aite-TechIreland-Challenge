@@ -136,6 +136,14 @@ stays invisible. `RULE-TRIAGE-TURNAROUND` (21 days) is evaluated against the unc
 present the uncategorised group as merely low priority — it is unknown priority, which is a
 different and more urgent thing.
 
+**Note (2026-09-06):** Excluded (`cpc` 4) is defined in `core.ref_codes` but does not occur
+anywhere in data v1.1. `SELECT triage_category, count(*) FROM core.triage_events` returns only
+categories 1 (1,248), 2 (1,586) and 3 (1,378) across 4,212 rows. The excluded-tail branch therefore
+exists for correctness against `ref_codes`, not against observed data, and is exercised only by
+hand-built test fixtures. It is kept deliberately: a regenerated or real dataset could contain
+Excluded referrals, and the coordinator must not break on the first one. Do not delete it as dead
+code.
+
 ---
 
 ### ADR-007: `capacity_score` direction is required configuration
