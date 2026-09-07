@@ -22,3 +22,25 @@ proposal §14 Days 3–6.
 — Postgres is the system of record, the graph gets a synchronous projection on commit. The write path
 itself is implemented in `retrieval-service_20260904`, not in this track; agents built here call that
 service rather than writing to Postgres or the graph directly.
+
+**2026-09-08:** Phase 1 (urgency agent) built in `urgency-agent/` — NEWS2 scoring, the
+retrieval-service write path, CLI and a committed mutation check. 113 tests passing, 5 skipped
+(3 awaiting captured fixtures, 2 awaiting a live retrieval service), 97% coverage. Only the manual
+verification task remains open in Phase 1, plus the MTS task, which is **not buildable from this
+dataset** (ADR-004).
+
+Four ADRs were added building it, two of them open and neither this track's to close:
+
+- **ADR-004 (open)** — `urgency_score` v1 is NEWS2-only and is an *incomplete* urgency signal. The
+  dataset team measured NEWS2 against triage category and published the result: correlation never
+  exceeds 0.253, the best rule on `news2` alone beats guessing by 17.5 percentage points, and 54–59%
+  of the highest-acuity patients score `news2 <= 2`. No ranked list built on v1 alone should be
+  described as clinically prioritised.
+- **ADR-008 (open)** — `GET /referrals/.../context` does not return `priority_level_gp`,
+  `referral_source` or `high_clinical_or_social_needs`, three of the four inputs the dataset's own
+  documentation says an urgency agent must read. A change request against
+  `retrieval-service_20260904`; nothing in `urgency-agent/` can resolve it. **This blocks ADR-004's
+  remedy.**
+
+ADR-005 (score the most recent observation) and ADR-006 (normalise through escalation breakpoints,
+not linearly) are accepted; ADR-006 is pending a distribution check against real data.

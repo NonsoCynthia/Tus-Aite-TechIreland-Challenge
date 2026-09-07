@@ -1,0 +1,13 @@
+# Runtime dependencies only -- what `python -m urgency_agent` needs to run.
+# Bounds here, matching capacity-agent/requirements.txt and
+# retrieval/requirements.txt's convention.
+#
+# The exact versions this package was actually built and tested against are
+# frozen in requirements-dev.txt (a real `pip freeze`, per
+# BUILDING_AN_AGENT_WITH_CONDUCTOR.md Step 1: resolving bounds tomorrow gives
+# someone else a different dependency set). Install that file for development;
+# this one is the contract for anyone importing or deploying the package.
+pydantic>=2.9
+pydantic-settings>=2.5
+httpx>=0.27
+PyYAML>=6.0

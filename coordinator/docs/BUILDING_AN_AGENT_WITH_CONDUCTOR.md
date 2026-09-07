@@ -56,8 +56,18 @@ cp retrieval/mypy.ini    <agent>/mypy.ini      # disallow_untyped_defs
 touch <agent>/__init__.py <agent>/app/__init__.py <agent>/tests/__init__.py
 ```
 
-The top-level `__init__.py` matters. Without it mypy sees `<agent>/app/` as both `app` and
-`<agent>.app` and refuses to check anything at all.
+The top-level `__init__.py` matters **when your package directory has a generic name**.
+The coordinator's is `coordinator/app/`, and without the outer `__init__.py` mypy sees it as
+both `app` and `coordinator.app` and refuses to check anything at all — silently, exiting 0.
+
+**If your package has a distinctive name, skip it.** `capacity-agent/capacity_agent/` and
+`urgency-agent/urgency_agent/` have no top-level `__init__.py` and mypy checks them fine
+(`Success: no issues found in 16 source files` for capacity). Adding one there is harmless for
+mypy but confuses ruff's isort into treating your own package as third-party. Prefer the
+distinctive name and the simpler layout.
+
+Whichever you choose, **check the file count mypy reports.** "Success" over 0 files looks
+identical to success over 16.
 
 > **Known repo-wide disagreement:** `conductor/code_styleguides/python.md` says 80 columns;
 > both `ruff.toml` files say 100. The formatter reads the `.toml`, so 100 wins in practice
@@ -225,6 +235,32 @@ are coupled; none failing would mean the test does not do what its name says.
 
 You can only do this on a **committed** file — `git checkout` cannot revert something git has
 never seen.
+
+> **Clear `__pycache__` between every mutation, or this technique silently lies to you.**
+> Most useful mutations change a single character (`return 2` → `return 3`), so the mutant and
+> the original are **the same byte length**. Python validates cached bytecode on `(mtime, size)`,
+> and a revert landing in the same second as the mutation changes neither in a way it can see —
+> so the *mutant's* bytecode gets reused and the tests run against code that is no longer on
+> disk. This bit the urgency agent's first mutation run: temperature tests failed under a
+> mutation to a different module entirely, and the files on disk were provably clean.
+>
+> The failure mode is silent and, worse, it can read as **good news** — a stale-cache run that
+> reports "nothing failed" looks exactly like a mutation your tests correctly ignore.
+>
+> ```bash
+> find . -name __pycache__ -type d -exec rm -rf {} +
+> python -m pytest <agent>/tests/ -q -p no:cacheprovider
+> ```
+
+**Better still, commit the mutations as a script.** A check run once by hand proves something
+about that afternoon; committed, it re-asserts itself every time the scorer changes, and the
+failure counts become a reviewable record rather than a claim in a chat log. See
+`urgency-agent/tools/mutation_check.py`: each mutation names the tests that *must* catch it, so
+a **different** set firing is reported too — coupling becomes as visible as a hole. It refuses to
+run against a red baseline, aborts if a mutation's anchor text has vanished rather than silently
+skipping, and clears the cache on every run. It earned this on the urgency agent's Tier 2 commit,
+reporting a mismatch where new tests legitimately caught an existing mutation — a stale
+expectation, widened deliberately rather than absorbed.
 
 ## Step 7 — Meet real data early, and expect it to disprove something
 

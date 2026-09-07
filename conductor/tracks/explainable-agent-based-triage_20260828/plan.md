@@ -16,18 +16,36 @@ that service, so no separate "project `agent.*` into the graph" task is needed h
 
 ## Phase 1: Urgency Agent (Tier 1)
 
-- [ ] Task: MTS scoring logic
+- [ ] Task: MTS scoring logic — **NOT BUILDABLE from this dataset, deferred under ADR-004 (open)**
     - [ ] Sub-task: Write failing tests for MTS category assignment, cited to the MTS rubric
-    - [ ] Sub-task: Implement deterministic MTS scorer reading `UrgencySignal` via SPARQL
-- [ ] Task: NEWS2 scoring logic
-    - [ ] Sub-task: Write failing tests for NEWS2 score computation, cited to the NEWS2 rubric
-    - [ ] Sub-task: Implement deterministic NEWS2 scorer
-- [ ] Task: Write scores via retrieval-service_20260904 (Tier 2)
-    - [ ] Sub-task: Round-trip test — score, `POST /scores`, read back via `GET /runs/{run_id}/
-          hospitals/{hospital_hipe}/scores`, compare
-    - [ ] Sub-task: Implement `triage.agents.urgency` calling `POST /scores` with its evidence
-          citations (gather context first via `GET /referrals/{hospital_hipe}/{pathway_number}/
-          context`, ADR-002)
+    - [ ] Sub-task: ~~Implement deterministic MTS scorer reading `UrgencySignal` via SPARQL~~
+          Two blockers, neither resolvable in `urgency-agent/`: `chiefcomplaint` is empty on every
+          observation (`generate.py:553`) so no presentation flowchart can be selected, and the
+          stored `mts_category` is a random draw keyed on the CPC band (`generate.py:538`), so
+          scoring it would double-count the band the coordinator already orders by. **Note also
+          that this sub-task's stated method contradicts ADR-002** — agents never read SPARQL
+          directly; input comes from `GET /referrals/.../context`. See ADR-004.
+- [x] Task: NEWS2 scoring logic
+    - [x] Sub-task: Write failing tests for NEWS2 score computation, cited to the NEWS2 rubric
+          (`urgency-agent/tests/test_scoring.py` — 51 boundary cases pinned to the published
+          rubric, not to the generator's copy of it; the generator's stored `news2` column is used
+          as an independent oracle instead)
+    - [x] Sub-task: Implement deterministic NEWS2 scorer (`urgency_agent/news2.py` +
+          `scoring.py` + `calibration.yml`). Normalised through calibrated escalation breakpoints,
+          not a flat divide (ADR-006); most recent observation scored (ADR-005); paediatric
+          referrals refused rather than scored (ADR-007). **The score is an incomplete urgency
+          signal — see ADR-004 before presenting it as triage.**
+- [x] Task: Write scores via retrieval-service_20260904 (Tier 2)
+    - [x] Sub-task: Round-trip test — score, `POST /scores`, read back via `GET /runs/{run_id}/
+          hospitals/{hospital_hipe}/scores`, compare (`tests/test_run_integration.py`, plus a
+          second live test asserting citations resolve to real graph nodes rather than degrading
+          to `type: null`; both skip cleanly without a running service, with mocked-transport
+          equivalents in `test_client.py`/`test_run.py`)
+    - [x] Sub-task: Implement `urgency_agent.run` (`score_referral`/`run_for_cohort`) calling
+          `POST /scores` with its evidence citations (gather context first via
+          `GET /referrals/{hospital_hipe}/{pathway_number}/context`, ADR-002). New standalone
+          package: `urgency-agent/` (sibling to `capacity-agent/`), 113 tests + 5 skipped,
+          97% coverage, ruff/mypy clean, 6 mutation checks in `tools/mutation_check.py`
 - [ ] Task: Conductor - User Manual Verification 'Urgency Agent' (Protocol in workflow.md)
 
 ---

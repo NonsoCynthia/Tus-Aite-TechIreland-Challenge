@@ -1,3 +1,9 @@
+# Frozen: the exact versions this package was built and tested against
+# (BUILDING_AN_AGENT_WITH_CONDUCTOR.md Step 1 -- freeze what you actually ran,
+# because resolving requirements.txt's bounds tomorrow gives someone else a
+# different set). Runtime-only dependencies are declared with bounds in
+# requirements.txt. Regenerate with `pip freeze > requirements-dev.txt` from a
+# clean env built off retrieval/requirements{,-dev}.txt plus PyYAML.
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
