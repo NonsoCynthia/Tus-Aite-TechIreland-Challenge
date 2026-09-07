@@ -95,50 +95,75 @@ both restate this polarity where a reader of just the code would otherwise have 
 
 ---
 
-### ADR-004: `urgency_score` v1 is NEWS2-only; MTS is deferred, not dropped
+### ADR-004: `urgency_score` v1 is NEWS2-only — an incomplete signal, knowingly shipped
 
-**Date:** 2026-09-07
+**Date:** 2026-09-07 (revised same day, see *Correction* below)
 **Status:** **open** — needs a clinician / the responsible-AI lead
 
 **Context:** spec.md FR1 says the urgency agent "computes MTS category and NEWS2 score
-deterministically from that data," and plan.md Phase 1 carries a task for each. NEWS2 is
-computable: `core.observations` exposes `hr`, `sbp`, `rr`, `temp`, `spo2` and `avpu`, every input
-scale 1 requires. MTS is not, for two independent reasons found by reading
-`dataset/generator/generate.py` rather than by reading the spec:
+deterministically from that data," and plan.md Phase 1 carries a task for each. Neither instrument
+in `core.observations` identifies referral urgency on its own, for different reasons.
 
-1. **The input MTS needs is absent.** Real Manchester triage selects a presentation flowchart from
+**MTS cannot be computed here at all.** Two independent reasons, both from
+`dataset/generator/generate.py`:
+
+1. **Its starting input is absent.** Real Manchester triage selects a presentation flowchart from
    the chief complaint, then applies discriminators. The generator writes `chiefcomplaint` as the
    empty string on every observation (`generate.py:553`). There is no flowchart to select.
-2. **The stored `mts_category` is not derived from the vitals — it is drawn from the CPC band.**
-   `generate.py:538` picks a colour uniformly from `MTS_BY_RANK[rank]`, where `rank` is the
-   referral's own `SEVERITY_RANK`: `{1: ["red","orange"], 2: ["orange","yellow"],
-   3: ["yellow","green","blue"]}`. It is a random draw conditioned on CPC and nothing else.
+2. **The stored `mts_category` is drawn from the CPC band, not from the patient.**
+   `generate.py:538` picks a colour uniformly from `MTS_BY_RANK[rank]`, keyed on the referral's own
+   `SEVERITY_RANK`: `{1: ["red","orange"], 2: ["orange","yellow"], 3: ["yellow","green","blue"]}`.
+   It carries no information beyond CPC plus noise — at most ~1.6 bits, all of it already in the
+   band, and lossy even about that (an `orange` may be Urgent or Semi-Urgent). Since the coordinator
+   already treats CPC as a non-compensatory band (`coordinating-agent_20260906` ADR-004), scoring
+   the colour would **double-count CPC**: once as the band that orders the list, once inside the
+   score that orders within it.
 
-The consequence is the part that matters. `mts_category` carries **no information beyond CPC plus
-noise** — at most ~1.6 bits, all of it already in the band. The coordinator already treats CPC as a
-non-compensatory band ordered by `severity_rank` (`coordinating-agent_20260906` ADR-004). An urgency
-agent that scored MTS as an independent signal would therefore be **double-counting CPC**: once as
-the band that orders the list, once inside the score that orders within it. Every value would stay
-in `[0, 1]` and every ranking would look plausible — the same silent-plausibility failure mode
-ADR-003 and `coordinating-agent_20260906` ADR-007 were both written about.
+**NEWS2 can be computed, but it is a weak urgency signal — and this is measured, not suspected.**
+`dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4 lists it under "Three things the data disproved":
 
-**Decision:** v1 scores on NEWS2 alone. `score_urgency()` is nonetheless built with the capacity
-agent's weight-renormalisation shape (`capacity_agent/scoring.py:score_capacity`), so a second
-weighted component can be added later without restructuring. `method` is
-`urgency-news2-v1`, naming the single component explicitly, so a score written now can never be
-mistaken for one written under a later multi-component calibration.
+- The build spec required `news2` x `severity_rank` correlation in 0.35–0.65. A sweep across the one
+  free parameter **never exceeded 0.253**, at any value.
+- The best possible rule on `news2` alone recovers the triage category only **17.5 percentage
+  points** better than guessing the most common one.
+- **54–59% of the highest-acuity patients score `news2 <= 2`.**
 
-**Rationale:** shipping a defensible one-signal score beats shipping a two-signal score whose second
-signal is laundered CPC. The alternative reading — that the agent should *cite* `mts_category` as
-observed triage evidence without recomputing or scoring it — is viable and cheap to add, but whether
-a nurse-assigned MTS colour should influence rank *at all* given it is already reflected in CPC is a
-clinical question, not an engineering one.
+This is deliberate, not a defect: `latent_hazard` in `ground_truth.csv` is never computed from
+`news2` (`generate.py:767`), so an agent reading vitals cannot be graded against its own input.
+`DATASET_README.md` §7.6 carries the worked case — a suspected melanoma, every vital normal,
+clinically urgent. This agent scores that patient **0.0**.
 
-**Trade-off accepted:** spec.md FR1 and plan.md Phase 1's first task are **not** met by this
-implementation, and this ADR is the record of that gap rather than a silent narrowing of scope. No
-urgency score should be presented as a complete triage judgement until this is answered. `workflow.md`
-puts the responsible-AI review at the moment an agent first produces output, not at Day 6 — this is
-that moment.
+That same section states the requirement directly: *"an urgency agent must read condition, pathway,
+referral source and the high-needs flag, not just physiology."* Three of those four are not
+currently reachable — see ADR-008.
+
+**Decision:** v1 scores on NEWS2 alone, and is documented everywhere as an **incomplete** urgency
+signal rather than a triage judgement. `score_urgency()` is built with the capacity agent's
+weight-renormalisation shape (`capacity_agent/scoring.py:score_capacity`) so further components add
+without restructuring. `method` is `urgency-news2-v1`, naming the single component explicitly, so a
+v1 score can never be mistaken for one written under a later multi-component calibration.
+
+**Rationale:** NEWS2 is the only component available today that is both computable and auditable
+end to end — a clinician can re-add the six numbers by hand and check the result, and
+`test_real_fixture_news2_matches_the_generators_own_value` checks recomputation against the
+generator's own stored column. That is worth shipping as a first slice. It is not worth
+*presenting* as urgency. `conditions` is already returned by the context endpoint and is the
+obvious next component; the remaining three fields need ADR-008 resolved first.
+
+**Trade-off accepted:** spec.md FR1 and plan.md Phase 1's first task are not met, and roughly half
+of genuinely urgent referrals will score at or near zero. **No ranked list built on v1 alone should
+be described as clinically prioritised**, in the UI, in the pitch, or in the rationale text.
+`workflow.md` puts the responsible-AI review at the moment an agent first produces output — this is
+that moment, and this ADR is what that review should read first.
+
+**Correction (2026-09-07).** The first version of this ADR justified NEWS2-only partly on the
+grounds that NEWS2 "works" while MTS does not. That was wrong, and it was wrong for a reason worth
+recording: it was reasoned from `generate.py` — the code that *makes* the data — without reading
+`dataset/docs/` or the data itself. The generator shows NEWS2 is computable; it does not show
+whether the result discriminates urgency. The dataset team had already measured that it does not.
+**Reading the code that produces a dataset is not the same as meeting the dataset**
+(`BUILDING_AN_AGENT_WITH_CONDUCTOR.md` Step 7), and the three tests still skipping for want of a
+captured fixture are the same gap in a different form.
 
 ---
 
@@ -232,3 +257,52 @@ pathway exists, which is a real loss of coverage and must be visible in the clin
 silent. Whether the right answer is PEWS, an age-banded NEWS2 variant, or a separate paediatric
 agent is a clinical decision. Until it is made, no ranked list produced by this system should be
 described as covering paediatric referrals.
+
+---
+
+### ADR-008: The context endpoint does not expose the fields urgency actually needs
+
+**Date:** 2026-09-07
+**Status:** **open** — a change request against `retrieval-service_20260904`, not this track's to decide
+
+**Context:** `dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4 states, as a measured finding rather than a
+design preference, that *"an urgency agent must read condition, pathway, referral source and the
+high-needs flag, not just physiology"* — because NEWS2 alone recovers triage category only 17.5
+percentage points better than guessing (ADR-004).
+
+All four fields exist in `core.referral_daily`, and `retrieval-service_20260904` itself writes three
+of them on intake (`POST /referrals`, `retrieval/app/db.py:283-300`). But
+`GET /referrals/{hospital_hipe}/{pathway_number}/context` does not return them. Its referral SELECT
+(`retrieval/app/db.py:330-331`) is:
+
+```sql
+SELECT hospital_hipe, pathway_number, specialty_hipe, clinic_code,
+       referral_date, referral_received_date, triage_status, as_of_date
+```
+
+Present in the table, absent from the response:
+
+| Field | Why urgency needs it |
+|---|---|
+| `priority_level_gp` | The referring GP's own priority — a clinical judgement made with the patient present |
+| `referral_source` | A consultant or ED referral is not an equivalent signal to a routine GP one |
+| `high_clinical_or_social_needs` | An explicit vulnerability flag; ~7% of referrals (`generate.py:746`) |
+
+`conditions` **is** returned and needs no change. Per ADR-002 the agent may not read
+`core.referral_daily` directly to work around this, and doing so would be the wrong fix regardless:
+the mediator exists so that every agent input is one reviewable contract.
+
+**Decision:** the gap is recorded here and the fields are **not** worked around. v1 ships NEWS2-only
+(ADR-004) and the next component will be built from `conditions`, which is already reachable. The
+change request is: add `priority_level_gp`, `referral_source` and `high_clinical_or_social_needs` to
+the `referral` object returned by `GET /referrals/.../context`.
+
+**Rationale:** additive, three columns from a row the query already reads, and every one of them is
+already written by that same service — so this is exposure, not new plumbing. Raising it while the
+scorer is still one component is far cheaper than reweighting a finished multi-component model
+around a late-arriving input (`BUILDING_AN_AGENT_WITH_CONDUCTOR.md` Step 9).
+
+**Trade-off accepted:** until this lands, the urgency agent cannot implement what the dataset's own
+documentation says it must, and ADR-004's incompleteness cannot be fully remedied no matter how
+much work happens inside `urgency-agent/`. That dependency should be visible on the track board
+rather than discovered when the scores look wrong.

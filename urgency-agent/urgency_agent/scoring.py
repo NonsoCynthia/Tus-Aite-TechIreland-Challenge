@@ -10,10 +10,31 @@ to prioritise, for either agent.
 The rubric itself lives in `news2.py`; this module is the decisions built on
 top of it:
 
-- **ADR-004** -- NEWS2 is the only scored component in v1. `mts_category` is
-  read into the model but never scored: it is a random draw conditioned on the
-  referral's CPC band (generate.py:538), so scoring it would double-count the
-  band the coordinator already orders by.
+- **ADR-004** -- NEWS2 is the only scored component in v1, and v1 is an
+  INCOMPLETE urgency signal. `mts_category` is read into the model but never
+  scored: it is a random draw conditioned on the referral's CPC band
+  (generate.py:538), so scoring it would double-count the band the coordinator
+  already orders by.
+
+  **Read this before treating the output as urgency.** The dataset team
+  measured NEWS2 against triage category and published the result in
+  `dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4, under "Three things the data
+  disproved": the correlation never exceeds 0.253, the best possible rule on
+  `news2` alone beats guessing by 17.5 percentage points, and **54-59% of the
+  highest-acuity patients score news2 <= 2**. `DATASET_README.md` §7.6 carries
+  the worked case -- a suspected melanoma, every vital normal, clinically
+  urgent -- which this scorer returns 0.0 for.
+
+  That is by construction, not by defect: `latent_hazard` is never computed
+  from `news2` (generate.py:767) so an agent reading vitals cannot be graded
+  against its own input. The same section states what is actually required --
+  "an urgency agent must read condition, pathway, referral source and the
+  high-needs flag, not just physiology" -- and three of those four are not
+  reachable through `GET /referrals/.../context` today (ADR-008).
+
+  A score from this module is one auditable component of urgency. It is not a
+  triage judgement, and no ranked list built on it alone should be described
+  as clinically prioritised.
 - **ADR-005** -- the most recent observation is scored, not the worst in
   window. Worst-in-window is not reproducible: a newer, better observation
   would leave the score unchanged, making it depend on history rather than on

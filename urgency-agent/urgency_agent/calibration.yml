@@ -7,7 +7,11 @@
 # 1.0 = maximum. Same polarity as the capacity agent's pressure score (ADR-003),
 # so a higher number always means more reason to prioritise, for either agent.
 #
-# v1 scores NEWS2 only. MTS is deferred, not dropped -- see ADR-004.
+# v1 scores NEWS2 only, and NEWS2 alone is a WEAK urgency signal -- measured,
+# not suspected: correlation with triage category never exceeds 0.253, and
+# 54-59% of the highest-acuity patients score news2 <= 2
+# (dataset/docs/HOW_THE_DATA_WAS_MADE.md section 4). Retuning the curve below
+# cannot fix that; only further components can. See ADR-004 and ADR-008.
 
 # The NEWS2 -> [0,1] curve, as anchors interpolated linearly between (ADR-006).
 #
