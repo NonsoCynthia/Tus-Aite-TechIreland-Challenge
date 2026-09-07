@@ -1,0 +1,52 @@
+# Urgency agent scoring config (spec.md FR1) -- committed, inspectable config
+# rather than hidden constants, per product.md's Calibration Configuration
+# principle. A compliance reviewer or clinician can read and adjust these
+# without touching code; urgency_agent.calibration validates them before a run.
+#
+# urgency_score is a CLINICAL-URGENCY score: 0.0 = no physiological derangement,
+# 1.0 = maximum. Same polarity as the capacity agent's pressure score (ADR-003),
+# so a higher number always means more reason to prioritise, for either agent.
+#
+# v1 scores NEWS2 only. MTS is deferred, not dropped -- see ADR-004.
+
+# The NEWS2 -> [0,1] curve, as anchors interpolated linearly between (ADR-006).
+#
+# NOT a flat news2/17: that compresses the whole population into the bottom of
+# the range and leaves the score unable to discriminate where clinicians
+# actually act -- the same distribution defect min-max normalisation produced on
+# the coordinator, where the median referral sat at 0.18 in every band.
+#
+# The anchors are NEWS2's own clinical escalation thresholds:
+#   0-4   low risk               -> ward-based response
+#   5-6   low-medium risk        -> urgent review by a clinician
+#   7+    high risk              -> emergency threshold, critical-care input
+#
+# Allocating 0.30 of the range to each of the first two bands spreads out the
+# dense low-scoring population; the sparse 7-17 tail shares the remaining 0.40.
+# Interpolation *within* each band is what keeps ordering intact -- a step
+# function would give hundreds of referrals identical scores and hand the
+# coordinator nothing but ties to break on waiting time.
+#
+# Constraints enforced at load: first must be (0, 0.0); last must be news2 17
+# (the reachable maximum on scale 1, since temperature's top band is 2);
+# strictly ascending in news2; non-decreasing in score.
+#
+# NOT YET CONFIRMED against the real distribution -- ADR-006 is accepted
+# pending that check, which needs a captured fixture (tests/fixtures/README.md).
+breakpoints:
+  - news2: 0
+    score: 0.0
+  - news2: 4      # top of the low-risk band
+    score: 0.30
+  - news2: 6      # top of the low-medium band
+    score: 0.60
+  - news2: 17     # reachable maximum: 3+3+3+3+3+2
+    score: 1.0
+
+# Written to agent_scores.method / agent_version. `method` names the single
+# scored component explicitly (ADR-004), so a v1 score can never be mistaken
+# for one written under a later multi-component calibration. Bump both when
+# the breakpoints above change, so a historical score stays reproducible
+# against the calibration that actually produced it.
+method: "urgency-news2-v1"
+agent_version: "urgency-agent-0.1.0"
