@@ -128,9 +128,10 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         name="M5 paediatric guard removed (ADR-007)",
         rationale=(
-            "ADR-007 refuses specialty 0601 outright. Removing the guard must fail both "
-            "refusal tests -- including the one asserting the refusal is on the specialty "
-            "rather than on data quality."
+            "ADR-007 refuses specialty 0601 outright. Removing the guard must fail every "
+            "refusal test at both tiers -- the scorer's own, the one asserting the refusal "
+            "is on the specialty rather than on data quality, and the two in Tier 2 that "
+            "keep a refusal from ever reaching POST /scores."
         ),
         path=PACKAGE / "scoring.py",
         old="if referral.specialty_hipe == PAEDIATRIC_SPECIALTY:",
@@ -139,7 +140,30 @@ MUTATIONS: list[Mutation] = [
             {
                 "test_paediatric_specialty_is_refused",
                 "test_paediatric_refusal_happens_before_scoring",
+                # Widened when Tier 2 landed: removing the guard also stops
+                # run_for_cohort populating refused_paediatric, and stops
+                # score_referral refusing before the POST. The script
+                # reported this as a mismatch rather than absorbing it --
+                # an expectation only ever widens deliberately.
+                "test_run_for_cohort_reports_paediatric_refusals_separately",
+                "test_score_referral_raises_and_writes_nothing_when_refused",
             }
+        ),
+    ),
+    Mutation(
+        name="M6 paediatric refusal caught by its parent handler (run.py bucket order)",
+        rationale=(
+            "PaediatricReferralRefusedError subclasses InsufficientUrgencyEvidenceError, so "
+            "the except-block ORDER is the only thing keeping the buckets apart. Widening "
+            "the first handler swallows genuine data gaps into refused_paediatric -- the run "
+            "still completes, the counts still add up, and 'we do not cover paediatrics' "
+            "becomes indistinguishable from 'some rows are broken' (ADR-007)."
+        ),
+        path=PACKAGE / "run.py",
+        old="        except PaediatricReferralRefusedError as exc:",
+        new="        except InsufficientUrgencyEvidenceError as exc:",
+        expected_tests=frozenset(
+            {"test_run_for_cohort_skips_a_referral_with_no_observation_and_continues"}
         ),
     ),
 ]

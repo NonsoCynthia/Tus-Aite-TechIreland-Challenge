@@ -68,6 +68,7 @@ __all__ = [
     "Citation",
     "EvidenceType",
     "InsufficientUrgencyEvidenceError",
+    "PaediatricReferralRefusedError",
     "UrgencyScoreResult",
     "news2_components",
     "news2_total",
@@ -92,6 +93,18 @@ class InsufficientUrgencyEvidenceError(RuntimeError):
     either there is no observation to cite (NFR5, `ScoreIn.citations`'
     1..n minimum) or the referral is paediatric and NEWS2 does not apply
     (ADR-007). Nothing is written in either case."""
+
+
+class PaediatricReferralRefusedError(InsufficientUrgencyEvidenceError):
+    """ADR-007 specifically: refused because NEWS2 does not apply to
+    children, not because the data was inadequate.
+
+    A subclass rather than a message a caller has to pattern-match, because
+    `run_for_cohort` must report these separately: a whole specialty leaving
+    the ranked list is a coverage statement, while a missing observation is a
+    data-quality incident. Collapsing them would make ADR-007's deliberate
+    exclusion indistinguishable from a broken row.
+    """
 
 
 @dataclass(frozen=True)
@@ -192,7 +205,7 @@ def score_urgency(
     # perfectly scorable vitals must still be refused, or the refusal would
     # silently depend on data quality rather than on ADR-007.
     if referral.specialty_hipe == PAEDIATRIC_SPECIALTY:
-        raise InsufficientUrgencyEvidenceError(
+        raise PaediatricReferralRefusedError(
             f"referral {referral.hospital_hipe}/{referral.pathway_number} is paediatric "
             f"(specialty {PAEDIATRIC_SPECIALTY}); NEWS2 is validated for adults only, so "
             "no urgency score is written (ADR-007)"
