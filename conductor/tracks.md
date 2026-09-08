@@ -13,9 +13,16 @@
 
 | Raised by | Against | What is needed | Status |
 |---|---|---|---|
+| `explainable-agent-based-triage_20260828` ADR-009 (urgency agent, 2026-09-08) | `retrieval-service_20260904` **and** `coordinating-agent_20260906` | `GET /runs/.../hospitals/.../scores` returns `score` as a **string** (`"0.075"`) — `agent_scores.score` is a Postgres `numeric`, so the driver's `Decimal` serialises as JSON string, while `POST /scores` accepts a float. The coordinator passes this field straight into arithmetic (`cli.py:204` → `priority.py:134` → `decision.py:191`) and raises `TypeError` on it; verified against its own code. Its tests pass only because ADR-008's fixture score source yields real floats, so **every coordinator run so far has used stub scores**. Fix in the service (serialise as float, symmetric with the input, fixes all consumers) or coerce at the coordinator's `merge_scores` boundary. | **open** |
 | `explainable-agent-based-triage_20260828` ADR-008 (urgency agent, 2026-09-08) | `retrieval-service_20260904` | Add `priority_level_gp`, `referral_source` and `high_clinical_or_social_needs` to the `referral` object returned by `GET /referrals/{hospital_hipe}/{pathway_number}/context`. All three are already in `core.referral_daily` and already written by that service on intake (`retrieval/app/db.py:283-300`); the context query simply does not select them (`db.py:330-331`). Additive — exposure, not new plumbing. | **open** |
 
-**Why this one matters beyond a missing field.** `dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4 measured
+**ADR-009 is the more urgent of the two.** It is a live break, not a missing capability: task 6.6 of
+`coordinating-agent_20260906` — its last open build task, currently recorded as *"blocked on the
+urgency/capacity agents"* — is no longer blocked on those agents. Real urgency scores now exist and
+are readable via `GET /runs/.../scores`. It is blocked on this type mismatch instead, and the fix is
+a one-line coercion at worst.
+
+**Why ADR-008 matters beyond a missing field.** `dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4 measured
 that NEWS2 alone recovers triage category only 17.5 percentage points better than guessing, and that
 54–59% of the highest-acuity patients score `news2 <= 2`. That section states the requirement
 directly: *"an urgency agent must read condition, pathway, referral source and the high-needs flag,

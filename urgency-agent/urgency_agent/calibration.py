@@ -56,12 +56,12 @@ class UrgencyCalibration(BaseModel):
                 f"score={points[0].score})"
             )
 
-        if points[-1].news2 != NEWS2_MAX:
+        if points[-1].score != 1.0:
             raise ValueError(
-                f"the last breakpoint must be news2={NEWS2_MAX}, the reachable maximum "
-                f"on scale 1 (got {points[-1].news2}). Anchoring below it leaves real "
-                "observations unscorable at the top; anchoring above it (e.g. at the "
-                "generator's cap of 20) leaves the top of the range dead"
+                "the last breakpoint must score 1.0, or the top of the [0,1] range is "
+                f"unreachable by any observation (got {points[-1].score}). NEWS2 values "
+                "above the last breakpoint saturate at its score, so where that anchor "
+                "sits is a clinical choice; that it scores 1.0 is not"
             )
 
         for lower, upper in zip(points, points[1:], strict=False):

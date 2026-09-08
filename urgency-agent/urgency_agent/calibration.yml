@@ -15,28 +15,38 @@
 
 # The NEWS2 -> [0,1] curve, as anchors interpolated linearly between (ADR-006).
 #
-# NOT a flat news2/17: that compresses the whole population into the bottom of
-# the range and leaves the score unable to discriminate where clinicians
-# actually act -- the same distribution defect min-max normalisation produced on
-# the coordinator, where the median referral sat at 0.18 in every band.
+# MEASURED against all 609 observations in data v1.1 (sample profile), not
+# assumed. The observed distribution:
 #
-# The anchors are NEWS2's own clinical escalation thresholds:
-#   0-4   low risk               -> ward-based response
-#   5-6   low-medium risk        -> urgent review by a clinician
-#   7+    high risk              -> emergency threshold, critical-care input
+#   news2=0  51.1%   news2=3   7.7%   news2=6  0.7%
+#   news2=1  25.6%   news2=4   2.1%   news2=7  0.5%   <- highest observed
+#   news2=2  11.5%   news2=5   0.8%
 #
-# Allocating 0.30 of the range to each of the first two bands spreads out the
-# dense low-scoring population; the sparse 7-17 tail shares the remaining 0.40.
-# Interpolation *within* each band is what keeps ordering intact -- a step
-# function would give hundreds of referrals identical scores and hand the
-# coordinator nothing but ties to break on waiting time.
+# The top anchor is 7, NOT NEWS2_MAX (17). 17 is reachable in the rubric but
+# never occurs here, and anchoring there capped the highest real referral at
+# 0.636 -- the top 36% of the range was dead. 7 is also the clinically correct
+# ceiling independent of this sample: NEWS2 >= 7 is the top escalation
+# category ("emergency response"), and a 9 does not trigger a different action
+# than a 7. Scores saturate at 1.0 above 7.
 #
-# Constraints enforced at load: first must be (0, 0.0); last must be news2 17
-# (the reachable maximum on scale 1, since temperature's top band is 2);
-# strictly ascending in news2; non-decreasing in score.
+# NOT a flat news2/7 either: the anchors are NEWS2's own escalation
+# thresholds (0-4 low, 5-6 low-medium, 7+ high), so the curve steps where
+# clinicians change behaviour.
 #
-# NOT YET CONFIRMED against the real distribution -- ADR-006 is accepted
-# pending that check, which needs a captured fixture (tests/fixtures/README.md).
+# KNOWN, AND NOT FIXABLE HERE: 51.1% of referrals score news2=0 and therefore
+# tie at exactly 0.0, and 88.2% sit at or below news2=2. No monotone mapping
+# can separate patients whose inputs are identical. Retuning these anchors
+# changes the spread of the top 12%, never the tie at the bottom -- that is a
+# property of NEWS2 on this population (ADR-004), not of this calibration.
+#
+# STORAGE PRECISION: agent_scores.score is numeric(4,3), so the retrieval
+# service rounds every written score to three decimals. Breakpoint scores that
+# produce values needing more precision are silently rounded on write -- the
+# anchors below are all exact at 3dp deliberately.
+#
+# Constraints enforced at load: first must be (0, 0.0); last must score 1.0;
+# no breakpoint above NEWS2_MAX; strictly ascending in news2; non-decreasing
+# in score.
 breakpoints:
   - news2: 0
     score: 0.0
@@ -44,13 +54,8 @@ breakpoints:
     score: 0.30
   - news2: 6      # top of the low-medium band
     score: 0.60
-  - news2: 17     # reachable maximum: 3+3+3+3+3+2
+  - news2: 7      # high-risk / emergency-response threshold; saturates above
     score: 1.0
 
-# Written to agent_scores.method / agent_version. `method` names the single
-# scored component explicitly (ADR-004), so a v1 score can never be mistaken
-# for one written under a later multi-component calibration. Bump both when
-# the breakpoints above change, so a historical score stays reproducible
-# against the calibration that actually produced it.
 method: "urgency-news2-v1"
 agent_version: "urgency-agent-0.1.0"

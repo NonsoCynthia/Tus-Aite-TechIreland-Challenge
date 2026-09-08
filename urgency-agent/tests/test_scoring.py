@@ -219,9 +219,42 @@ def test_normalisation_is_not_linear_in_news2(calibration) -> None:  # type: ign
 def test_normalisation_preserves_ordering_within_a_band(calibration) -> None:  # type: ignore[no-untyped-def]
     """A pure step function would give every referral in a band the same
     score, producing hundreds of ties for the coordinator to break on wait
-    time alone. Interpolation inside a band is required, not optional."""
+    time alone. Interpolation inside a band is required, not optional.
+
+    REVISED 2026-09-08: previously compared news2 8 and 12. Both now sit above
+    the top anchor (7) and saturate at 1.0, so that pair no longer tests
+    interpolation -- it tests saturation, which
+    `test_scores_saturate_above_the_top_anchor` covers deliberately.
+    """
+    assert normalise_news2(1, calibration) < normalise_news2(3, calibration)
     assert normalise_news2(5, calibration) < normalise_news2(6, calibration)
-    assert normalise_news2(8, calibration) < normalise_news2(12, calibration)
+
+
+def test_scores_saturate_above_the_top_anchor(calibration) -> None:  # type: ignore[no-untyped-def]
+    """ADR-006 as revised: the top anchor is NEWS2 7, the emergency-response
+    threshold, not the rubric maximum of 17. Anything above it scores 1.0.
+
+    This is clinically deliberate, not a clamp of convenience -- NEWS2 >= 7 is
+    a single escalation category, and a 9 does not trigger a different
+    response than a 7. It also means a future cohort containing scores this
+    dataset never produced still ranks sensibly rather than exceeding 1.0.
+    """
+    assert normalise_news2(7, calibration) == 1.0
+    assert normalise_news2(8, calibration) == 1.0
+    assert normalise_news2(NEWS2_MAX, calibration) == 1.0
+
+
+def test_the_highest_score_is_reachable_by_real_data(calibration) -> None:  # type: ignore[no-untyped-def]
+    """The defect this ADR-006 revision fixes, pinned so it cannot return.
+
+    The previous calibration anchored 1.0 at NEWS2 17. Measured across all 609
+    observations in data v1.1, NEWS2 never exceeds 7 -- so the best any real
+    referral could score was 0.636 and the top 36% of the range was dead.
+    A score range no observation can reach is not a calibration choice, it is
+    a bug.
+    """
+    highest_observed_in_data_v1_1 = 7
+    assert normalise_news2(highest_observed_in_data_v1_1, calibration) == 1.0
 
 
 # --------------------------------------------------------------------------- #

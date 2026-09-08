@@ -16,6 +16,8 @@ Run with the stack up:
 
 from __future__ import annotations
 
+import os
+import uuid
 from datetime import date, timedelta
 from typing import Any
 
@@ -29,8 +31,21 @@ from urgency_agent.run import score_referral
 from urgency_agent.scoring import InsufficientUrgencyEvidenceError
 
 # Any seeded hospital works -- this is only where we look for a real cohort
-# to pick a referral from, not a fact these tests assert on.
-_HOSPITAL_HIPE = "9004"
+# to pick a referral from, not a fact these tests assert on. 9001 because the
+# default `sample` profile (dataset/versions.yml) carries only 9001 and 9002;
+# 9004 exists in `full` but not in what `make load` pulls by default, and a
+# hospital that isn't there skips the test rather than failing it, which is
+# an easy way to think these tests ran when they never did.
+_HOSPITAL_HIPE = "9001"
+
+
+# agent_scores' primary key is (run_id, agent_name, hospital_hipe,
+# pathway_number), so a run_id that is stable within a day makes these tests
+# pass exactly once and then 400 on every re-run that day -- self-poisoning,
+# and it looks like a service fault rather than a test defect. One fresh id
+# per invocation.
+def _fresh_run_id(label: str) -> str:
+    return f"run-urgency-{label}-{date.today().isoformat()}-{uuid.uuid4().hex[:8]}"
 
 
 def _service_reachable() -> bool:
@@ -51,6 +66,26 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def _graph_is_populated() -> bool:
+    """The RDF projection (Morph-KGC) is a manual host-side step, not part of
+    `make up`/`make load` -- see kg/docs/GETTING_THE_GRAPH.md. Against an empty
+    Oxigraph every citation resolves to `type: null`, which is precisely the
+    symptom `test_citations_resolve_to_real_graph_nodes` looks for. Without
+    this guard that test reports a scary "citations did not resolve" failure
+    whose actual cause is "the graph was never built"."""
+    url = os.environ.get("OXIGRAPH_URL", "http://localhost:7878")
+    try:
+        response = httpx.post(
+            f"{url}/query",
+            data={"query": "ASK { ?s ?p ?o }"},
+            headers={"Accept": "application/sparql-results+json"},
+            timeout=5.0,
+        )
+        return bool(response.status_code == 200 and response.json().get("boolean"))
+    except (httpx.HTTPError, ValueError):
+        return False
+
+
 def _find_cohort(client: RetrievalClient) -> tuple[date, list[dict[str, Any]]]:
     """Look back for a hospital-day that actually has referrals on the list.
     Real seeded data, not a fixture this test writes."""
@@ -66,7 +101,7 @@ def test_score_written_via_post_scores_reads_back_via_get_scores_for_run() -> No
     calibration = load_calibration(DEFAULT_CALIBRATION_PATH)
     client = RetrievalClient(settings.retrieval_base_url, settings.bearer_token)
     as_of_date, referrals = _find_cohort(client)
-    run_id = f"run-urgency-agent-integration-test-{date.today().isoformat()}"
+    run_id = _fresh_run_id("roundtrip")
 
     # Refusals are legitimate outcomes on real data (ADR-004/ADR-007), so
     # walk the cohort until one referral is actually scorable rather than
@@ -91,7 +126,26 @@ def test_score_written_via_post_scores_reads_back_via_get_scores_for_run() -> No
     scores = client.get_scores_for_run(run_id, _HOSPITAL_HIPE)
     written = scores["scores"][pathway_number]["urgency"]
 
-    assert written["score"] == pytest.approx(result.score)
+    # NOTE THE float(). `GET /runs/.../scores` returns `score` as a **string**
+    # ("0.075"), not a number: agent_scores.score is a Postgres `numeric`, and
+    # the driver hands back a Decimal that serialises as a JSON string. The
+    # value round-trips exactly; only the type changes. Recorded as ADR-009,
+    # because the coordinator reads this same field and does arithmetic on it
+    # (`compute_priority`), which raises TypeError on a string -- its tests pass
+    # only because its stub score source produces real floats.
+    # abs=5e-4, not pytest.approx's default relative tolerance: `agent_scores.score`
+    # is `numeric(4,3)`, so the service silently rounds every score to THREE
+    # DECIMALS on write. The committed calibration happens to produce exact
+    # 3dp values (0.075, 0.225, 0.6, 1.0), so a stricter tolerance passes today
+    # by luck rather than design -- retune a breakpoint to something like 1/3
+    # and this test would fail on storage precision while nothing was actually
+    # wrong. Half of one ulp of the stored scale is the honest bound.
+    assert float(written["score"]) == pytest.approx(result.score, abs=5e-4)
+    assert isinstance(written["score"], str), (
+        "score came back as a number -- if the retrieval service now returns a "
+        "float, ADR-009 has been fixed upstream and this assertion should be "
+        "inverted, not deleted"
+    )
     assert written["method"] == result.method
     assert {c["evidence_type"] for c in written["citations"]} == {"observation"}
     assert len(written["citations"]) == len(result.citations)
@@ -104,10 +158,16 @@ def test_citations_resolve_to_real_graph_nodes() -> None:
     against the real graph catches it, which is why this test cannot live in
     test_run.py.
     """
+    if not _graph_is_populated():
+        pytest.skip(
+            "Oxigraph holds no triples -- the RDF projection has not been built "
+            "(kg/docs/GETTING_THE_GRAPH.md). Every citation would resolve to null "
+            "for that reason rather than because of a malformed evidence_key."
+        )
     calibration = load_calibration(DEFAULT_CALIBRATION_PATH)
     client = RetrievalClient(settings.retrieval_base_url, settings.bearer_token)
     as_of_date, referrals = _find_cohort(client)
-    run_id = f"run-urgency-agent-citation-test-{date.today().isoformat()}"
+    run_id = _fresh_run_id("citations")
 
     for referral in referrals:
         pathway_number = referral["pathway_number"]

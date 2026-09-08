@@ -66,8 +66,16 @@ every band. The anchors are NEWS2's own escalation thresholds (0-4 low, 5-6 low-
 Interpolation *within* a band is required, not optional: a step function would give hundreds of
 referrals identical scores and hand the coordinator nothing but ties to break on waiting time.
 
-**The breakpoints are not yet confirmed against the real distribution.** That check needs a captured
-fixture -- see [`tests/fixtures/README.md`](tests/fixtures/README.md).
+**The breakpoints are measured, not assumed** (ADR-006, revised 2026-09-08 after the check ran
+against all 609 observations in data v1.1). The top anchor is NEWS2 **7**, not `NEWS2_MAX` (17):
+NEWS2 never exceeds 7 in this data, so anchoring at 17 capped the highest real referral at 0.636 and
+left the top 36% of the range dead. 7 is also the clinically correct ceiling — it is the
+emergency-response threshold, and scores saturate above it.
+
+**One limit no calibration can fix:** 51.1% of referrals score `news2=0` and tie at exactly 0.0, and
+88.2% sit at or below 0.15. Patients whose six vitals are all normal have identical inputs, so no
+monotone mapping separates them. For half the cohort this agent contributes nothing to ranking and
+order falls entirely to waiting time. That is ADR-004's finding again, from a third direction.
 
 ### Refusals
 

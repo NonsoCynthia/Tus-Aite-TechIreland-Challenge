@@ -122,6 +122,11 @@ MUTATIONS: list[Mutation] = [
             {
                 "test_normalisation_separates_the_escalation_bands",
                 "test_normalisation_is_not_linear_in_news2",
+                # Widened 2026-09-08 with ADR-006's revision: both new tests
+                # assert the shape of the re-anchored curve, so a flat divide
+                # correctly breaks them too.
+                "test_scores_saturate_above_the_top_anchor",
+                "test_the_highest_score_is_reachable_by_real_data",
             }
         ),
     ),
@@ -147,6 +152,10 @@ MUTATIONS: list[Mutation] = [
                 # an expectation only ever widens deliberately.
                 "test_run_for_cohort_reports_paediatric_refusals_separately",
                 "test_score_referral_raises_and_writes_nothing_when_refused",
+                # Widened 2026-09-08: this one only started firing when the
+                # real paediatric fixture was captured -- until then it
+                # skipped. A mutation's catch set grows as the evidence does.
+                "test_real_paediatric_fixture_is_refused",
             }
         ),
     ),

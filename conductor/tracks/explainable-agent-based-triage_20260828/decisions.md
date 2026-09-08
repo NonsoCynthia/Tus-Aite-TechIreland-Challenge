@@ -192,33 +192,65 @@ against real time-series data, and this ADR should be revisited before any such 
 
 ---
 
-### ADR-006: NEWS2 is normalised through its clinical escalation bands, not linearly
+### ADR-006: NEWS2 is normalised through its clinical escalation bands, anchored at 7
 
-**Date:** 2026-09-07
-**Status:** accepted (pending distribution check against real data)
+**Date:** 2026-09-07 — **revised 2026-09-08 after the distribution check ran**
+**Status:** accepted (breakpoints now measured, no longer provisional)
 
-**Context:** `ScoreIn.score` is constrained to `[0, 1]`, so a raw NEWS2 (0–20 as the generator caps
-it) must be mapped. The obvious `news2 / 20` is a trap with precedent in this repo: the coordinator's
-min–max normalisation of waiting time put the median referral at 0.18 in every band, leaving its
-weighting parameter with nothing to trade (`BUILDING_AN_AGENT_WITH_CONDUCTOR.md` Step 7, "the
-distribution defect"). NEWS2 here will behave the same way — the cap is 20, but air-breathing scale-1
-scores top out near 18 and cluster low, so a linear map compresses almost every referral into the
-bottom fifth of the range and the score stops discriminating where it matters.
+**Context:** `ScoreIn.score` is constrained to `[0, 1]`, so a raw NEWS2 must be mapped. The obvious
+`news2 / 20` is a trap with precedent in this repo: the coordinator's min–max normalisation of
+waiting time put the median referral at 0.18 in every band, leaving its weighting parameter nothing
+to trade.
 
-**Decision:** NEWS2 maps to `[0, 1]` through the **clinical escalation thresholds** — low (0–4),
-low-medium (5–6), high (7+) — as calibrated breakpoints in `urgency_agent/calibration.yml`, not as
-constants in `scoring.py`. `product.md`'s Calibration Configuration principle: a clinician or
-compliance reviewer retunes the mapping by editing committed YAML, without reading Python.
+**Decision:** NEWS2 maps to `[0, 1]` by linear interpolation between calibrated breakpoints at
+NEWS2's own escalation thresholds — `0 → 0.0`, `4 → 0.30` (top of low risk), `6 → 0.60` (top of
+low-medium), `7 → 1.0` (high risk / emergency response) — held in
+`urgency_agent/calibration.yml`, not as constants in `scoring.py`. **Values above 7 saturate at
+1.0.**
 
-**Rationale:** the escalation bands are where clinicians actually change behaviour, so separating the
-score there puts the resolution where decisions get made. It also makes the mapping defensible to a
-reviewer by reference to the NEWS2 rubric itself rather than to an arbitrary divisor.
+**Rationale:** the escalation bands are where clinicians change behaviour, so the curve steps where
+decisions get made, and the mapping is defensible by reference to the NEWS2 rubric rather than an
+arbitrary divisor. Interpolation *within* a band is required rather than optional: a pure step
+function would give hundreds of referrals identical scores and hand the coordinator nothing but ties.
+
+**Revision (2026-09-08) — the first version of this ADR was wrong, and the data said so.**
+
+The original breakpoints anchored `1.0` at `NEWS2_MAX` (17), the rubric's reachable maximum. Status
+was "accepted pending a distribution check against real data". That check has now run, against **all
+609 observations in data v1.1**:
+
+| NEWS2 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| share | 51.1% | 25.6% | 11.5% | 7.7% | 2.1% | 0.8% | 0.7% | 0.5% |
+
+**NEWS2 never exceeds 7 in this dataset.** Anchoring at 17 therefore capped the highest real
+referral at **0.636** — the top 36% of the score range was unreachable by any patient. That is the
+same defect ADR-006 was written to prevent, reproduced by this ADR's own first attempt: median
+score **0.000**, worse than the coordinator's 0.18.
+
+The anchor moved to 7. That is a *clinical* choice, not a fit to this sample: NEWS2 ≥ 7 is a single
+escalation category, and a 9 does not trigger a different response than a 7, so saturating there is
+correct for a future cohort too. The validator changed accordingly — it no longer requires the last
+breakpoint to sit at `NEWS2_MAX`, only that it **scores 1.0**, since where the ceiling sits is a
+clinical judgement while an unreachable top of range is always a bug.
+
+**What the revision does NOT fix, and cannot.** After re-anchoring, the distribution is:
+
+| score | 0.000 | 0.075 | 0.150 | 0.225 | 0.300 | 0.450 | 0.600 | 1.000 |
+|---|---|---|---|---|---|---|---|---|
+| referrals | 311 | 156 | 70 | 47 | 13 | 5 | 4 | 3 |
+
+**311 referrals (51.1%) tie at exactly 0.0, and 88.2% sit at or below 0.15.** No monotone mapping
+can separate patients whose six vitals are all normal — they have identical inputs. Retuning these
+anchors changes the spread of the top 12% and nothing else. This is a property of NEWS2 on this
+population, not of this calibration, and it is ADR-004's finding arriving from a third direction:
+for half the cohort the urgency agent contributes nothing to ranking, and order within that half
+falls entirely to waiting time.
 
 **Trade-off accepted:** a banded map is a step function — two referrals either side of a breakpoint
-separate more than their one-point NEWS2 difference warrants, and two inside a band separate less.
-That is deliberate, and it is why this is calibration rather than code. **The breakpoints are not
-confirmed against the real distribution yet**; that check is Step 7 of the build process and this
-ADR's status should be revisited when the fixture is captured.
+separate more than their one-point NEWS2 difference warrants. That is deliberate, and it is why this
+is calibration rather than code. The 51% tie block is not a trade-off but a limit, and it must be
+visible to the clinician UI and stated in any description of what this system ranks.
 
 ---
 
@@ -306,3 +338,65 @@ around a late-arriving input (`BUILDING_AN_AGENT_WITH_CONDUCTOR.md` Step 9).
 documentation says it must, and ADR-004's incompleteness cannot be fully remedied no matter how
 much work happens inside `urgency-agent/`. That dependency should be visible on the track board
 rather than discovered when the scores look wrong.
+
+---
+
+### ADR-009: `GET /runs/.../scores` returns `score` as a string, and the coordinator breaks on it
+
+**Date:** 2026-09-08
+**Status:** **open** — affects `coordinating-agent_20260906`; needs that author and/or a
+`retrieval-service_20260904` change
+
+**Context:** the urgency agent's first genuine round trip against a live service — write via
+`POST /scores`, read back via `GET /runs/{run_id}/hospitals/{hospital_hipe}/scores` — surfaced a
+type mismatch that no mocked test could have found.
+
+`agent.agent_scores.score` is a Postgres `numeric`. The driver returns a `Decimal`, which serialises
+to JSON as a **string**. The value round-trips exactly; only the type changes:
+
+```
+written["score"] == "0.075"     # str, not float
+```
+
+`POST /scores` takes `score` as a float (`ScoreIn.score`, `ge=0, le=1`). The asymmetry is invisible
+unless something actually reads a score back.
+
+**Why this is not just the urgency agent's problem.** The coordinator reads this exact field and
+does arithmetic on it. `coordinator/app/cli.py:204` passes it through untouched
+(`"urgency_score": urgency["score"] if urgency else None`), `app/priority.py:134` multiplies it, and
+`app/decision.py:191` rounds it. Demonstrated against the coordinator's own code:
+
+```
+compute_priority(0.075, 0.5, 0.7)    = 0.2025
+compute_priority("0.075", 0.5, 0.7)  -> TypeError: can't multiply sequence by non-int of type 'float'
+```
+
+Its tests pass because ADR-008 of `coordinating-agent_20260906` reads scores through a replaceable
+seam, and the fixture implementation produces genuine floats
+(`(hash(pathway_number) % 1000) / 1000`). **Every coordinator run to date has used stub scores.** The
+first real urgency score switches `--scores live` from working to raising `TypeError`.
+
+This is precisely the failure mode `BUILDING_AN_AGENT_WITH_CONDUCTOR.md` Step 7 documents — a test
+written from the same assumption as the code verifies internal consistency, not truth — and it is the
+second instance in this repo after the coordinator's own `str`/`int` `cpc` defect. Same root cause,
+different column.
+
+**Decision:** the urgency agent does not work around it, because the urgency agent is not affected:
+it writes scores and never reads them back except in `test_run_integration.py`, which now coerces
+explicitly and asserts the string type so the day it changes upstream is a visible test failure
+rather than a silent behaviour change.
+
+Recorded here as a change request with two candidate fixes, neither this track's to choose:
+
+- **(a) Fix in the retrieval service** — serialise `score` as a float on the way out, matching the
+  float it accepts on the way in. Symmetric, fixes every current and future consumer at once, and is
+  the reading most callers will assume.
+- **(b) Fix in the coordinator** — coerce with `float()` at the `merge_scores` boundary. Smaller
+  blast radius, but leaves the next consumer of that endpoint to rediscover this.
+
+**(a) is the better fix**, with (b) as an immediate unblock if the service change is slow.
+
+**Trade-off accepted:** until one lands, the coordinator cannot be run end to end against real agent
+output — which is exactly what task 6.6 of `coordinating-agent_20260906` (its last open build task,
+recorded as "blocked on the urgency/capacity agents") is waiting to do. The urgency agent is no
+longer the blocker there; this is.

@@ -32,7 +32,7 @@ VALID: dict[str, Any] = {
         {"news2": 0, "score": 0.0},
         {"news2": 4, "score": 0.30},
         {"news2": 6, "score": 0.60},
-        {"news2": 17, "score": 1.0},
+        {"news2": 7, "score": 1.0},
     ],
     "method": "urgency-news2-v1",
     "agent_version": "urgency-agent-0.1.0",
@@ -91,27 +91,45 @@ def test_breakpoints_must_start_at_zero() -> None:
     """A NEWS2 of 0 is a fully normal observation and must score 0.0. Without
     this anchor, interpolation below the first breakpoint is undefined."""
     with pytest.raises(ValidationError):
-        UrgencyCalibration.model_validate(with_breakpoints((2, 0.1), (17, 1.0)))
+        UrgencyCalibration.model_validate(with_breakpoints((2, 0.1), (7, 1.0)))
 
 
-def test_breakpoints_must_reach_news2_max() -> None:
-    """Anchoring the top at 20 (the generator's cap) rather than 17 (the
-    reachable maximum on scale 1) would mean no real observation could ever
-    score 1.0 -- the top of the range would be dead."""
+def test_last_breakpoint_must_score_one() -> None:
+    """REVISED 2026-09-08 after meeting real data. This test previously
+    required the last breakpoint to sit at news2=NEWS2_MAX (17). That is what
+    the committed calibration did, and measuring all 609 real observations
+    showed it was wrong: NEWS2 never exceeds 7 in this dataset, so anchoring
+    at 17 capped the highest real referral at 0.636 and left the top 36% of
+    the range unreachable -- the exact distribution defect ADR-006 exists to
+    prevent.
+
+    WHERE the top anchor sits is now a clinical choice (7 = the
+    emergency-response threshold; values above it saturate). THAT it scores
+    1.0 is not: otherwise no observation can ever reach the top of the range.
+    """
     with pytest.raises(ValidationError):
-        UrgencyCalibration.model_validate(with_breakpoints((0, 0.0), (12, 1.0)))
+        UrgencyCalibration.model_validate(with_breakpoints((0, 0.0), (7, 0.8)))
+
+
+def test_a_top_anchor_below_news2_max_is_allowed() -> None:
+    """The positive half of the above: anchoring at 7 rather than 17 must
+    validate, or the measured calibration cannot be expressed at all."""
+    calibration = UrgencyCalibration.model_validate(
+        with_breakpoints((0, 0.0), (4, 0.3), (6, 0.6), (7, 1.0))
+    )
+    assert calibration.breakpoints[-1].news2 == 7
 
 
 def test_breakpoints_must_be_strictly_ascending_in_news2() -> None:
     """Interpolation reads them in order; a duplicate or out-of-order NEWS2
     value would divide by zero or silently pick the wrong segment."""
     with pytest.raises(ValidationError):
-        UrgencyCalibration.model_validate(with_breakpoints((0, 0.0), (6, 0.6), (4, 0.3), (17, 1.0)))
+        UrgencyCalibration.model_validate(with_breakpoints((0, 0.0), (6, 0.6), (4, 0.3), (7, 1.0)))
 
 
 def test_duplicate_breakpoints_are_rejected() -> None:
     with pytest.raises(ValidationError):
-        UrgencyCalibration.model_validate(with_breakpoints((0, 0.0), (4, 0.3), (4, 0.5), (17, 1.0)))
+        UrgencyCalibration.model_validate(with_breakpoints((0, 0.0), (4, 0.3), (4, 0.5), (7, 1.0)))
 
 
 def test_scores_must_be_non_decreasing() -> None:
@@ -120,19 +138,19 @@ def test_scores_must_be_non_decreasing() -> None:
     invert the scale by accident -- that is exactly the silent sign error
     ADR-003 and coordinating-agent_20260906's ADR-007 were written about."""
     with pytest.raises(ValidationError):
-        UrgencyCalibration.model_validate(with_breakpoints((0, 0.0), (4, 0.7), (6, 0.3), (17, 1.0)))
+        UrgencyCalibration.model_validate(with_breakpoints((0, 0.0), (4, 0.7), (6, 0.3), (7, 1.0)))
 
 
 def test_scores_must_stay_within_zero_and_one() -> None:
     """ScoreIn.score is `ge=0, le=1`; an out-of-range breakpoint would be a
     422 from the retrieval service at write time, far from its cause."""
     with pytest.raises(ValidationError):
-        UrgencyCalibration.model_validate(with_breakpoints((0, 0.0), (17, 1.4)))
+        UrgencyCalibration.model_validate(with_breakpoints((0, 0.0), (7, 1.4)))
 
 
 def test_negative_scores_are_rejected() -> None:
     with pytest.raises(ValidationError):
-        UrgencyCalibration.model_validate(with_breakpoints((0, -0.1), (17, 1.0)))
+        UrgencyCalibration.model_validate(with_breakpoints((0, -0.1), (7, 1.0)))
 
 
 def test_at_least_two_breakpoints_are_required() -> None:
