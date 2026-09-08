@@ -12,17 +12,34 @@ Full spec/plan: [`conductor/tracks/explainable-agent-based-triage_20260828/`](..
 
 ## Read this before using the score
 
-**`urgency_score` v1 is an incomplete urgency signal, and this is measured rather than suspected.**
+**`urgency_score` v1 cannot rank alone**, measured on this dataset (508 referrals holding both a
+NEWS2 and a triage category):
 
-`dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4 lists it under *"Three things the data disproved"*:
+| Category | n | mean NEWS2 | median | `news2 = 0` |
+|---|---|---|---|---|
+| Urgent | 155 | 1.66 | 1 | **31.0%** |
+| Semi-Urgent | 175 | 0.98 | 1 | 43.4% |
+| Routine | 178 | 0.46 | 0 | 68.5% |
 
-- `news2` x `severity_rank` correlation **never exceeds 0.253**, against a 0.35-0.65 requirement.
-- The best possible rule on `news2` alone recovers the triage category only **17.5 percentage
-  points** better than guessing the most common one.
-- **54-59% of the highest-acuity patients score `news2 <= 2`.**
+Pearson r with `severity_rank` = **-0.367**.
+
+The signal is **real and correctly directed** -- mean NEWS2 falls monotonically as urgency drops.
+What makes it insufficient is the shape of the misses:
+
+- **31% of Urgent referrals score `news2 = 0`**, so this agent gives 48 genuinely urgent patients
+  0.0 -- indistinguishable from a routine patient with normal vitals. About a third of the urgent
+  list is invisible to it.
+- **Urgent and Semi-Urgent share a median of 1.** The instrument does not separate the two bands it
+  most needs to.
 
 `DATASET_README.md` §7.6 carries the worked case: a suspected melanoma, every vital normal,
-clinically urgent. **This agent scores that patient 0.0.**
+clinically urgent. **This agent scores that patient 0.0** -- and the table above shows that is not a
+rare edge case.
+
+(`dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4 reports lower figures still -- 0.253 correlation, 17.5
+percentage points over guessing. Those come from the dataset team's MIMIC fitting work, not from
+this cohort, and are the instrument's own limits rather than a measurement of this system. Quote the
+table above when describing what this agent does.)
 
 That is by construction, not by defect -- `latent_hazard` is never computed from `news2`
 (`generate.py:767`), so an agent reading vitals cannot be graded against its own input. The same

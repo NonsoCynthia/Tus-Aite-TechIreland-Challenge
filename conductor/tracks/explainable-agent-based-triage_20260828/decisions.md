@@ -97,7 +97,7 @@ both restate this polarity where a reader of just the code would otherwise have 
 
 ### ADR-004: `urgency_score` v1 is NEWS2-only — an incomplete signal, knowingly shipped
 
-**Date:** 2026-09-07 (revised same day, see *Correction* below)
+**Date:** 2026-09-07 — corrected 2026-09-07, evidence re-measured on real data 2026-09-08
 **Status:** **open** — needs a clinician / the responsible-AI lead
 
 **Context:** spec.md FR1 says the urgency agent "computes MTS category and NEWS2 score
@@ -128,19 +128,46 @@ in `core.observations` identifies referral urgency on its own, for different rea
    ADR-004), scoring the colour would **double-count CPC**: once as the band that orders the list,
    once inside the score that orders within it.
 
-**NEWS2 can be computed, but it is a weak urgency signal — and this is measured, not suspected.**
-`dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4 lists it under "Three things the data disproved":
+**NEWS2 can be computed, but it cannot rank alone.** Two bodies of evidence, kept separate because
+they are not the same claim and an earlier version of this ADR conflated them.
 
-- The build spec required `news2` x `severity_rank` correlation in 0.35–0.65. A sweep across the one
-  free parameter **never exceeded 0.253**, at any value.
-- The best possible rule on `news2` alone recovers the triage category only **17.5 percentage
-  points** better than guessing the most common one.
-- **54–59% of the highest-acuity patients score `news2 <= 2`.**
+**(a) Measured on this cohort, by this track (2026-09-08).** Across the 508 referrals in data v1.1
+holding both a NEWS2 and a triage category:
 
-This is deliberate, not a defect: `latent_hazard` in `ground_truth.csv` is never computed from
-`news2` (`generate.py:767`), so an agent reading vitals cannot be graded against its own input.
+| Category | n | mean NEWS2 | median | `news2 <= 2` | `news2 = 0` |
+|---|---|---|---|---|---|
+| Urgent | 155 | 1.66 | 1 | 71.0% | **31.0%** |
+| Semi-Urgent | 175 | 0.98 | 1 | 88.6% | 43.4% |
+| Routine | 178 | 0.46 | 0 | 96.6% | 68.5% |
+
+Pearson r between `news2` and `severity_rank` = **−0.367**.
+
+The signal is **real and correctly directed** — mean NEWS2 falls monotonically as urgency
+decreases, and |r| = 0.37 sits inside the build spec's original 0.35–0.65 target band. What makes
+it insufficient is not absence of signal but the shape of the misses:
+
+- **31% of Urgent referrals score `news2 = 0`.** This agent gives 48 genuinely urgent patients a
+  score of 0.0 — indistinguishable from a routine patient with normal vitals. Roughly a third of
+  the urgent list is invisible to it.
+- **Urgent and Semi-Urgent share a median of 1.** The instrument does not separate the two bands it
+  most needs to.
+- Separation is small in absolute terms: 1.66 vs 0.98 vs 0.46 on a scale running to 17.
+
+**(b) Measured by the dataset team during construction, against MIMIC.**
+`dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4, under "Three things the data disproved": a parameter
+sweep never exceeded 0.253; the best rule on `news2` alone beats guessing the modal category by
+17.5 percentage points; 54–59% of the highest-acuity patients score `news2 <= 2`.
+
+**These figures describe their fitting work, not this cohort, and they do not agree with (a)** —
+notably 0.253 vs our 0.367, and 54–59% vs our 71%. Different populations and different questions;
+neither is wrong. Cite **(a)** when describing this system's behaviour and **(b)** only as the
+dataset team's own finding about the instrument.
+
+The weakness is deliberate, not a defect: `latent_hazard` in `ground_truth.csv` is never computed
+from `news2` (`generate.py:767`), so an agent reading vitals cannot be graded against its own input.
 `DATASET_README.md` §7.6 carries the worked case — a suspected melanoma, every vital normal,
-clinically urgent. This agent scores that patient **0.0**.
+clinically urgent. This agent scores that patient **0.0**, and (a) shows that is not a rare edge
+case but 31% of the urgent list.
 
 That same section states the requirement directly: *"an urgency agent must read condition, pathway,
 referral source and the high-needs flag, not just physiology."* Three of those four are not
