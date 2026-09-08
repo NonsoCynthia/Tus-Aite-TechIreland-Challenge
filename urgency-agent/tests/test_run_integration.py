@@ -37,6 +37,8 @@ from urgency_agent.scoring import InsufficientUrgencyEvidenceError
 # hospital that isn't there skips the test rather than failing it, which is
 # an easy way to think these tests ran when they never did.
 _HOSPITAL_HIPE = "9001"
+_OXIGRAPH_URL = "http://localhost:7878"
+_EATD_NS = "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/id/"
 
 
 # agent_scores' primary key is (run_id, agent_name, hospital_hipe,
@@ -77,13 +79,37 @@ def _graph_is_populated() -> bool:
     try:
         response = httpx.post(
             f"{url}/query",
-            data={"query": "ASK { ?s ?p ?o }"},
+            # NOTE THE `GRAPH ?g`. Everything in this store is quad-tagged into
+            # named graphs, so `ASK { ?s ?p ?o }` inspects only the empty
+            # default graph and returns false against a fully loaded store --
+            # the exact trap kg/docs/GETTING_THE_GRAPH.md section 6 warns
+            # about, which this guard originally fell into: it reported "graph
+            # not built" and skipped after the graph had been built correctly.
+            data={"query": "ASK { GRAPH ?g { ?s ?p ?o } }"},
             headers={"Accept": "application/sparql-results+json"},
             timeout=5.0,
         )
         return bool(response.status_code == 200 and response.json().get("boolean"))
     except (httpx.HTTPError, ValueError):
         return False
+
+
+def _obs_iri(evidence_key: str) -> str:
+    """retrieval/app/iri.py's own convention: EATD_NS + the evidence type's
+    segment + the caller-supplied composite key."""
+    return f"{_EATD_NS}obs/{evidence_key}"
+
+
+def _graph_has(iri: str) -> bool:
+    url = os.environ.get("OXIGRAPH_URL", _OXIGRAPH_URL)
+    response = httpx.post(
+        url + "/query",
+        data={"query": f"ASK {{ GRAPH ?g {{ <{iri}> ?p ?o }} }}"},
+        headers={"Accept": "application/sparql-results+json"},
+        timeout=10.0,
+    )
+    response.raise_for_status()
+    return bool(response.json().get("boolean"))
 
 
 def _find_cohort(client: RetrievalClient) -> tuple[date, list[dict[str, Any]]]:
@@ -151,17 +177,35 @@ def test_score_written_via_post_scores_reads_back_via_get_scores_for_run() -> No
     assert len(written["citations"]) == len(result.citations)
 
 
-def test_citations_resolve_to_real_graph_nodes() -> None:
-    """The silent-failure guard. An evidence_key built with the wrong
-    timestamp format points at a node that was never loaded and degrades to
-    `type: null` when resolved -- it never raises. Only a live round trip
-    against the real graph catches it, which is why this test cannot live in
+def test_citations_point_at_real_graph_nodes() -> None:
+    """The silent-failure guard, and the only test that can catch it.
+
+    An `evidence_key` built with the wrong `obs_datetime` format names a graph
+    node that was never loaded. Nothing raises: the retrieval service's
+    `_resolve_iri` simply returns `type: null` when a reader eventually asks
+    for that evidence, far from the agent that wrote it. Only a live check
+    against the real graph catches it, which is why this cannot live in
     test_run.py.
+
+    **Checked against the graph directly, by SPARQL ASK, not through the
+    service.** `GET /runs/.../scores` returns citations as raw
+    `{evidence_type, evidence_key}` pairs and deliberately does NOT resolve
+    them -- it is an agent-input endpoint. Resolution happens on the
+    decision-placement evidence endpoint (`reads.py:_evidence_for_placement`),
+    which needs a `Decision` to exist, which needs the coordinator, which is
+    blocked on ADR-009. An earlier version of this test read the scores
+    endpoint and asserted `type` was not null; every citation "failed" because
+    that key never exists there. That was a false alarm about the agent and a
+    real defect in the test.
+
+    The IRI template is retrieval's own (`app/iri.py`: `EATD_NS` +
+    `obs/{evidence_key}`), reproduced here rather than imported because this
+    package does not depend on the retrieval service's source.
     """
     if not _graph_is_populated():
         pytest.skip(
             "Oxigraph holds no triples -- the RDF projection has not been built "
-            "(kg/docs/GETTING_THE_GRAPH.md). Every citation would resolve to null "
+            "(kg/docs/GETTING_THE_GRAPH.md). Every citation would appear unresolvable "
             "for that reason rather than because of a malformed evidence_key."
         )
     calibration = load_calibration(DEFAULT_CALIBRATION_PATH)
@@ -172,7 +216,7 @@ def test_citations_resolve_to_real_graph_nodes() -> None:
     for referral in referrals:
         pathway_number = referral["pathway_number"]
         try:
-            score_referral(
+            result = score_referral(
                 client,
                 calibration,
                 run_id=run_id,
@@ -186,10 +230,9 @@ def test_citations_resolve_to_real_graph_nodes() -> None:
     else:
         pytest.skip("no scorable referral found in this cohort")
 
-    scores = client.get_scores_for_run(run_id, _HOSPITAL_HIPE)
-    citations = scores["scores"][pathway_number]["urgency"]["citations"]
-    unresolved = [c for c in citations if c.get("type") is None]
-    assert not unresolved, (
-        f"{len(unresolved)} of {len(citations)} citations did not resolve to a graph "
-        f"node -- check the obs_datetime format in the evidence_key: {unresolved[:2]}"
+    missing = [c.evidence_key for c in result.citations if not _graph_has(_obs_iri(c.evidence_key))]
+    assert not missing, (
+        f"{len(missing)} of {len(result.citations)} citations name a graph node that does "
+        f"not exist -- check the obs_datetime format in the evidence_key "
+        f"(space-separated and percent-encoded, not ISO 'T'): {missing[:2]}"
     )
