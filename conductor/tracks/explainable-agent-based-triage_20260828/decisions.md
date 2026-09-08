@@ -104,20 +104,29 @@ both restate this polarity where a reader of just the code would otherwise have 
 deterministically from that data," and plan.md Phase 1 carries a task for each. Neither instrument
 in `core.observations` identifies referral urgency on its own, for different reasons.
 
-**MTS cannot be computed here at all.** Two independent reasons, both from
-`dataset/generator/generate.py`:
+**MTS cannot be computed here at all.** Two independent reasons. Both were first found by reading
+`dataset/generator/generate.py`; both have since been **measured against the loaded dataset**
+(data v1.1, sample profile, 2026-09-08). The measured form is the citable one.
 
 1. **Its starting input is absent.** Real Manchester triage selects a presentation flowchart from
-   the chief complaint, then applies discriminators. The generator writes `chiefcomplaint` as the
-   empty string on every observation (`generate.py:553`). There is no flowchart to select.
-2. **The stored `mts_category` is drawn from the CPC band, not from the patient.**
-   `generate.py:538` picks a colour uniformly from `MTS_BY_RANK[rank]`, keyed on the referral's own
-   `SEVERITY_RANK`: `{1: ["red","orange"], 2: ["orange","yellow"], 3: ["yellow","green","blue"]}`.
-   It carries no information beyond CPC plus noise — at most ~1.6 bits, all of it already in the
-   band, and lossy even about that (an `orange` may be Urgent or Semi-Urgent). Since the coordinator
-   already treats CPC as a non-compensatory band (`coordinating-agent_20260906` ADR-004), scoring
-   the colour would **double-count CPC**: once as the band that orders the list, once inside the
-   score that orders within it.
+   the chief complaint, then applies discriminators. **0 of 609 observations carry one** — the
+   column is `NULL` on every row, not merely empty (`generate.py:553` writes `""`; the loader
+   stores it as NULL). There is no flowchart to select.
+2. **The stored `mts_category` is the CPC band re-labelled, not an observation of the patient.**
+   Cross-tabulated across the 500 referrals holding both a colour and a triage category:
+
+   | CPC | Colours that ever occur | Referrals |
+   |---|---|---|
+   | Urgent | red, orange — nothing else | 77 / 75 |
+   | Semi-Urgent | yellow, orange — nothing else | 88 / 86 |
+   | Routine | yellow, blue, green — nothing else | 62 / 62 / 50 |
+
+   No colour ever appears outside its band's permitted set, and within a band the split is uniform.
+   **Given CPC, the colour is a coin flip** — no information beyond the band, and lossy even about
+   that (`orange` may be Urgent or Semi-Urgent; `yellow` may be Semi-Urgent or Routine). Since the
+   coordinator already treats CPC as a non-compensatory band (`coordinating-agent_20260906`
+   ADR-004), scoring the colour would **double-count CPC**: once as the band that orders the list,
+   once inside the score that orders within it.
 
 **NEWS2 can be computed, but it is a weak urgency signal — and this is measured, not suspected.**
 `dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4 lists it under "Three things the data disproved":
@@ -155,6 +164,15 @@ of genuinely urgent referrals will score at or near zero. **No ranked list built
 be described as clinically prioritised**, in the UI, in the pitch, or in the rationale text.
 `workflow.md` puts the responsible-AI review at the moment an agent first produces output — this is
 that moment, and this ADR is what that review should read first.
+
+**Confirmation (2026-09-08).** With the dataset loaded, both MTS claims above were re-checked
+against the data rather than against the generator. Both hold, and the measured form is stronger:
+the chief-complaint count is a fact about the data, and the colour/CPC cross-tab shows the
+constraint directly instead of inferring it from a sampling expression. **This is the argument to
+use externally** — "we measured it across the dataset", not "we read the code that made it". Given
+the correction below, measuring rather than code-reading is the standard this track should hold to.
+
+Nothing here changes the *decision*; it changes how well it can be defended.
 
 **Correction (2026-09-07).** The first version of this ADR justified NEWS2-only partly on the
 grounds that NEWS2 "works" while MTS does not. That was wrong, and it was wrong for a reason worth

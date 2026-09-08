@@ -19,12 +19,16 @@ that service, so no separate "project `agent.*` into the graph" task is needed h
 - [ ] Task: MTS scoring logic — **NOT BUILDABLE from this dataset, deferred under ADR-004 (open)**
     - [ ] Sub-task: Write failing tests for MTS category assignment, cited to the MTS rubric
     - [ ] Sub-task: ~~Implement deterministic MTS scorer reading `UrgencySignal` via SPARQL~~
-          Two blockers, neither resolvable in `urgency-agent/`: `chiefcomplaint` is empty on every
-          observation (`generate.py:553`) so no presentation flowchart can be selected, and the
-          stored `mts_category` is a random draw keyed on the CPC band (`generate.py:538`), so
-          scoring it would double-count the band the coordinator already orders by. **Note also
-          that this sub-task's stated method contradicts ADR-002** — agents never read SPARQL
-          directly; input comes from `GET /referrals/.../context`. See ADR-004.
+          Two blockers, neither resolvable in `urgency-agent/`, both now **measured against the
+          loaded dataset** rather than inferred from the generator (2026-09-08):
+          (1) **0 of 609 observations carry a chief complaint** — the column is NULL on every row,
+          so no presentation flowchart can be selected; (2) across the 500 referrals holding both a
+          colour and a triage category, `mts_category` never leaves its CPC band's permitted set
+          (Urgent → red/orange 77/75; Semi-Urgent → yellow/orange 88/86; Routine →
+          yellow/blue/green 62/62/50) and is uniform within it — so given CPC the colour is a coin
+          flip, and scoring it would double-count the band the coordinator already orders by.
+          **Note also that this sub-task's stated method contradicts ADR-002** — agents never read
+          SPARQL directly; input comes from `GET /referrals/.../context`. See ADR-004.
 - [x] Task: NEWS2 scoring logic
     - [x] Sub-task: Write failing tests for NEWS2 score computation, cited to the NEWS2 rubric
           (`urgency-agent/tests/test_scoring.py` — 51 boundary cases pinned to the published

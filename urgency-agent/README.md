@@ -51,9 +51,15 @@ Two rubric properties the code depends on:
 - **Systolic BP is not a descending ladder.** `>= 220` scores 3, the same as `<= 90`. A scorer
   written as one downward staircase gets the hypertensive tail wrong and no mid-range case notices.
 
-**MTS is not scored** (ADR-004). `chiefcomplaint` is empty on every row (`generate.py:553`) so no
-flowchart can be selected, and the stored `mts_category` is a random draw keyed on the CPC band
-(`generate.py:538`) -- scoring it would double-count the band the coordinator already orders by.
+**MTS is not scored** (ADR-004), and this is measured rather than assumed. **0 of 609 observations
+carry a chief complaint**, so no presentation flowchart can be selected. And across the 500
+referrals holding both a colour and a triage category, `mts_category` never leaves its CPC band's
+permitted set -- Urgent is only ever red/orange, Semi-Urgent only yellow/orange, Routine only
+yellow/blue/green -- and is uniform within it. Given CPC, the colour is a coin flip, so scoring it
+would double-count the band the coordinator already orders by.
+
+Reading and *citing* the colour without scoring it stays open and costs nothing; only letting it
+move rank is the problem.
 
 ### Normalisation (ADR-006)
 
