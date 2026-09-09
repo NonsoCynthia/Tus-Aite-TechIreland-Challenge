@@ -1,6 +1,7 @@
 /* Component styles. Every colour comes from tokens.css; none is a literal. */
 
 .app { min-height: 100%; display: flex; flex-direction: column; }
+.app > main { flex: 1 1 auto; }
 
 /* --- top bar ------------------------------------------------------------- */
 .topbar {
@@ -491,4 +492,48 @@
 @media (max-width: 720px) {
   .landing-scrim { background: rgba(250,250,248,0.94); }
   .landing-lead { max-width: none; }
+}
+
+/* --- the run, dark: the one moment the system is visibly working ---------- */
+.run-dark {
+  background: var(--bg); color: var(--text);
+  min-height: calc(100vh - 58px);
+  padding: 12px 0 40px;
+}
+.run-dark .pad { padding-top: 28px; }
+.run-dark .lede h1 { color: var(--text); }
+.run-dark .lede-p { color: var(--text-2); }
+.run-dark .run-panel {
+  background: var(--surface); border-color: var(--rule);
+}
+.run-dark .run-btn {
+  color: var(--ink); background: var(--taupe); border-color: var(--taupe);
+}
+.run-dark .run-btn:hover:not(:disabled) { background: #d3c8ba; }
+.run-dark .run-meta, .run-dark .run-count, .run-dark .lane-a { color: var(--text-2); }
+.run-dark .run-id, .run-dark .lane-r { color: var(--text-3); }
+.run-dark .run-n { color: var(--text); }
+.run-dark .run-bar { background: rgba(196,182,166,0.14); }
+.run-dark .run-bar i { background: var(--taupe); }
+.run-dark .lanes { background: var(--rule); border-color: var(--rule); }
+.run-dark .lane { background: var(--surface); }
+.run-dark .lane-dot { background: rgba(196,182,166,0.28); }
+.run-dark .lane.is-live .lane-dot { background: var(--taupe); }
+.run-dark .lane.is-done .lane-dot { background: rgba(196,182,166,0.55); }
+.run-dark .lane.is-live .lane-a, .run-dark .lane.is-done .lane-a { color: var(--text); }
+.run-dark .run-done {
+  background: rgba(196,182,166,0.07); border-left-color: var(--taupe);
+}
+.run-dark .run-done-p { color: var(--text-2); }
+.run-dark .run-go {
+  background: transparent; color: var(--text); border-color: var(--rule-firm);
+}
+.run-dark .run-go:hover { border-color: var(--taupe); }
+/* the live pill is the one place glass belongs here: it floats over the panel */
+.run-dark .lane.is-live {
+  position: relative;
+}
+.run-dark .lane.is-live::after {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--taupe);
 }

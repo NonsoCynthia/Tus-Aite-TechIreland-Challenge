@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useQuery } from '@tanstack/react-query'
 import { api, bandOf, BANDS } from '../lib/api'
 import type { CohortReferral, Decision } from '../lib/types'
@@ -154,7 +155,12 @@ function RowTable({ rows, ranked, outside, onOpen }: { rows: Row[]; ranked: bool
         </tr>
       </thead>
       <tbody>
-        {slice.map((r) => <PatientRow key={r.pathway_number} r={r} ranked={ranked} outside={outside} onOpen={onOpen} />)}
+        <AnimatePresence initial={false}>
+          {slice.map((r, i) => (
+            <PatientRow key={r.pathway_number} r={r} i={i}
+                        ranked={ranked} outside={outside} onOpen={onOpen} />
+          ))}
+        </AnimatePresence>
       </tbody>
     </table>
 
@@ -180,7 +186,8 @@ function RowTable({ rows, ranked, outside, onOpen }: { rows: Row[]; ranked: bool
   )
 }
 
-function PatientRow({ r, ranked, outside, onOpen }: { r: Row; ranked: boolean; outside: boolean; onOpen: (pw: string) => void }) {
+function PatientRow({ r, ranked, outside, onOpen, i }: { r: Row; ranked: boolean; outside: boolean; onOpen: (pw: string) => void; i: number }) {
+  const still = useReducedMotion()
   const target = r.crt_threshold_days
   const wait = r.adjusted_wait_days ?? 0
   const over = target != null && wait > target
@@ -188,7 +195,18 @@ function PatientRow({ r, ranked, outside, onOpen }: { r: Row; ranked: boolean; o
   const age = r.reading_age_days
 
   return (
-    <tr className="row is-clickable" tabIndex={0} role="button"
+    <motion.tr
+        className="row is-clickable" tabIndex={0} role="button"
+        layout={still ? false : 'position'}
+        layoutId={`row-${r.pathway_number}`}
+        initial={still ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={still ? { duration: 0 } : {
+          // stagger only across a page, never the whole 305: a queue that takes
+          // seconds to appear reads as slow, not considered
+          delay: Math.min(i, 20) * 0.014,
+          duration: 0.26, ease: [0.2, 0, 0, 1],
+        }}
         onClick={() => onOpen(r.pathway_number)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(r.pathway_number) } }}>
       <td className="c-rank num">
@@ -221,7 +239,7 @@ function PatientRow({ r, ranked, outside, onOpen }: { r: Row; ranked: boolean; o
           ? <Contribution urgency={r.urgency_score} wait={r.wait_normalised} />
           : null}
       </td>
-    </tr>
+    </motion.tr>
   )
 }
 

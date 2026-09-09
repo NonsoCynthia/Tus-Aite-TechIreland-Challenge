@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import type { Run as RunT } from '../lib/types'
@@ -24,6 +25,7 @@ export function Run({ hospital, date, onDone }: {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const timer = useRef<number | null>(null)
+  const still = useReducedMotion()
   const qc = useQueryClient()
 
   useEffect(() => () => { if (timer.current) window.clearInterval(timer.current) }, [])
@@ -55,6 +57,7 @@ export function Run({ hospital, date, onDone }: {
   const done = run?.status === 'done'
 
   return (
+    <div className="run-dark" data-surface="dark">
     <div className="pad">
       <div className="lede">
         <h1>Run the agents</h1>
@@ -83,10 +86,15 @@ export function Run({ hospital, date, onDone }: {
         {run && (
           <>
             <div className="run-bar">
-              <i style={{ width: `${pct}%` }} />
+              <motion.i
+                animate={{ width: `${pct}%` }}
+                transition={still ? { duration: 0 } : { duration: 0.2, ease: 'linear' }}
+              />
             </div>
             <div className="run-count">
-              <span className="num run-n">{fmt(run.scored)}</span>
+              <motion.span key={run.scored} className="num run-n"
+                initial={still ? false : { opacity: 0.55 }} animate={{ opacity: 1 }}
+                transition={{ duration: 0.14 }}>{fmt(run.scored)}</motion.span>
               <span className="run-of num"> / {fmt(run.total)} scores committed</span>
               {run.cohort_size > 0 && (
                 <span className="muted"> · {fmt(run.cohort_size)} referrals, each read twice</span>
@@ -135,6 +143,7 @@ export function Run({ hospital, date, onDone }: {
           </>
         )}
       </div>
+    </div>
     </div>
   )
 }
