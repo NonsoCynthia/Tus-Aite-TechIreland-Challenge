@@ -1,0 +1,127 @@
+/* Tús Áite design tokens.
+   Frozen before component work. Components consume these; they never invent one.
+
+   Palette is the brand kit verbatim (brand_assets/assets/README.md):
+     ink #122056 · clay #7A5B4D · taupe #C4B6A6 · paper #FAFAF8
+   Brand rules honoured here:
+     - red/amber/green are reserved for triage categories and appear ONLY as
+       --cat-* below. Nothing else may use them.
+     - clay marks ONE element per composition.
+     - no gradients, glows or drop shadows. Depth comes from blur and hairlines. */
+
+:root {
+  /* --- brand constants, identical on both grounds --- */
+  --ink:        #122056;
+  --clay:       #7A5B4D;
+  --taupe:      #C4B6A6;
+  --paper:      #FAFAF8;
+
+  /* --- triage categories. RESERVED. Never reuse these hues. --- */
+  --cat-urgent:      #A32A1E;   /* CPC 1, 28-day target  */
+  --cat-semi:        #8A5A12;   /* CPC 3, 91-day target  */
+  --cat-routine:     #2F5D45;   /* CPC 2, no target      */
+  --cat-uncat:       #5A6172;   /* no category recorded  */
+  --cat-outside:     #6B6257;   /* not scored, not placed */
+
+  /* --- LIGHT: the working surfaces (overview, list, patient) --- */
+  --bg:         #FAFAF8;
+  --bg-sunk:    #F2F1EC;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F6F2;
+  --text:       #122056;
+  --text-2:     #5A6172;
+  --text-3:     #8A8F9C;
+  --rule:       #E2DED6;
+  --rule-firm:  #C9C3B7;
+  --accent:     #7A5B4D;
+  --focus:      #122056;
+
+  /* --- type --- */
+  --font-brand: 'Jost', ui-sans-serif, system-ui, sans-serif;
+  --font-data:  ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --t-hero:     44px;
+  --t-title:    26px;
+  --t-section:  17px;
+  --t-body:     14px;
+  --t-data:     15px;   /* the primary numeral in a cell */
+  --t-small:    12px;   /* the floor. nothing carrying meaning goes below this */
+  --track-wide: 0.14em; /* the wordmark's letterspacing */
+
+  /* --- geometry: the mark, and everything derived from it ---
+     tus-aite-mark-navy.svg is viewBox 0 0 52 70: a 5-wide stem at x=24 with
+     four 21x5 bars alternating left and right. Those ratios drive the spine. */
+  --spine-w:      5px;    /* stem width  */
+  --spine-bar:    5px;    /* bar height  */
+  --spine-reach:  21px;   /* bar length at rest */
+  --row-h:        48px;
+  --gap:          16px;
+  --pad:          20px;
+  --radius:       3px;    /* nearly square. the mark has no curves. */
+
+  /* --- motion. movement is ours; displacement is the coordinator's. --- */
+  --ease:      cubic-bezier(0.2, 0, 0, 1);
+  --t-fast:    140ms;
+  --t-base:    260ms;
+  --t-settle:  600ms;   /* rows arriving at a rank */
+  --t-rotate:  700ms;   /* the spine turning from rank axis to timeline */
+}
+
+/* --- DARK: the showpieces (landing, run, graph) ---------------------------
+   Scoped, not a theme toggle: a surface declares itself dark and the tokens
+   flip beneath it. Both grounds coexist on one page during a transition. */
+[data-surface="dark"] {
+  --bg:         #0B1436;
+  --bg-sunk:    #070F2A;
+  --surface:    #16204A;
+  --surface-2:  #1C2758;
+  --text:       #FAFAF8;
+  --text-2:     #C4B6A6;
+  --text-3:     #8E93A8;
+  --rule:       rgba(196, 182, 166, 0.18);
+  --rule-firm:  rgba(196, 182, 166, 0.34);
+  --accent:     #C4B6A6;    /* taupe is the accent on dark, per the kit */
+  --focus:      #C4B6A6;
+}
+
+/* --- glass. depth through blur, never light through glow. -----------------
+   Used ONLY on chrome that floats over something: panels over the graph, the
+   run pill, the override scrim, the sticky tab bar. Never behind a number. */
+.glass {
+  background: rgba(22, 32, 74, 0.72);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(196, 182, 166, 0.18);
+}
+:root:not([data-surface="dark"]) .glass {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(18, 32, 86, 0.10);
+}
+
+/* --- base ---------------------------------------------------------------- */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-data);
+  font-size: var(--t-body);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, .brand { font-family: var(--font-brand); font-weight: 500; margin: 0; }
+h1 { font-size: var(--t-title); letter-spacing: -0.015em; text-wrap: balance; }
+
+/* every digit that lines up in a column */
+.num { font-variant-numeric: tabular-nums; }
+
+/* focus is always visible and never removed */
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* reduced motion drops travel, never meaning */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

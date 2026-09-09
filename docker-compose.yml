@@ -108,6 +108,25 @@ services:
       oxigraph:
         condition: service_started
 
+  orchestrator:
+    # Context is the repo root -- the image composes coordinator/,
+    # capacity-agent/ and urgency-agent/ in-process, and the coordinator
+    # imports retrieval.app.schemas.
+    build:
+      context: .
+      dockerfile: orchestrator/Dockerfile
+    container_name: triage_orchestrator
+    environment:
+      # Every coordinator helper takes base_url as a keyword; only _load_config()
+      # hardcodes localhost and main() is its sole caller, so this works unchanged.
+      RETRIEVAL_BASE_URL: http://retrieval:8000
+      RETRIEVAL_BEARER_TOKENS: ${RETRIEVAL_BEARER_TOKENS}
+    ports:
+      - "${UI_PORT:-8080}:8080"
+    depends_on:
+      retrieval:
+        condition: service_started
+
 volumes:
   db_data:
   pgadmin_data:
