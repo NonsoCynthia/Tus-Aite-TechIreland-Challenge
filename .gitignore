@@ -16,3 +16,10 @@ htmlcov/
 **/.venv/
 **/.pytest_cache/
 **/.coverage
+
+# Frontend build artefacts. web/ is a Vite app; none of this belongs in git.
+node_modules/
+**/node_modules/
+web/dist/
+**/dist/
+.playwright-mcp/
