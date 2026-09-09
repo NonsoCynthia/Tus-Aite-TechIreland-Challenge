@@ -4,7 +4,7 @@ import { api, bandOf } from '../lib/api'
 import { Journey, type Event } from '../components/Journey'
 import { Provenance } from '../components/Provenance'
 import { Override } from '../components/Override'
-import type { Decision } from '../lib/types'
+import type { Decision, Ranking } from '../lib/types'
 
 const fmt = (n: number) => n.toLocaleString('en-IE')
 const VITAL = {
@@ -98,6 +98,8 @@ export function Patient({ hospital, date, pathway, onBack }: {
 
       <Journey events={events} today={date} />
 
+      {placed && dec.data && <WhyHere placed={placed} decision={dec.data} />}
+
       <section className="p-sec">
         <h2 className="sec-h">What the score read
           <span className="sec-note">six vital signs, measured once</span></h2>
@@ -148,6 +150,89 @@ export function Patient({ hospital, date, pathway, onBack }: {
           </p>
         )}
       </section>
+    </div>
+  )
+}
+
+
+/** Why this person sits here, as arithmetic rather than assertion.
+ *
+ *  The order inside a band is (past target first, then priority), and priority
+ *  is alpha*urgency + (1-alpha)*wait-percentile. Both facts are shown, because
+ *  showing only the blend contradicts the rows either side of a tier boundary.
+ */
+function WhyHere({ placed, decision }: { placed: Ranking; decision: Decision }) {
+  const a = placed.alpha
+  const uTerm = a * placed.urgency_score
+  const wTerm = (1 - a) * placed.wait_normalised
+  const band = bandOf(placed.cpc)
+  const inBand = decision.rankings.filter((r) => bandOf(r.cpc) === band)
+  const idx = inBand.findIndex((r) => r.pathway_number === placed.pathway_number)
+  const above = idx > 0 ? inBand[idx - 1] : undefined
+  const below = idx >= 0 && idx < inBand.length - 1 ? inBand[idx + 1] : undefined
+  const n = (x: number) => x.toFixed(3)
+
+  return (
+    <section className="p-sec">
+      <h2 className="sec-h">Why this position
+        <span className="sec-note">the same arithmetic the coordinator used</span></h2>
+
+      <div className="why-tier">
+        {placed.crt_breached === true
+          ? <><strong>Already past target.</strong> Inside {band}, everyone past their target is
+              placed before everyone still within it. That tier is decided before any score.</>
+          : placed.crt_threshold_days == null
+            ? <><strong>No target applies</strong> to {band}, so only the score below orders this group.</>
+            : <><strong>Still within target.</strong> Inside {band}, everyone already past their
+              target is placed above this point, whatever their score.</>}
+      </div>
+
+      <div className="why-sum">
+        <div className="why-row">
+          <span className="why-k">how unwell</span>
+          <span className="why-b"><i style={{ width: `${uTerm * 100}%` }} /></span>
+          <span className="why-v num">{n(a)} &times; {n(placed.urgency_score)} = {n(uTerm)}</span>
+        </div>
+        <div className="why-row">
+          <span className="why-k">how long waited</span>
+          <span className="why-b"><i className="is-wait" style={{ width: `${wTerm * 100}%` }} /></span>
+          <span className="why-v num">{n(1 - a)} &times; {n(placed.wait_normalised)} = {n(wTerm)}</span>
+        </div>
+        <div className="why-row is-total">
+          <span className="why-k">priority</span>
+          <span className="why-b" />
+          <span className="why-v num">{n(placed.priority)}</span>
+        </div>
+      </div>
+
+      <p className="p-note">
+        Waiting time is a percentile <em>within this category</em>, not a raw day count, so one
+        very long waiter cannot flatten everyone else. The {Math.round(a * 100)}/{Math.round((1 - a) * 100)}{' '}
+        split is set once for the whole hospital-day from how pressured its specialties are —
+        it is the same number for all {decision.rankings.length} people here and cannot move
+        anyone between categories.
+      </p>
+
+      {(above || below) && (
+        <div className="why-neighbours">
+          {above && <NeighbourRow r={above} label="above" />}
+          <NeighbourRow r={placed} label="this patient" self />
+          {below && <NeighbourRow r={below} label="below" />}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function NeighbourRow({ r, label, self }: { r: Ranking; label: string; self?: boolean }) {
+  return (
+    <div className={'nb' + (self ? ' is-self' : '')}>
+      <span className="nb-l">{label}</span>
+      <span className="nb-p num">{r.position}</span>
+      <span className="nb-id num">{r.pathway_number}</span>
+      <span className="nb-w num">{(r.adjusted_wait_days ?? 0).toLocaleString('en-IE')}d</span>
+      <span className="nb-t">{r.crt_breached === true ? 'past target' : r.crt_threshold_days == null ? 'no target' : 'within target'}</span>
+      <span className="nb-s num">priority {r.priority.toFixed(3)}</span>
     </div>
   )
 }

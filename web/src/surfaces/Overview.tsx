@@ -116,6 +116,12 @@ export function Overview({ hospital, date, name }: { hospital: string; date: str
               safe-operating threshold (Bagust, <em>BMJ</em> 1999)
             </span>
           </h2>
+          <p className="panel-note">
+            This pressure does <strong>not</strong> move any individual up or down. It sets one
+            number for the whole hospital-day — how much the order leans on how unwell someone
+            is versus how long they have waited — and that number is the same for everyone and
+            cannot move anyone between clinical categories.
+          </p>
           <div className="ward-grid">
             {ops.data.wards.map((w) => (
               <div className="ward" key={w.ward_id}>

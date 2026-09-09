@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useQuery } from '@tanstack/react-query'
@@ -14,6 +14,8 @@ type Row = CohortReferral & {
   news2?: number | null
   reading_age_days?: number | null
   obs_datetime?: string | null
+  alpha?: number
+  priority?: number
 }
 
 /** Order within a band, and what decided it.
@@ -39,6 +41,8 @@ function useRows(hospital: string, date: string) {
         position: p?.position,
         urgency_score: p?.urgency_score,
         wait_normalised: p?.wait_normalised,
+        alpha: p?.alpha,
+        priority: p?.priority,
         news2: c?.news2 ?? null,
         reading_age_days: c?.reading_age_days ?? null,
         obs_datetime: c?.obs_datetime ?? null,
@@ -74,12 +78,23 @@ export function List({ hospital, date, onOpen }: { hospital: string; date: strin
 
   return (
     <div className="pad">
+      {!ranked && (
+        <div className="prerun">
+          <img src="/brand/corridor-light.png" alt="" aria-hidden="true" />
+          <div className="prerun-in">
+            <strong>No agent has scored this hospital-day yet.</strong>
+            <span>Everything below is what a clinician recorded. Run the agents to see a suggested order.</span>
+          </div>
+        </div>
+      )}
+
       <div className="lede">
         <h1>{ranked ? 'Suggested order' : 'The list, before any ranking'}</h1>
         <p className="lede-p">
           {ranked ? (
             <>Every Urgent patient is seen before every Semi-Urgent patient — no score moves
-            anyone between groups. Inside a group the order weighs how unwell someone looks
+            anyone between groups. <strong>Inside a group, everyone already past their target
+            comes first.</strong> Only then does the order weigh how unwell someone looks
             against how long they have waited, at{' '}
             <strong className="num">{Math.round(decision.alpha * 100)}%</strong> to{' '}
             <strong className="num">{Math.round((1 - decision.alpha) * 100)}%</strong>, set
@@ -156,10 +171,23 @@ function RowTable({ rows, ranked, outside, onOpen }: { rows: Row[]; ranked: bool
       </thead>
       <tbody>
         <AnimatePresence initial={false}>
-          {slice.map((r, i) => (
-            <PatientRow key={r.pathway_number} r={r} i={i}
-                        ranked={ranked} outside={outside} onOpen={onOpen} />
-          ))}
+          {slice.map((r, i) => {
+            const prev = i > 0 ? slice[i - 1] : undefined
+            // the sort key is (band, severity, -crt_breached, -priority, ...):
+            // breach is a hard TIER above priority, so say where it falls
+            const tierEdge = ranked && !outside && prev
+              && prev.crt_breached === true && r.crt_breached !== true
+            return (
+              <Fragment key={r.pathway_number}>
+                {tierEdge && (
+                  <tr className="tier-edge"><td colSpan={5}>
+                    <span>everyone above this line is already past their target</span>
+                  </td></tr>
+                )}
+                <PatientRow r={r} i={i} ranked={ranked} outside={outside} onOpen={onOpen} />
+              </Fragment>
+            )
+          })}
         </AnimatePresence>
       </tbody>
     </table>
@@ -236,20 +264,26 @@ function PatientRow({ r, ranked, outside, onOpen, i }: { r: Row; ranked: boolean
       </td>
       <td className="c-why">
         {ranked && !outside && r.urgency_score != null && r.wait_normalised != null
-          ? <Contribution urgency={r.urgency_score} wait={r.wait_normalised} />
+          ? <Contribution urgency={r.urgency_score} wait={r.wait_normalised} alpha={r.alpha ?? 0.8} />
           : null}
       </td>
     </motion.tr>
   )
 }
 
-/** Both terms, always. The weight alone would mislead: urgency carries most of
- *  it but almost no spread, so waiting time does the discriminating. */
-function Contribution({ urgency, wait }: { urgency: number; wait: number }) {
-  const u = Math.max(0, Math.min(1, urgency))
-  const w = Math.max(0, Math.min(1, wait))
+/** Both terms, always, and WEIGHTED.
+ *
+ *  Drawing the raw urgency and raw wait-percentile on identical tracks misstates
+ *  their relative contribution by up to six times, in the direction of
+ *  overstating waiting time. What actually decides the order is
+ *  alpha*urgency + (1-alpha)*wait, so that is what the bars show, and their
+ *  lengths sum to the priority the coordinator used. */
+function Contribution({ urgency, wait, alpha }: { urgency: number; wait: number; alpha: number }) {
+  const u = Math.max(0, Math.min(1, urgency)) * alpha
+  const w = Math.max(0, Math.min(1, wait)) * (1 - alpha)
   return (
-    <div className="contrib" title={`urgency ${u.toFixed(3)} · waiting ${w.toFixed(3)}`}>
+    <div className="contrib"
+         title={`priority ${(u + w).toFixed(3)} = ${u.toFixed(3)} urgency + ${w.toFixed(3)} waiting`}>
       <div className="contrib-row">
         <span className="contrib-lab">unwell</span>
         <span className="contrib-track"><i style={{ width: `${u * 100}%` }} /></span>
