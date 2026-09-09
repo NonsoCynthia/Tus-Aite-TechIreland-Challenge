@@ -388,9 +388,8 @@ rather than discovered when the scores look wrong.
 
 ### ADR-009: `GET /runs/.../scores` returns `score` as a string, and the coordinator breaks on it
 
-**Date:** 2026-09-08
-**Status:** **open** — affects `coordinating-agent_20260906`; needs that author and/or a
-`retrieval-service_20260904` change
+**Date:** 2026-09-08 — resolved 2026-09-09
+**Status:** **resolved** — fixed in `retrieval-service_20260904` (option (a) below)
 
 **Context:** the urgency agent's first genuine round trip against a live service — write via
 `POST /scores`, read back via `GET /runs/{run_id}/hospitals/{hospital_hipe}/scores` — surfaced a
@@ -445,3 +444,24 @@ Recorded here as a change request with two candidate fixes, neither this track's
 output — which is exactly what task 6.6 of `coordinating-agent_20260906` (its last open build task,
 recorded as "blocked on the urgency/capacity agents") is waiting to do. The urgency agent is no
 longer the blocker there; this is.
+
+**Resolution (2026-09-09).** Root cause was narrower than "Decimal serialises to a string": every
+GET route in `retrieval/app/reads.py` returns a plain `dict[str, Any]` with no `response_model=None`
+on its `@router.get(...)` decorator (the write endpoints in `routes.py` already carried this, GET
+never did). Without it, FastAPI infers a response model from the return-type annotation and
+serialises through Pydantic's own encoder, which renders a `Decimal` nested under `Any` as a string.
+`fastapi.encoders.jsonable_encoder` — used when `response_model=None` tells FastAPI not to build that
+inferred model — renders the same `Decimal` as a JSON number, confirmed directly against both code
+paths before changing anything. Fix: added `response_model=None` to all six `@router.get(...)`
+decorators in `reads.py`, matching the pattern `routes.py` already used. This is a strict superset of
+option (a)'s fix — it also corrects `occupancy_pct` (`core.bed_status`, also a Postgres `numeric`) on
+`GET /referrals/.../context`, which carried the identical defect and had gone unnoticed because
+Pydantic coerces a numeric string back to `float` leniently on the read side, masking it.
+
+Verified against the live stack (not mocked): rebuilt and redeployed the `retrieval` container,
+confirmed `GET /runs/{run_id}/hospitals/{hospital_hipe}/scores` returns `"score": 0.662` (a JSON
+number) rather than `"score": "0.662"` for real capacity-agent output already written under
+`run-0001`. New regression test asserts the JSON type directly
+(`test_coordinator_input.py::test_score_is_returned_as_a_json_number_not_a_string`) rather than
+coercing with `float(...)` first, which is what let this ship unnoticed in the existing test suite —
+417 tests pass against live Postgres/Oxigraph, ruff/mypy clean.

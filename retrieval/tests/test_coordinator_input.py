@@ -185,6 +185,30 @@ class TestScoresForRun:
         assert entry["urgency"]["citations"]
         assert entry["capacity"]["citations"]
 
+    def test_score_is_returned_as_a_json_number_not_a_string(
+        self, client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        # agent_scores.score is a Postgres `numeric`; psycopg returns a
+        # Decimal, which serialises to a JSON *string* if this route lets
+        # FastAPI infer a response_model from its `-> dict[str, Any]`
+        # annotation (Pydantic's own Decimal-under-Any encoding) instead of
+        # going through `jsonable_encoder` directly (`response_model=None`).
+        # A consumer doing arithmetic on this field -- the coordinator's
+        # `priority.py` multiplies it -- gets a `TypeError`, not a wrong
+        # number, so this must fail loudly rather than coerce and pass.
+        run_id = _run_id()
+        payload = to_score_in(make_score(42, run_id=run_id, agent_name="urgency"))
+        client.post("/scores", json=payload.model_dump(mode="json"), headers=auth_headers)
+
+        response = client.get(
+            f"/runs/{run_id}/hospitals/{payload.hospital_hipe}/scores", headers=auth_headers
+        )
+
+        score = response.json()["scores"][payload.pathway_number]["urgency"]["score"]
+        assert isinstance(score, float), (
+            f"score must be a JSON number, got {type(score)}: {score!r}"
+        )
+
     def test_only_written_agent_appears_when_the_other_hasnt_scored_yet(
         self, client: TestClient, auth_headers: dict[str, str]
     ) -> None:
