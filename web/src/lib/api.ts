@@ -58,6 +58,24 @@ export const api = {
       }>
     }>(`/api/operations/${hospital}/${date}`),
 
+  /** Which hospital-days actually hold a cohort, discovered from the data.
+   *  `runnable` is the newest of them: evidence is date-blind, so scoring an
+   *  earlier day would cite readings taken later. Everything else is readable. */
+  hospitalDays: (hospital: string) =>
+    get<{
+      hospital_hipe: string
+      days: Array<{ date: string; referrals: number }>
+      runnable: string | null
+      today: string
+      today_has_cohort: boolean
+    }>(`/api/hospital-days/${hospital}`),
+
+  refreshDays: async (hospital: string) => {
+    const r = await fetch(`/api/hospital-days/${hospital}/refresh`, { method: 'POST' })
+    if (!r.ok) throw new Error(`could not refresh: ${r.status}`)
+    return r.json()
+  },
+
   context: (hospital: string, pathway: string) =>
     get<ReferralContext>(`/api/context/${hospital}/${pathway}`),
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from './lib/api'
 import { Mark } from './components/Mark'
@@ -14,18 +14,36 @@ const HOSPITALS = [
   { hipe: '9001', name: "St Brendan's University Hospital" },
   { hipe: '9002', name: 'Kilbrannan Regional Hospital' },
 ]
-/** 14 days loaded, 2026-08-17..08-30. Only the latest is honest to RANK: the
- *  evidence call carries no date and returns the most recent observation
- *  whichever day you ask for, so scoring an earlier day cites later readings. */
-export const DATES = Array.from({ length: 14 }, (_, i) => `2026-08-${17 + i}`)
-export const RUNNABLE_DATE = DATES[DATES.length - 1]
+// Hospital-days are DISCOVERED, never hardcoded: a batch loaded while the
+// service is up must appear in the selector without a frontend change.
 
 export function App() {
   const [hospital, setHospital] = useState('9001')
-  const [date, setDate] = useState(RUNNABLE_DATE)
+  const [date, setDate] = useState<string | null>(null)
   const [surface, setSurface] = useState<Surface>('landing')
   const [patient, setPatient] = useState<string | null>(null)
   const health = useQuery({ queryKey: ['health'], queryFn: api.health })
+  const days = useQuery({
+    queryKey: ['hospital-days', hospital],
+    queryFn: () => api.hospitalDays(hospital),
+    staleTime: 5 * 60_000,
+  })
+  // default to the newest day that actually holds data, whatever that turns
+  // out to be, and follow it if the hospital changes
+  useEffect(() => {
+    const r = days.data?.runnable
+    if (r && (date === null || !days.data?.days.some((d) => d.date === date))) setDate(r)
+  }, [days.data, date])
+
+  if (!date || !days.data) {
+    return (
+      <div className="boot">
+        <Mark size={34} draw />
+        <span>{days.error ? 'Cannot reach the service.' : 'Reading the waiting lists\u2026'}</span>
+      </div>
+    )
+  }
+  const runnable = days.data.runnable
   const name = HOSPITALS.find((h) => h.hipe === hospital)?.name ?? hospital
 
   if (surface === 'landing') {
@@ -51,10 +69,11 @@ export function App() {
           </select>
           <select className="picker num" value={date} onChange={(e) => setDate(e.target.value)}
                   aria-label="Hospital-day">
-            {DATES.map((d) => (
-              <option key={d} value={d}>
-                {new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })}
-                {d === RUNNABLE_DATE ? '' : ' · view only'}
+            {days.data.days.map((d) => (
+              <option key={d.date} value={d.date}>
+                {new Date(d.date).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {' · '}{d.referrals} waiting
+                {d.date === runnable ? '' : ' · view only'}
               </option>
             ))}
           </select>
@@ -80,7 +99,8 @@ export function App() {
       <main>
         {surface === 'overview' && <Overview hospital={hospital} date={date} name={name} />}
         {surface === 'run' && (
-          <Run hospital={hospital} date={date} onDone={() => setSurface('list')} />
+          <Run hospital={hospital} date={date} runnable={runnable}
+               onDone={() => setSurface('list')} />
         )}
         {surface === 'list' && (patient
           ? <Patient hospital={hospital} date={date} pathway={patient} onBack={() => setPatient(null)} />

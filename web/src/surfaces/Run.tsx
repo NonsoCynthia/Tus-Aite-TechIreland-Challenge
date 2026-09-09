@@ -18,9 +18,14 @@ const PHASES = [
  *  endpoint the coordinator reads. It cannot advance unless work happened, and
  *  it never interpolates between polls: it steps when data arrives.
  */
-export function Run({ hospital, date, onDone }: {
-  hospital: string; date: string; onDone: () => void
+export function Run({ hospital, date, runnable, onDone }: {
+  hospital: string; date: string; runnable: string | null; onDone: () => void
 }) {
+  // Evidence is date-blind: GET /referrals/{h}/{pw}/context takes no date and
+  // returns the most recent observation whichever day is asked about. Scoring
+  // an older day would cite readings taken after it, so only the newest day
+  // holding data can honestly be ranked.
+  const rankable = runnable == null || date === runnable
   const [run, setRun] = useState<RunT | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -70,7 +75,7 @@ export function Run({ hospital, date, onDone }: {
 
       <div className="run-panel">
         <div className="run-top">
-          <button className="run-btn" onClick={start} disabled={busy}>
+          <button className="run-btn" onClick={start} disabled={busy || !rankable}>
             {busy ? 'Running…' : done ? 'Run again' : 'Run for this hospital-day'}
           </button>
           <div className="run-meta">
@@ -80,6 +85,20 @@ export function Run({ hospital, date, onDone }: {
             {run && <> · <span className="num run-id">{run.run_id}</span></>}
           </div>
         </div>
+
+        {!rankable && (
+          <div className="run-locked">
+            <strong>This day can be read, but not scored.</strong>
+            <p>
+              The evidence call carries no date: it returns the most recent observation on
+              record whichever day you ask about. Scoring{' '}
+              {new Date(date).toLocaleDateString('en-IE', { day: 'numeric', month: 'long' })}{' '}
+              would cite readings taken after it. Runs happen on{' '}
+              {runnable && new Date(runnable).toLocaleDateString('en-IE',
+                { day: 'numeric', month: 'long', year: 'numeric' })}, the newest day holding data.
+            </p>
+          </div>
+        )}
 
         {err && <div className="err">{err}</div>}
 

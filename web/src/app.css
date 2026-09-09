@@ -598,3 +598,16 @@
 .nb-p { font-family: var(--font-brand); font-size: 15px; }
 .nb-t { color: var(--text-2); font-size: 11px; }
 .nb-s { color: var(--text-2); text-align: right; }
+
+/* --- boot, before the days are discovered -------------------------------- */
+.boot {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 18px;
+  color: var(--text-2); font-size: var(--t-small); background: var(--bg);
+}
+/* --- a readable but unrankable day --------------------------------------- */
+.run-locked {
+  border-left: 3px solid var(--taupe); background: rgba(196,182,166,0.07);
+  padding: 13px 16px; margin-bottom: 18px; font-size: var(--t-small); line-height: 1.55;
+}
+.run-locked p { margin: 6px 0 0; color: var(--text-2); max-width: 76ch; }

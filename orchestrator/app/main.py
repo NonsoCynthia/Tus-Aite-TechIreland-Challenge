@@ -108,6 +108,65 @@ def decision(hospital_hipe: str, as_of_date: str) -> dict[str, Any]:
 
 
 _ops_cache: dict[tuple[str, str], dict[str, Any]] = {}
+_days_cache: dict[str, dict[str, Any]] = {}
+
+
+@app.get("/api/hospital-days/{hospital_hipe}")
+def hospital_days(hospital_hipe: str, window: int = 60) -> dict[str, Any]:
+    """Which hospital-days actually hold a cohort, discovered rather than assumed.
+
+    The UI used to carry a hardcoded fortnight, which meant a day appearing in
+    the data -- a new batch loaded today, say -- would be invisible until
+    someone edited the frontend. This probes the window instead, so the selector
+    follows the data.
+
+    RUNNABLE vs READABLE is a real distinction, not a nicety. Evidence is
+    date-blind: GET /referrals/{h}/{pw}/context takes no date and returns the
+    most recent observation whichever day you ask about, so scoring an earlier
+    day would cite readings taken later. Every day with a cohort can be READ;
+    only the latest can honestly be RANKED.
+    """
+    cached = _days_cache.get(hospital_hipe)
+    if cached:
+        return cached
+
+    today = _dt.date.today()
+    candidates = [(today - _dt.timedelta(days=i)).isoformat() for i in range(window)]
+
+    def probe(d: str) -> tuple[str, int]:
+        try:
+            r = _client.get(f"/hospitals/{hospital_hipe}/cohort/{d}")
+            if r.status_code != 200:
+                return d, 0
+            return d, len(r.json().get("referrals", []))
+        except httpx.HTTPError:
+            return d, 0
+
+    with cf.ThreadPoolExecutor(max_workers=12) as ex:
+        found = [(d, n) for d, n in ex.map(probe, candidates) if n > 0]
+
+    found.sort(key=lambda x: x[0])
+    days = [{"date": d, "referrals": n} for d, n in found]
+    out = {
+        "hospital_hipe": hospital_hipe,
+        "days": days,
+        # the newest day holding data: the only one it is honest to rank
+        "runnable": days[-1]["date"] if days else None,
+        "today": today.isoformat(),
+        "today_has_cohort": any(d["date"] == today.isoformat() for d in days),
+    }
+    _days_cache[hospital_hipe] = out
+    return out
+
+
+@app.post("/api/hospital-days/{hospital_hipe}/refresh")
+def refresh_days(hospital_hipe: str) -> dict[str, Any]:
+    """Forget what we discovered and look again -- for when a batch is loaded
+    while the service is up, which is exactly the case this has to survive."""
+    _days_cache.pop(hospital_hipe, None)
+    for key in [k for k in _ops_cache if k[0] == hospital_hipe]:
+        _ops_cache.pop(key, None)
+    return hospital_days(hospital_hipe)
 
 
 @app.get("/api/operations/{hospital_hipe}/{as_of_date}")
