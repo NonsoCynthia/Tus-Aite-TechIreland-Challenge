@@ -413,3 +413,38 @@
   display: flex; align-items: center; justify-content: center; height: 100%;
   color: #8E93A8; font-size: var(--t-small);
 }
+
+/* --- the one modal -------------------------------------------------------- */
+.ovr {
+  width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 64px);
+  border: 1px solid var(--rule-firm); background: var(--surface);
+  color: var(--text); padding: 24px 26px; font: inherit;
+}
+.ovr::backdrop { background: rgba(11, 20, 54, 0.55); backdrop-filter: blur(3px); }
+.ovr-h { font-family: var(--font-brand); font-size: 20px; font-weight: 500; margin: 0 0 4px; }
+.ovr-sub { font-size: var(--t-small); color: var(--text-2); margin: 0 0 18px; }
+.ovr-f { display: grid; gap: 5px; margin-bottom: 16px; }
+.ovr-l { font-size: var(--t-small); color: var(--text-2); }
+.ovr-opt { color: var(--text-3); }
+.ovr-in {
+  font: inherit; font-size: var(--t-body); color: var(--text);
+  background: var(--bg); border: 1px solid var(--rule-firm); padding: 9px 11px; width: 100%;
+}
+.ovr-ta { resize: vertical; min-height: 54px; }
+.ovr-hint { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+/* the boundary warning: the one place an interruption is justified */
+.ovr-warn {
+  border-left: 3px solid var(--cat-urgent); background: var(--surface-2);
+  padding: 13px 15px; margin: 0 0 16px; font-size: var(--t-small); line-height: 1.55;
+}
+.ovr-warn p { margin: 6px 0 10px; color: var(--text-2); }
+.ovr-attest { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
+.ovr-attest input { margin-top: 2px; }
+.ovr-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.ovr-go { padding: 9px 20px; font-size: var(--t-body); }
+.ovr-err { margin-top: 12px; }
+.p-actions { margin-left: auto; padding-right: 22px; }
+.flash {
+  border-left: 3px solid var(--cat-routine); background: var(--surface-2);
+  padding: 11px 16px; margin-bottom: 18px; font-size: var(--t-body);
+}

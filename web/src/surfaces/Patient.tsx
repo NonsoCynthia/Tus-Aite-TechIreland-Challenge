@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, bandOf } from '../lib/api'
 import { Journey, type Event } from '../components/Journey'
 import { Provenance } from '../components/Provenance'
+import { Override } from '../components/Override'
 import type { Decision } from '../lib/types'
 
 const fmt = (n: number) => n.toLocaleString('en-IE')
@@ -20,6 +22,8 @@ const ICD: Record<string, string> = {
 export function Patient({ hospital, date, pathway, onBack }: {
   hospital: string; date: string; pathway: string; onBack: () => void
 }) {
+  const [ovr, setOvr] = useState(false)
+  const [flash, setFlash] = useState<string | null>(null)
   const ops = useQuery({ queryKey: ['operations', hospital, date], queryFn: () => api.operations(hospital, date), staleTime: Infinity })
   const ctx = useQuery({ queryKey: ['context', hospital, pathway], queryFn: () => api.context(hospital, pathway) })
   const dec = useQuery<Decision>({ queryKey: ['decision', hospital, date], queryFn: () => api.decision(hospital, date), retry: false })
@@ -71,6 +75,11 @@ export function Patient({ hospital, date, pathway, onBack }: {
             {refused && <span className="muted">outside the ranking &mdash; paediatric</span>}
           </div>
         </div>
+        <div className="p-actions">
+          {placed && dec.data && (
+            <button className="pg" onClick={() => setOvr(true)}>Accept or move&hellip;</button>
+          )}
+        </div>
         <div className="p-wait">
           <div className="p-wait-n num">{fmt(wait)}</div>
           <div className="p-wait-l">
@@ -78,6 +87,14 @@ export function Patient({ hospital, date, pathway, onBack }: {
           </div>
         </div>
       </div>
+
+      {flash && <div className="flash">{flash}</div>}
+
+      {ovr && placed && dec.data && (
+        <Override patient={placed} decision={dec.data}
+                  onClose={() => setOvr(false)}
+                  onDone={(m) => { setFlash(m); setOvr(false) }} />
+      )}
 
       <Journey events={events} today={date} />
 
