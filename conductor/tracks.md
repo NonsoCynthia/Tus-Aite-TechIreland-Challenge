@@ -6,8 +6,33 @@
 
 | Track | Type | Status | Description |
 |---|---|---|---|
-| [explainable-agent-based-triage_20260828](./tracks/explainable-agent-based-triage_20260828/index.md) | feature | pending; ADR-002 resolved and implemented by `retrieval-service_20260904` — agents should call that service's write endpoints | Full build on top of graph-foundation: urgency agent, capacity agent, coordinator + audit trail, rationale layer, clinician UI + override loop, CPC/CRT compliance validation (proposal §14 Days 3–6). Write target settled by ADR-002 (Postgres, graph projects it) |
+| [explainable-agent-based-triage_20260828](./tracks/explainable-agent-based-triage_20260828/index.md) | feature | pending; Phase 1 (urgency agent) built in `urgency-agent/` — NEWS2 scoring, write path, CLI, 113 tests, 97% coverage; only manual verification and the MTS task remain, and MTS is **not buildable from this dataset** (ADR-004). Phase 2 (capacity agent) built. ADR-002 resolved and implemented by `retrieval-service_20260904` — agents call that service's write endpoints. **ADR-004 and ADR-008 open** | Full build on top of graph-foundation: urgency agent, capacity agent, coordinator + audit trail, rationale layer, clinician UI + override loop, CPC/CRT compliance validation (proposal §14 Days 3–6). Write target settled by ADR-002 (Postgres, graph projects it) |
 | [coordinating-agent_20260906](./tracks/coordinating-agent_20260906/index.md) | feature | pending; Phases 1–6 built (73 tests, 1 deliberate failure, Tier 1 coverage 100%) — only 6.6 (live scores, blocked on the urgency/capacity agents) and 6.7 (compliance review, blocked on the responsible-AI/compliance lead) remain; ADR-007/009/011 open | Coordinating agent carved out of `explainable-agent-based-triage_20260828` FR3/FR6 so it can be built independently of the in-parallel urgency and capacity agents. Ranks one hospital-day cohort deterministically and writes it via `POST /decisions`. CPC as a non-compensatory band ordered by `severity_rank` (never the raw code), cohort-level scarcity modulating the urgency/waiting weight, CPC/CRT rule checks, citations, atomic write-back with 207 handling. No LLM; determinism is a tested property |
+
+## Blocked / Cross-Track Requests
+
+| Raised by | Against | What is needed | Status |
+|---|---|---|---|
+| `explainable-agent-based-triage_20260828` ADR-009 (urgency agent, 2026-09-08) | `retrieval-service_20260904` **and** `coordinating-agent_20260906` | `GET /runs/.../hospitals/.../scores` returns `score` as a **string** (`"0.075"`) — `agent_scores.score` is a Postgres `numeric`, so the driver's `Decimal` serialises as JSON string, while `POST /scores` accepts a float. The coordinator passes this field straight into arithmetic (`cli.py:204` → `priority.py:134` → `decision.py:191`) and raises `TypeError` on it; verified against its own code. Its tests pass only because ADR-008's fixture score source yields real floats, so **every coordinator run so far has used stub scores**. Fix in the service (serialise as float, symmetric with the input, fixes all consumers) or coerce at the coordinator's `merge_scores` boundary. | **open** |
+| `explainable-agent-based-triage_20260828` ADR-008 (urgency agent, 2026-09-08) | `retrieval-service_20260904` | Add `priority_level_gp`, `referral_source` and `high_clinical_or_social_needs` to the `referral` object returned by `GET /referrals/{hospital_hipe}/{pathway_number}/context`. All three are already in `core.referral_daily` and already written by that service on intake (`retrieval/app/db.py:283-300`); the context query simply does not select them (`db.py:330-331`). Additive — exposure, not new plumbing. | **open** |
+
+**ADR-009 is the more urgent of the two.** It is a live break, not a missing capability: task 6.6 of
+`coordinating-agent_20260906` — its last open build task, currently recorded as *"blocked on the
+urgency/capacity agents"* — is no longer blocked on those agents. Real urgency scores now exist and
+are readable via `GET /runs/.../scores`. It is blocked on this type mismatch instead, and the fix is
+a one-line coercion at worst.
+
+**Why ADR-008 matters beyond a missing field.** `dataset/docs/HOW_THE_DATA_WAS_MADE.md` §4 measured
+that NEWS2 alone recovers triage category only 17.5 percentage points better than guessing, and that
+54–59% of the highest-acuity patients score `news2 <= 2`. That section states the requirement
+directly: *"an urgency agent must read condition, pathway, referral source and the high-needs flag,
+not just physiology."* `conditions` is already returned; the other three are not. Until this lands,
+the urgency agent cannot implement what the dataset's own documentation says it must, and **no
+ranked list can honestly be described as clinically prioritised** (ADR-004). Not resolvable inside
+`urgency-agent/`: ADR-002 forbids reading `core.referral_daily` directly, and doing so would defeat
+the single-contract point of the mediator.
+
+---
 
 ## Planned Tracks
 

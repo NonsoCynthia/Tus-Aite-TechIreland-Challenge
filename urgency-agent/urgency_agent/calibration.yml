@@ -1,0 +1,61 @@
+# Urgency agent scoring config (spec.md FR1) -- committed, inspectable config
+# rather than hidden constants, per product.md's Calibration Configuration
+# principle. A compliance reviewer or clinician can read and adjust these
+# without touching code; urgency_agent.calibration validates them before a run.
+#
+# urgency_score is a CLINICAL-URGENCY score: 0.0 = no physiological derangement,
+# 1.0 = maximum. Same polarity as the capacity agent's pressure score (ADR-003),
+# so a higher number always means more reason to prioritise, for either agent.
+#
+# v1 scores NEWS2 only, and NEWS2 alone is a WEAK urgency signal -- measured,
+# not suspected: correlation with triage category never exceeds 0.253, and
+# 54-59% of the highest-acuity patients score news2 <= 2
+# (dataset/docs/HOW_THE_DATA_WAS_MADE.md section 4). Retuning the curve below
+# cannot fix that; only further components can. See ADR-004 and ADR-008.
+
+# The NEWS2 -> [0,1] curve, as anchors interpolated linearly between (ADR-006).
+#
+# MEASURED against all 609 observations in data v1.1 (sample profile), not
+# assumed. The observed distribution:
+#
+#   news2=0  51.1%   news2=3   7.7%   news2=6  0.7%
+#   news2=1  25.6%   news2=4   2.1%   news2=7  0.5%   <- highest observed
+#   news2=2  11.5%   news2=5   0.8%
+#
+# The top anchor is 7, NOT NEWS2_MAX (17). 17 is reachable in the rubric but
+# never occurs here, and anchoring there capped the highest real referral at
+# 0.636 -- the top 36% of the range was dead. 7 is also the clinically correct
+# ceiling independent of this sample: NEWS2 >= 7 is the top escalation
+# category ("emergency response"), and a 9 does not trigger a different action
+# than a 7. Scores saturate at 1.0 above 7.
+#
+# NOT a flat news2/7 either: the anchors are NEWS2's own escalation
+# thresholds (0-4 low, 5-6 low-medium, 7+ high), so the curve steps where
+# clinicians change behaviour.
+#
+# KNOWN, AND NOT FIXABLE HERE: 51.1% of referrals score news2=0 and therefore
+# tie at exactly 0.0, and 88.2% sit at or below news2=2. No monotone mapping
+# can separate patients whose inputs are identical. Retuning these anchors
+# changes the spread of the top 12%, never the tie at the bottom -- that is a
+# property of NEWS2 on this population (ADR-004), not of this calibration.
+#
+# STORAGE PRECISION: agent_scores.score is numeric(4,3), so the retrieval
+# service rounds every written score to three decimals. Breakpoint scores that
+# produce values needing more precision are silently rounded on write -- the
+# anchors below are all exact at 3dp deliberately.
+#
+# Constraints enforced at load: first must be (0, 0.0); last must score 1.0;
+# no breakpoint above NEWS2_MAX; strictly ascending in news2; non-decreasing
+# in score.
+breakpoints:
+  - news2: 0
+    score: 0.0
+  - news2: 4      # top of the low-risk band
+    score: 0.30
+  - news2: 6      # top of the low-medium band
+    score: 0.60
+  - news2: 7      # high-risk / emergency-response threshold; saturates above
+    score: 1.0
+
+method: "urgency-news2-v1"
+agent_version: "urgency-agent-0.1.0"

@@ -1,0 +1,47 @@
+# Frozen: the exact versions this package was built and tested against
+# (BUILDING_AN_AGENT_WITH_CONDUCTOR.md Step 1 -- freeze what you actually ran,
+# because resolving requirements.txt's bounds tomorrow gives someone else a
+# different set). Runtime-only dependencies are declared with bounds in
+# requirements.txt.
+#
+# Frozen from a CLEAN environment built off this package's own
+# requirements.txt plus the four dev tools, not from the retrieval service's
+# requirements. Step 1 says to bootstrap from retrieval/ -- doing so and
+# freezing the result carried that service's whole web stack (fastapi,
+# starlette, uvicorn, uvloop, httptools, watchfiles, websockets) and, worse,
+# psycopg: a Postgres driver in the dependency list of an agent that ADR-002
+# forbids from touching Postgres directly. All four gates and the mutation
+# check pass against exactly this set.
+#
+# Regenerate:
+#   python -m venv .venv && .venv/bin/pip install -r requirements.txt \
+#     pytest pytest-cov ruff mypy types-PyYAML
+#   .venv/bin/pip freeze > requirements-dev.txt
+annotated-types==0.8.0
+anyio==4.15.1
+ast_serialize==0.10.0
+certifi==2026.7.22
+coverage==7.16.0
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.19
+iniconfig==2.3.0
+librt==0.15.0
+mypy==2.3.1
+mypy_extensions==1.1.0
+packaging==26.3
+pathspec==1.1.1
+pluggy==1.6.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+pydantic_core==2.46.5
+Pygments==2.21.0
+pytest==9.1.1
+pytest-cov==7.1.0
+python-dotenv==1.2.3
+PyYAML==6.0.3
+ruff==0.16.6
+types-PyYAML==6.0.12.20260906
+typing-inspection==0.4.4
+typing_extensions==4.16.0
