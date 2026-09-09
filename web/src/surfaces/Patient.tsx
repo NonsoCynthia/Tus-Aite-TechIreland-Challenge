@@ -4,6 +4,7 @@ import { api, bandOf } from '../lib/api'
 import { Journey, type Event } from '../components/Journey'
 import { Provenance } from '../components/Provenance'
 import { Override } from '../components/Override'
+import { Compare } from '../components/Compare'
 import type { Decision, Ranking } from '../lib/types'
 
 const fmt = (n: number) => n.toLocaleString('en-IE')
@@ -23,6 +24,7 @@ export function Patient({ hospital, date, pathway, onBack }: {
   hospital: string; date: string; pathway: string; onBack: () => void
 }) {
   const [ovr, setOvr] = useState(false)
+  const [cmp, setCmp] = useState<'above' | 'below' | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const ops = useQuery({ queryKey: ['operations', hospital, date], queryFn: () => api.operations(hospital, date), staleTime: Infinity })
   const ctx = useQuery({ queryKey: ['context', hospital, pathway], queryFn: () => api.context(hospital, pathway) })
@@ -98,7 +100,10 @@ export function Patient({ hospital, date, pathway, onBack }: {
 
       <Journey events={events} today={date} />
 
-      {placed && dec.data && <WhyHere placed={placed} decision={dec.data} />}
+      {placed && dec.data
+        ? <WhyHere placed={placed} decision={dec.data} compare={cmp}
+                   onCompare={setCmp} onCloseCompare={() => setCmp(null)} />
+        : <NotScoredYet refused={!!refused} />}
 
       <section className="p-sec">
         <h2 className="sec-h">What the score read
@@ -120,7 +125,7 @@ export function Patient({ hospital, date, pathway, onBack }: {
         </p>
       </section>
 
-      {dec.data && (
+      {dec.data && placed && (
         <section className="p-sec">
           <h2 className="sec-h">The chain behind this position
             <span className="sec-note">assembled from the recorded citations</span></h2>
@@ -161,7 +166,12 @@ export function Patient({ hospital, date, pathway, onBack }: {
  *  is alpha*urgency + (1-alpha)*wait-percentile. Both facts are shown, because
  *  showing only the blend contradicts the rows either side of a tier boundary.
  */
-function WhyHere({ placed, decision }: { placed: Ranking; decision: Decision }) {
+function WhyHere({ placed, decision, compare, onCompare, onCloseCompare }: {
+  placed: Ranking; decision: Decision
+  compare: 'above' | 'below' | null
+  onCompare: (w: 'above' | 'below') => void
+  onCloseCompare: () => void
+}) {
   const a = placed.alpha
   const uTerm = a * placed.urgency_score
   const wTerm = (1 - a) * placed.wait_normalised
@@ -215,16 +225,25 @@ function WhyHere({ placed, decision }: { placed: Ranking; decision: Decision }) 
 
       {(above || below) && (
         <div className="why-neighbours">
-          {above && <NeighbourRow r={above} label="above" />}
+          {above && <NeighbourRow r={above} label="above" onCompare={() => onCompare('above')} />}
           <NeighbourRow r={placed} label="this patient" self />
-          {below && <NeighbourRow r={below} label="below" />}
+          {below && <NeighbourRow r={below} label="below" onCompare={() => onCompare('below')} />}
         </div>
+      )}
+
+      {compare === 'above' && above && (
+        <Compare a={above} b={placed} decision={decision} onClose={onCloseCompare} />
+      )}
+      {compare === 'below' && below && (
+        <Compare a={placed} b={below} decision={decision} onClose={onCloseCompare} />
       )}
     </section>
   )
 }
 
-function NeighbourRow({ r, label, self }: { r: Ranking; label: string; self?: boolean }) {
+function NeighbourRow({ r, label, self, onCompare }: {
+  r: Ranking; label: string; self?: boolean; onCompare?: () => void
+}) {
   return (
     <div className={'nb' + (self ? ' is-self' : '')}>
       <span className="nb-l">{label}</span>
@@ -233,6 +252,36 @@ function NeighbourRow({ r, label, self }: { r: Ranking; label: string; self?: bo
       <span className="nb-w num">{(r.adjusted_wait_days ?? 0).toLocaleString('en-IE')}d</span>
       <span className="nb-t">{r.crt_breached === true ? 'past target' : r.crt_threshold_days == null ? 'no target' : 'within target'}</span>
       <span className="nb-s num">priority {r.priority.toFixed(3)}</span>
+      {onCompare
+        ? <button className="nb-cmp" onClick={onCompare}>why?</button>
+        : <span />}
     </div>
+  )
+}
+
+
+/** The honest empty state for a day no agent has scored.
+ *
+ *  Three sections disappear without it -- position, arithmetic, provenance --
+ *  and a page that silently shrinks reads as broken rather than as "nothing has
+ *  happened here yet". The clinician-recorded facts above are still true and
+ *  still shown; only the computed layer is absent.
+ */
+function NotScoredYet({ refused }: { refused: boolean }) {
+  return (
+    <section className="p-sec">
+      <div className="notyet">
+        <strong>
+          {refused
+            ? 'Not scored, and not placed.'
+            : 'No agent has scored this hospital-day.'}
+        </strong>
+        <p>
+          {refused
+            ? 'NEWS2 is validated in adults, so the urgency agent refuses paediatric specialties rather than scoring a child on an adult scale. That is a statement about what this system covers, not a low position.'
+            : 'Everything above was recorded by a clinician and is unaffected. There is no position, no priority arithmetic and no citation chain, because nothing has been computed for this day. Runs happen on the newest day holding data.'}
+        </p>
+      </div>
+    </section>
   )
 }

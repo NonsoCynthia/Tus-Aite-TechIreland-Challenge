@@ -611,3 +611,58 @@
   padding: 13px 16px; margin-bottom: 18px; font-size: var(--t-small); line-height: 1.55;
 }
 .run-locked p { margin: 6px 0 0; color: var(--text-2); max-width: 76ch; }
+
+/* --- nothing computed yet: say so where the ranking would be ------------- */
+.notyet {
+  border: 1px solid var(--rule); border-left: 3px solid var(--rule-firm);
+  background: var(--surface-2); padding: 15px 18px; max-width: 78ch;
+}
+.notyet strong { font-size: var(--t-body); }
+.notyet p { margin: 7px 0 0; font-size: var(--t-small); color: var(--text-2); line-height: 1.6; }
+
+/* --- pairwise comparison: the question the project exists to answer ------- */
+.nb { grid-template-columns: 78px 46px 1fr 68px 106px 128px 54px; }
+.nb-cmp {
+  font: inherit; font-size: 11px; color: var(--text-2);
+  background: none; border: 1px solid var(--rule-firm); padding: 3px 8px; cursor: pointer;
+}
+.nb-cmp:hover { color: var(--text); border-color: var(--text-3); }
+.cmp { margin-top: 16px; border: 1px solid var(--rule-firm); background: var(--surface); }
+.cmp-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 13px 18px; border-bottom: 1px solid var(--rule);
+}
+.cmp-head h3 { font-family: var(--font-brand); font-size: 15px; font-weight: 500; margin: 0; }
+.cmp-cols, .cmp-step {
+  display: grid; grid-template-columns: 1fr 170px 170px; gap: 14px;
+  padding: 9px 18px; align-items: baseline;
+}
+.cmp-cols { border-bottom: 1px solid var(--rule); }
+.cmp-who { font-size: 11px; color: var(--text-2); }
+.cmp-step { border-bottom: 1px solid var(--rule); }
+.cmp-rule { font-size: var(--t-small); display: flex; align-items: center; gap: 9px; }
+.cmp-v { font-size: var(--t-small); color: var(--text-2); }
+/* the step that actually separated them carries the one clay mark here */
+.cmp-step.is-decider { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--clay); }
+.cmp-step.is-decider .cmp-rule, .cmp-step.is-decider .cmp-v { color: var(--text); font-weight: 600; }
+.cmp-tag {
+  font-size: 10px; font-weight: 400; color: var(--clay);
+  border: 1px solid var(--clay); padding: 1px 6px; letter-spacing: 0.03em;
+}
+.cmp-note { grid-column: 1 / -1; font-size: 11px; color: var(--text-3); margin-top: 3px; }
+.cmp-terms { padding: 14px 18px; }
+.cmp-terms-h {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-2); font-family: var(--font-brand); margin-bottom: 9px;
+}
+.cmp-trow {
+  display: grid; grid-template-columns: 1fr 170px 170px 130px; gap: 14px;
+  padding: 5px 0; font-size: var(--t-small);
+}
+.cmp-tk { color: var(--text-2); }
+.cmp-tv { color: var(--text); }
+.cmp-td { color: var(--text-3); text-align: right; }
+.cmp-verdict {
+  margin: 12px 0 0; font-size: var(--t-body); line-height: 1.6; max-width: 76ch;
+  border-left: 3px solid var(--clay); padding-left: 14px;
+}
