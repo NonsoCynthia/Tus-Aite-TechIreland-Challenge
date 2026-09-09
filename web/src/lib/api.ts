@@ -1,4 +1,7 @@
-import type { CohortReferral, Decision, ReferralContext, Run, ScoresByPathway } from './types'
+import type {
+  CohortGraph, CohortReferral, Decision, Overrides, Reference,
+  ReferralContext, Run, ScoresByPathway,
+} from './types'
 
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(path, { headers: { Accept: 'application/json' } })
@@ -10,7 +13,16 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const api = {
-  health: () => get<{ status: string; retrieval: unknown; capacity_direction: string }>('/api/health'),
+  health: () => get<{
+    status: string; retrieval: unknown; capacity_direction: string
+    sources: { postgres: string; oxigraph: string }
+    /** Which hospital-days hold a decision, and whether it came from a run in
+        this process or from the snapshot restored on boot. */
+    decisions_held: Array<{
+      hospital_hipe: string; as_of_date: string; run_id: string
+      built_at: string; source: 'run' | 'snapshot'
+    }>
+  }>('/api/health'),
 
   cohort: (hospital: string, date: string) =>
     get<{ referrals: CohortReferral[] }>(`/api/cohort/${hospital}/${date}`),
@@ -32,8 +44,26 @@ export const api = {
       cohort: number
       wards: Array<{
         ward_id: string; nominal_beds: number | null; occupancy_pct: number
+        /** DATASET_README calls `free` "the answer to how many beds are
+            available". It was never fetched until now. */
+        occupied: number | null; free: number | null; outliers: number
         gar_status: 'G' | 'A' | 'R' | null
         over_9h: number; over_24h: number; dtoc: number; surge: number; snapshot: string
+        /** Which specialties this ward backs. Dropped during de-duplication
+            before, which left the ward panel unjoinable to any referral. */
+        specialties: string[]; primary_for: string[]
+      }>
+      /** The clinic half of the capacity score — 30% of it, and previously
+          discarded. `cited_session_date` is the ONE row the agent read; the
+          rest of the series is context and must be labelled as such. */
+      clinics: Array<{
+        specialty_hipe: string; clinic_code: string | null; clinic_name: string | null
+        cited_session_date: string | null; cited_pressure: number
+        slots_booked: number; slots_total: number; slots_available: number
+        sessions: Array<{
+          session_date: string; slots_total: number
+          slots_booked: number; slots_available: number
+        }>
       }>
       observation_age: {
         n: number; median: number; mean: number; max: number
@@ -79,6 +109,20 @@ export const api = {
   context: (hospital: string, pathway: string) =>
     get<ReferralContext>(`/api/context/${hospital}/${pathway}`),
 
+  /** core.ref_* — specialty names, the authoritative CRT days, the five rule
+      statements. Seed data, so it is fetched once and never refetched. */
+  reference: () => get<Reference>('/api/reference'),
+
+  /** Overrides, read back. Nothing could read one before: retrieval has no GET
+      and the graph keeps only three triples per override. */
+  overrides: (hospital: string, date: string) =>
+    get<Overrides>(`/api/overrides/${hospital}/${date}`),
+
+  /** The whole decision as a graph — 305 placements and their citations, from
+      one SPARQL query. `limit` caps placements for a smaller draw. */
+  cohortGraph: (runId: string, limit = 0) =>
+    get<CohortGraph>(`/api/graph/cohort/${runId}${limit ? `?limit=${limit}` : ''}`),
+
   startRun: async (hospital: string, date: string): Promise<{ run_id: string }> => {
     const r = await fetch('/api/runs', {
       method: 'POST',
@@ -91,7 +135,12 @@ export const api = {
 }
 
 /** SEVERITY_RANK, coordinator/app/bands.py. Note cpc 3 outranks cpc 2, so
-    sorting by the raw code puts Routine above Semi-Urgent. Never sort on cpc. */
+    sorting by the raw code puts Routine above Semi-Urgent. Never sort on cpc.
+
+    The `target` days here are a FALLBACK for the first paint only. The
+    authoritative values are core.ref_codes.crt_days via api.reference(), and a
+    component that draws a threshold reads them from there — otherwise a change
+    to the seed desyncs the product silently. */
 export const BANDS = [
   { key: 'Urgent',        cpc: 1,    rank: 1, target: 28,   token: 'urgent'  },
   { key: 'Semi-Urgent',   cpc: 3,    rank: 2, target: 91,   token: 'semi'    },

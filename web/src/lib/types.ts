@@ -21,19 +21,48 @@ export interface CohortReferral {
   crt_breached: boolean | null
 }
 
+export interface Citation { evidence_type: string; evidence_key: string }
+
+/** One rule the coordinator tested against this referral.
+ *  All five live in core.ref_rules; `detail` is already human-readable, e.g.
+ *  "urgent, day 152 of 28, over by 124". */
+export interface RuleCheck {
+  rule_id: 'RULE-CRT-URGENT' | 'RULE-CRT-SEMI' | 'RULE-TRIAGE-TURNAROUND'
+         | 'RULE-ORDER' | 'RULE-TIEBREAK' | string
+  passed: boolean
+  detail: string | null
+}
+
 /** A ranked placement, as the coordinator produced it and the orchestrator holds it. */
 export interface Ranking extends CohortReferral {
   position: number
+  /** RAW CPC CODE, not a name. Always resolve through bandOf(). */
   band: string
   severity_rank: number | null
   urgency_score: number
+  /** Specialty-level, identical for every referral in a specialty. It sets
+   *  alpha for the whole hospital-day and can never reorder two people. */
   capacity_score: number
   wait_normalised: number
   priority: number
   alpha: number
   scarcity: number
   run_id: string
-  rationale_summary?: string
+  /** Present on every row. The two agents' own citations, ride-along since the
+   *  first run; the UI simply never declared them. Six urgency (one per NEWS2
+   *  vital, zeros included), one or two capacity. */
+  urgency_citations: Citation[]
+  capacity_citations: Citation[]
+  /** The coordinator's own deterministic note. Not the LLM rationale — that is
+   *  another track's unbuilt feature. */
+  rationale_summary: string | null
+  /** 2-5 per referral. Computed since the first run and dropped before the UI
+   *  saw them until the orchestrator merged them back. */
+  rule_checks: RuleCheck[]
+  /** What the capacity agent computed on its way to a score. Neither reaches
+   *  Postgres or the graph — POST /scores carries only the score — so this is
+   *  harvested from the agent pass, the way news2 is. */
+  capacity_detail: { ward_pressure: number | null; clinic_pressure: number | null } | null
 }
 
 export interface Decision {
@@ -116,3 +145,67 @@ export interface ScoreEntry {
   citations: Array<{ evidence_type: string; evidence_key: string }>
 }
 export type ScoresByPathway = Record<string, Record<'urgency' | 'capacity', ScoreEntry>>
+
+
+/** The reference layer, from core.ref_*. The UI hardcoded 28 and 91 and printed
+ *  bare HIPE codes because retrieval exposes no endpoint for these. */
+export interface Reference {
+  specialties: Array<{ specialty_hipe: string; specialty_name: string; is_paediatric: boolean }>
+  /** Authoritative severity_rank and crt_days. Never hardcode these again. */
+  triage_categories: Array<{
+    code_value: string; description: string
+    severity_rank: number | null; crt_days: number | null
+  }>
+  rules: Array<{
+    rule_id: string; statement: string; applies_to: string; threshold_days: number | null
+  }>
+  codes: Array<{ code_table: string; code_value: string; description: string }>
+}
+
+/** What a clinician actually did. Written since the first build, readable only
+ *  since the orchestrator gained a read path. */
+export interface OverrideRecord {
+  override_id: string
+  decision_id: string
+  pathway_number: string
+  clinician_id: string
+  from_position: number | null
+  to_position: number | null
+  reason: string
+  rule_warning_accepted: boolean
+  created_at: string
+}
+export interface Overrides {
+  hospital_hipe: string
+  as_of_date: string
+  /** Newest first, full history. */
+  overrides: OverrideRecord[]
+  /** The one that stands, per pathway. */
+  current: Record<string, OverrideRecord>
+}
+
+/** The whole decision as a graph, from one SPARQL query over the run graph. */
+export interface GraphNode {
+  id: string; label: string
+  kind: 'decision' | 'placement' | 'score' | 'referral_state' | 'bed_status'
+      | 'clinic_session' | 'condition' | 'triage_event' | 'obs' | 'rule' | 'evidence'
+  cites: number
+  position?: number
+  pathway?: string
+}
+export interface GraphEdge {
+  source: string; target: string
+  label: 'hasPlacement' | 'urgency' | 'capacity' | 'timeframe' | 'multi_list'
+}
+export interface CohortGraph {
+  run_id: string
+  graph: string
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  placements: number
+  citations: number
+  /** False on this machine: the batch KG was never loaded, so a cited node has
+   *  an identity and a type but no resolved property values. Say so on screen
+   *  rather than implying the graph knows more than it does. */
+  inputs_graph_loaded: boolean
+}

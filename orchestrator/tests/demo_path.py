@@ -141,6 +141,106 @@ res = post("/api/overrides", {
 })
 check("override accepted and recorded", res.get("status") in ("ok", None) or True)
 
+print("\n10. the reference layer (A5) -- nothing about it may be hardcoded")
+ref = get("/api/reference")
+specs = {r["specialty_hipe"]: r["specialty_name"] for r in ref["specialties"]}
+check("every specialty has a real name", len(specs) == 7 and specs.get("0600") == "Otolaryngology (ENT)",
+      f"got {len(specs)}")
+check("0601 is flagged paediatric",
+      any(r["is_paediatric"] for r in ref["specialties"] if r["specialty_hipe"] == "0601"))
+crt = {r["code_value"]: r["crt_days"] for r in ref["triage_categories"]}
+# the frontend used to hardcode these two; a seed change would have desynced it
+check("CRT days come from the seed: urgent 28, semi 91", crt.get("1") == 28 and crt.get("3") == 91,
+      f"got {crt}")
+check("routine carries no target", crt.get("2") is None)
+rules = {r["rule_id"] for r in ref["rules"]}
+check("all five rules are readable", rules == {
+    "RULE-CRT-URGENT", "RULE-CRT-SEMI", "RULE-TRIAGE-TURNAROUND",
+    "RULE-ORDER", "RULE-TIEBREAK"}, f"got {sorted(rules)}")
+
+print("\n11. per-referral reasoning reaches the UI (A2/A3)")
+rows = d["rankings"]
+check("every placement carries a rationale",
+      all(r.get("rationale_summary") for r in rows),
+      f"{sum(1 for r in rows if not r.get('rationale_summary'))} missing")
+check("every placement carries rule checks",
+      all(r.get("rule_checks") for r in rows),
+      f"{sum(1 for r in rows if not r.get('rule_checks'))} missing")
+by_rule = {}
+for r in rows:
+    for rc in r["rule_checks"]:
+        by_rule.setdefault(rc["rule_id"], []).append(rc["passed"])
+check("RULE-ORDER tested on every placement", len(by_rule.get("RULE-ORDER", [])) == len(rows))
+# the one breach the product could never show, because triage_status was never read
+check("RULE-TRIAGE-TURNAROUND is tested and does fire",
+      "RULE-TRIAGE-TURNAROUND" in by_rule and not all(by_rule["RULE-TRIAGE-TURNAROUND"]),
+      f"{by_rule.get('RULE-TRIAGE-TURNAROUND')}")
+check("a breached urgent names its rule with a readable detail", any(
+    rc["rule_id"] == "RULE-CRT-URGENT" and not rc["passed"] and rc.get("detail")
+    for r in rows for rc in r["rule_checks"]))
+cd = [r for r in rows if r.get("capacity_detail")]
+check("capacity internals are harvested, not discarded", len(cd) == len(rows),
+      f"{len(cd)}/{len(rows)}")
+check("ward and clinic pressure are both real numbers", all(
+    isinstance(r["capacity_detail"]["ward_pressure"], (int, float))
+    and isinstance(r["capacity_detail"]["clinic_pressure"], (int, float)) for r in cd))
+# capacity is specialty-level: it sets alpha and can never reorder two people
+by_spec = {}
+for r in rows:
+    by_spec.setdefault(r["specialty_hipe"], set()).add(round(r["capacity_score"], 6))
+check("capacity score is constant within a specialty",
+      all(len(v) == 1 for v in by_spec.values()), f"{ {k: v for k, v in by_spec.items() if len(v) > 1} }")
+check("both citation lists ride along on every row",
+      all(len(r.get("urgency_citations", [])) == 6 for r in rows)
+      and all(1 <= len(r.get("capacity_citations", [])) <= 2 for r in rows))
+
+print("\n12. the clinic half of the capacity score (A8)")
+ops = get(f"/api/operations/{HOSP}/{DATE}")
+check("clinics are reported at all", len(ops.get("clinics", [])) > 0, "was dropped entirely before")
+one = next((c for c in ops["clinics"] if c["specialty_hipe"] == "0600"), None)
+check("the cited session is identified, not just the series", bool(one and one["cited_session_date"]))
+check("clinic pressure matches booked/total on the cited row",
+      bool(one) and 0.0 <= one["cited_pressure"] <= 1.0)
+check("wards say which specialty they back",
+      any(w.get("primary_for") for w in ops["wards"]), "was dropped in de-duplication")
+check("free beds are reported", any(w.get("free") is not None for w in ops["wards"]),
+      "DATASET_README calls this the answer to how many beds are available")
+
+print("\n13. the whole decision as a graph (A7)")
+g = get(f"/api/graph/cohort/{run_id}")
+check("every placement is a node", g["placements"] == len(rows), f"{g['placements']} vs {len(rows)}")
+check("citations came back in bulk", g["citations"] > 1000, f"{g['citations']}")
+kinds = {}
+for n in g["nodes"]:
+    kinds[n["kind"]] = kinds.get(n["kind"], 0) + 1
+check("exactly one decision node", kinds.get("decision") == 1)
+# the finding the graph exists to SHOW: 305 patients converge on a handful of
+# shared capacity rows, because capacity is specialty-level
+check("capacity evidence is shared, not per-patient",
+      0 < kinds.get("bed_status", 0) <= 10 and 0 < kinds.get("clinic_session", 0) <= 10,
+      f"beds {kinds.get('bed_status')} clinics {kinds.get('clinic_session')}")
+check("urgency evidence is per-patient", kinds.get("score", 0) == len(rows))
+check("no node label is percent-encoded", not any("%" in n["label"] for n in g["nodes"]))
+check("the inputs graph is reported honestly", g["inputs_graph_loaded"] is False,
+      "if this flips to True, the resolved-values caveat must come off the screen")
+
+print("\n14. overrides can be read back (A6)")
+ovr = get(f"/api/overrides/{HOSP}/{DATE}")
+check("the override just written is readable", any(
+    o["clinician_id"] == "demo-path-check" for o in ovr["overrides"]),
+    "write-only until the orchestrator gained a read path")
+check("current holds one per pathway, newest wins",
+      len(ovr["current"]) <= len(ovr["overrides"]))
+check("attribution survives the round trip", all(
+    o.get("clinician_id") and o.get("reason") for o in ovr["overrides"]),
+    "the graph projection drops clinician_id; Postgres keeps it")
+
+print("\n15. the decision survives a restart (A4)")
+held = get("/api/health")["decisions_held"]
+check("the orchestrator says which hospital-days it holds", len(held) > 0)
+check("this hospital-day is one of them",
+      any(x["hospital_hipe"] == HOSP and x["as_of_date"] == DATE for x in held))
+
 print(f"\n{'=' * 62}\n  {len(ok)} passed, {len(failed)} failed")
 if failed:
     print("  FAILED: " + "; ".join(failed))

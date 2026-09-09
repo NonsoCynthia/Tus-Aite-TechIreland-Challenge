@@ -165,6 +165,44 @@ def execute(run, store, *, base_url: str, token: str) -> None:
         # news2 is NOT in the cohort payload (14 fields, no vitals). Harvest it
         # from the urgency agent's own pass so the UI never needs 308 context calls.
         news2 = {pw: getattr(r, "news2", None) for pw, r in u.scored.items()}
+        # The capacity agent computes ward_pressure and clinic_pressure on its way
+        # to a score (CapacityScoreResult) and then discards both -- POST /scores
+        # carries only the score, so neither reaches Postgres, the graph or the
+        # UI. news2 above proved the pattern; this is the missing other half, and
+        # it is what lets a patient page say WHAT informed the capacity agent
+        # rather than only that it ran.
+        capacity_detail = {
+            pw: {"ward_pressure": getattr(r, "ward_pressure", None),
+                 "clinic_pressure": getattr(r, "clinic_pressure", None)}
+            for pw, r in c.scored.items()
+        }
+
+        # rank_cohort returns the raw ranked dicts -- alpha, priority, band,
+        # wait_normalised, severity_rank, both citation lists. build_ranking
+        # returns a DIFFERENT eight-key shape, and is the only place
+        # rationale_summary and rule_checks are ever attached.
+        #
+        # Storing result.rankings alone silently dropped every per-referral rule
+        # check the coordinator computed -- RULE-CRT-URGENT, RULE-CRT-SEMI,
+        # RULE-TRIAGE-TURNAROUND -- and the coordinator's own rationale, which is
+        # why no rule ID appeared anywhere in the product although all five are
+        # seeded in core.ref_rules and written to Postgres and the graph.
+        #
+        # Swapping one for the other would lose alpha and priority instead, so
+        # the two are MERGED by pathway_number.
+        enriched = {r["pathway_number"]: r for r in rankings}
+        served = []
+        for row in result.rankings:
+            extra = enriched.get(row["pathway_number"], {})
+            served.append({
+                **row,
+                "rationale_summary": extra.get("rationale_summary"),
+                "rule_checks": extra.get("rule_checks") or [],
+                "capacity_detail": capacity_detail.get(row["pathway_number"]),
+            })
+        with_checks = sum(1 for r in served if r["rule_checks"])
+        logger.info("merged rationale + rule_checks onto %d of %d placements",
+                    with_checks, len(served))
 
         store.put_decision(hosp, as_of, {
             "decision_id": decision_id, "run_id": rid,
@@ -172,7 +210,7 @@ def execute(run, store, *, base_url: str, token: str) -> None:
             "alpha": head["alpha"], "scarcity": head["scarcity"],
             "capacity_direction": CAPACITY_DIRECTION,
             "rule_order_passed": order_ok, "rule_tiebreak_passed": tiebreak_ok,
-            "rankings": result.rankings, "excluded": result.excluded,
+            "rankings": served, "excluded": result.excluded,
             "refused_paediatric": sorted(u.refused_paediatric),
             "skipped": sorted(u.skipped), "news2": news2,
             "built_at": _now(),

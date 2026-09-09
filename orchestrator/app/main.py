@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 import concurrent.futures as cf
 import datetime as _dt
@@ -27,6 +28,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .runner import CAPACITY_DIRECTION, execute
+from .sources import query, sources_status, sparql
 from .state import Run, store
 
 logging.basicConfig(level=logging.INFO)
@@ -78,7 +80,11 @@ def health() -> dict[str, Any]:
         up = _client.get("/health").json()
     except Exception as exc:                                    # noqa: BLE001
         up = {"status": "unreachable", "detail": str(exc)}
-    return {"status": "ok", "retrieval": up, "capacity_direction": CAPACITY_DIRECTION}
+    # decisions_held makes the snapshot restore observable. A silent restore is
+    # indistinguishable from "nobody has run yet", which is exactly the state it
+    # exists to prevent someone misreading before a demo.
+    return {"status": "ok", "retrieval": up, "capacity_direction": CAPACITY_DIRECTION,
+            "sources": sources_status(), "decisions_held": store.decisions_held()}
 
 
 @app.get("/api/cohort/{hospital_hipe}/{as_of_date}")
@@ -189,7 +195,8 @@ def operations(hospital_hipe: str, as_of_date: str) -> dict[str, Any]:
 
     rows = _get(f"/hospitals/{hospital_hipe}/cohort/{as_of_date}")["referrals"]
     if not rows:
-        return {"wards": [], "observation_age": None, "cohort": 0}
+        return {"hospital_hipe": hospital_hipe, "as_of_date": as_of_date, "cohort": 0,
+                "wards": [], "clinics": [], "observation_age": None, "clinical": {}}
 
     def one(pw: str) -> dict[str, Any] | None:
         try:
@@ -202,25 +209,70 @@ def operations(hospital_hipe: str, as_of_date: str) -> dict[str, Any]:
         contexts = [c for c in ex.map(one, [r["pathway_number"] for r in rows]) if c]
 
     wards: dict[str, dict[str, Any]] = {}
+    # The clinic half of the capacity score. The agent's clinic_pressure is
+    # slots_booked/slots_total on the specialty's most recent session, and
+    # DATASET_README calls this "where the real constraint usually sits" -- yet
+    # de-duplicating wards used to drop the whole clinic_sessions array, so 30%
+    # of the capacity score had no operational display anywhere.
+    clinics: dict[str, dict[str, Any]] = {}
     ages: list[int] = []
     # Per-referral clinical facts the cohort payload does not carry. Gathered
     # here so the list screen needs one cached call, not 308.
     clinical: dict[str, dict[str, Any]] = {}
     as_of = _dt.date.fromisoformat(as_of_date)
     for ctx in contexts:
-        for w in ((ctx.get("capacity") or {}).get("wards") or []):
+        cap = ctx.get("capacity") or {}
+        spec = cap.get("specialty_hipe")
+        for w in (cap.get("wards") or []):
             bs = w.get("latest_bed_status")
-            if bs and w["ward_id"] not in wards:
-                wards[w["ward_id"]] = {
-                    "ward_id": w["ward_id"], "nominal_beds": w.get("nominal_beds"),
-                    "occupancy_pct": float(bs["occupancy_pct"]),
-                    "gar_status": bs.get("gar_status"),
-                    "over_9h": bs.get("awaiting_admission_over_9h") or 0,
-                    "over_24h": bs.get("awaiting_admission_over_24h") or 0,
-                    "dtoc": bs.get("delayed_transfers_of_care") or 0,
-                    "surge": bs.get("surge_capacity_in_use") or 0,
-                    "snapshot": bs.get("snapshot_datetime"),
-                }
+            if not bs:
+                continue
+            row = wards.setdefault(w["ward_id"], {
+                "ward_id": w["ward_id"], "nominal_beds": w.get("nominal_beds"),
+                "occupancy_pct": float(bs["occupancy_pct"]),
+                "occupied": bs.get("occupied"),
+                # DATASET_README: "the answer to how many beds are available",
+                # and it was never fetched.
+                "free": bs.get("free"),
+                "outliers": bs.get("outliers") or 0,
+                "gar_status": bs.get("gar_status"),
+                "over_9h": bs.get("awaiting_admission_over_9h") or 0,
+                "over_24h": bs.get("awaiting_admission_over_24h") or 0,
+                "dtoc": bs.get("delayed_transfers_of_care") or 0,
+                "surge": bs.get("surge_capacity_in_use") or 0,
+                "snapshot": bs.get("snapshot_datetime"),
+                # Which specialties this ward backs, and whether it is their
+                # primary. Dropped during de-duplication before, which left the
+                # ward panel unjoinable to any referral's capacity score.
+                "specialties": [], "primary_for": [],
+            })
+            if spec and spec not in row["specialties"]:
+                row["specialties"].append(spec)
+            if spec and w.get("is_primary") and spec not in row["primary_for"]:
+                row["primary_for"].append(spec)
+
+        sessions = cap.get("clinic_sessions") or []
+        if spec and sessions and spec not in clinics:
+            booked = sum(x["slots_booked"] for x in sessions)
+            total = sum(x["slots_total"] for x in sessions)
+            # The agent reads sessions[0] only. Marking it means the series can
+            # be drawn as context with the ONE row that was cited called out,
+            # rather than implying the agent read the fortnight.
+            clinics[spec] = {
+                "specialty_hipe": spec,
+                "clinic_code": sessions[0].get("clinic_code"),
+                "clinic_name": sessions[0].get("clinic_name"),
+                "cited_session_date": sessions[0].get("session_date"),
+                "cited_pressure": (round(sessions[0]["slots_booked"] / sessions[0]["slots_total"], 3)
+                                   if sessions[0].get("slots_total") else 1.0),
+                "slots_booked": booked, "slots_total": total,
+                "slots_available": total - booked,
+                "sessions": [
+                    {"session_date": x["session_date"], "slots_total": x["slots_total"],
+                     "slots_booked": x["slots_booked"], "slots_available": x["slots_available"]}
+                    for x in sorted(sessions, key=lambda x: x["session_date"])
+                ],
+            }
         ref = ctx.get("referral") or {}
         pw = ref.get("pathway_number")
         obs = ctx.get("observations") or []
@@ -269,11 +321,229 @@ def operations(hospital_hipe: str, as_of_date: str) -> dict[str, Any]:
         # Every ward, latest snapshot only. The 85% line is the safe-operating
         # threshold from Bagust, Place & Posnett, BMJ 1999;319:155-8.
         "wards": sorted(wards.values(), key=lambda w: w["ward_id"]),
+        "clinics": sorted(clinics.values(), key=lambda c: c["specialty_hipe"]),
         "observation_age": age,
         "clinical": clinical,
     }
     _ops_cache[key] = out
     return out
+
+
+# ------------------------------------------------- reference layer (A5)
+
+_ref_cache: dict[str, Any] = {}
+
+
+@app.get("/api/reference")
+def reference() -> dict[str, Any]:
+    """The reference layer, so the UI stops hardcoding it.
+
+    Three tables retrieval exposes no endpoint for, and which the frontend was
+    substituting for:
+
+    - `core.ref_specialty` -- every screen said "specialty 0600" because the
+      names were never fetched. 0600 is Otolaryngology (ENT).
+    - `core.ref_codes` where code_table='triage_category' -- carries the
+      authoritative severity_rank AND crt_days, which the frontend hardcoded as
+      28 and 91. A change to the seed would have silently desynced.
+    - `core.ref_rules` -- the five rule IDs and their statements, none of which
+      has ever appeared on a screen.
+
+    Read once and cached: this is seed data that does not move while the service
+    is up.
+    """
+    if _ref_cache:
+        return _ref_cache
+    out = {
+        "specialties": query(
+            "SELECT specialty_hipe, specialty_name, is_paediatric "
+            "FROM core.ref_specialty ORDER BY specialty_hipe"),
+        "triage_categories": query(
+            "SELECT code_value, description, severity_rank, crt_days "
+            "FROM core.ref_codes WHERE code_table = 'triage_category' "
+            "ORDER BY severity_rank NULLS LAST, code_value"),
+        "rules": query(
+            "SELECT rule_id, statement, applies_to, threshold_days "
+            "FROM core.ref_rules ORDER BY rule_id"),
+        "codes": query(
+            "SELECT code_table, code_value, description FROM core.ref_codes "
+            "WHERE code_table <> 'triage_category' ORDER BY code_table, code_value"),
+    }
+    if out["specialties"]:
+        _ref_cache.update(out)
+    return out
+
+
+# ------------------------------------------------- overrides, read back (A6)
+
+@app.get("/api/overrides/{hospital_hipe}/{as_of_date}")
+def overrides(hospital_hipe: str, as_of_date: str) -> dict[str, Any]:
+    """What a clinician actually did, read back.
+
+    Overrides were write-only: retrieval has no GET, the graph projection keeps
+    only three triples and drops clinician_id, from_position, to_position and
+    rule_warning_accepted, and the UI showed a flash message that died on the
+    next navigation. So pressing the button left no trace anywhere a clinician
+    could see.
+
+    Joined through agent.decisions on (hospital, as_of_date) because an override
+    references a decision_id, not a date. Newest first, and the newest per
+    pathway is the one that stands -- earlier ones are history, not competing
+    claims.
+    """
+    rows = query(
+        """
+        SELECT o.override_id, o.decision_id, o.pathway_number, o.clinician_id,
+               o.from_position, o.to_position, o.reason,
+               o.rule_warning_accepted, o.created_at
+          FROM agent.overrides o
+          JOIN agent.decisions d ON d.decision_id = o.decision_id
+         WHERE o.hospital_hipe = %s AND d.as_of_date = %s
+         ORDER BY o.created_at DESC
+        """,
+        (hospital_hipe, as_of_date),
+    )
+    for r in rows:
+        if r.get("created_at") is not None:
+            r["created_at"] = r["created_at"].isoformat()
+    latest: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        latest.setdefault(r["pathway_number"], r)
+    return {"hospital_hipe": hospital_hipe, "as_of_date": as_of_date,
+            "overrides": rows, "current": latest}
+
+
+# ------------------------------------------------- the cohort graph (A7)
+
+_GRAPH_BASE = "https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/"
+_EAT = _GRAPH_BASE + "ns#"
+
+_COHORT_QUERY = """
+PREFIX eat: <{eat}>
+SELECT ?placement ?position ?referral ?role ?evidence
+WHERE {{
+  GRAPH <{graph}> {{
+    ?decision a eat:Decision ; eat:hasPlacement ?placement .
+    ?placement eat:position ?position ; eat:ranks ?referral .
+    OPTIONAL {{
+      ?placement ?roleProp ?evidence .
+      VALUES (?roleProp ?role) {{
+        (eat:citesUrgencyEvidence   "urgency")
+        (eat:citesCapacityEvidence  "capacity")
+        (eat:citesTimeframeEvidence "timeframe")
+        (eat:citesMultiListEvidence "multi_list")
+      }}
+    }}
+  }}
+}}
+ORDER BY ?position
+"""
+
+
+def _leaf(iri: str) -> str:
+    return iri.rstrip("/").rsplit("/", 1)[-1]
+
+
+def _label(iri: str, kind: str) -> str:
+    """A readable name for a cited node.
+
+    The last path segment is the wrong choice for half of these: a bed status
+    ends in a percent-encoded timestamp and a clinic session in a bare date, so
+    both would read as noise. The segment that identifies the thing is the one
+    before it -- the ward, the clinic -- which is also the part a clinician
+    recognises.
+    """
+    parts = [unquote(x) for x in iri.rstrip("/").split("/")]
+    if kind in ("bed_status", "clinic_session") and len(parts) >= 2:
+        return f"{parts[-2]} \u00b7 {parts[-1][:10]}"
+    if kind == "score" and len(parts) >= 2:
+        return f"{parts[-1]} {parts[-2]}"
+    if kind == "referral_state" and len(parts) >= 2:
+        return parts[-2]
+    return parts[-1]
+
+
+def _kind(iri: str) -> str:
+    """What an evidence IRI is, read from its path segment.
+
+    The inputs graph is not loaded on this machine, so these IRIs resolve to
+    nothing -- a cited node has an identity and a type but no property values.
+    That is stated on the surface rather than papered over.
+    """
+    for seg in ("bed-status", "clinic-session", "referral-state", "obs", "condition",
+                "triage-event", "score", "rule"):
+        if f"/{seg}/" in iri:
+            return seg.replace("-", "_")
+    return "evidence"
+
+
+@app.get("/api/graph/cohort/{run_id}")
+def cohort_graph(run_id: str, limit: int = 0) -> dict[str, Any]:
+    """The WHOLE decision as a graph, in one SPARQL query.
+
+    Every graph the product has drawn so far was rebuilt from Postgres, four
+    levels deep, for one patient at a time. Meanwhile the run graph holds one
+    Decision, 305 RankedPlacements, 613 Scores, 2,446 cites and 776 RuleChecks,
+    and nothing in the application had ever issued a SPARQL query.
+
+    `limit` caps placements for a smaller draw; 0 means the whole cohort.
+    """
+    graph = f"{_GRAPH_BASE}graph/run/{run_id}"
+    rows = sparql(_COHORT_QUERY.format(eat=_EAT, graph=graph))
+    if not rows:
+        raise HTTPException(404, f"no triples in the run graph for {run_id}")
+
+    nodes: dict[str, dict[str, Any]] = {}
+    edges: list[dict[str, Any]] = []
+
+    def node(nid: str, label: str, kind: str, **extra: Any) -> str:
+        n = nodes.setdefault(nid, {"id": nid, "label": label, "kind": kind, "cites": 0})
+        n.update(extra)
+        return nid
+
+    node("decision", "decision", "decision")
+    keep: set[str] = set()
+    for r in rows:
+        pos = int(r["position"])
+        if limit and pos > limit:
+            continue
+        pid = r["placement"]
+        keep.add(pid)
+        node(pid, str(pos), "placement", position=pos, pathway=_leaf(r["referral"]))
+        edges.append({"source": "decision", "target": pid, "label": "hasPlacement"})
+
+    # one placement produces one row per citation, so hasPlacement repeats
+    seen_edge: set[tuple[str, str, str]] = set()
+    deduped = []
+    for e in edges:
+        key = (e["source"], e["target"], e["label"])
+        if key not in seen_edge:
+            seen_edge.add(key)
+            deduped.append(e)
+    edges = deduped
+
+    for r in rows:
+        ev, pid = r.get("evidence"), r["placement"]
+        if not ev or pid not in keep:
+            continue
+        kind = _kind(ev)
+        node(ev, _label(ev, kind), kind)
+        nodes[pid]["cites"] += 1
+        key = (pid, ev, r["role"])
+        if key in seen_edge:
+            continue
+        seen_edge.add(key)
+        edges.append({"source": pid, "target": ev, "label": r["role"]})
+
+    placements = sum(1 for n in nodes.values() if n["kind"] == "placement")
+    return {
+        "run_id": run_id, "graph": graph,
+        "nodes": list(nodes.values()), "edges": edges,
+        "placements": placements, "citations": sum(1 for e in edges if e["label"] != "hasPlacement"),
+        # Honest about what this graph can and cannot say.
+        "inputs_graph_loaded": bool(sparql(
+            f"SELECT ?s WHERE {{ GRAPH <{_GRAPH_BASE}graph/inputs> {{ ?s ?p ?o }} }} LIMIT 1")),
+    }
 
 
 # ---------------------------------------------------------------- runs
