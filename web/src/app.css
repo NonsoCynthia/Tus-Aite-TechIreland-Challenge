@@ -10,7 +10,8 @@
 }
 .brand-lockup {
   display: flex; align-items: center; gap: 11px;
-  padding-right: 18px; border-right: 1px solid var(--rule);
+  padding: 0 18px 0 0; border: 0; border-right: 1px solid var(--rule);
+  background: none; cursor: pointer; font: inherit; text-align: left;
 }
 .brand-text { display: flex; flex-direction: column; gap: 1px; }
 /* Jost ExtraLight at 0.14em, per the kit */
@@ -447,4 +448,47 @@
 .flash {
   border-left: 3px solid var(--cat-routine); background: var(--surface-2);
   padding: 11px 16px; margin-bottom: 18px; font-size: var(--t-body);
+}
+
+/* --- landing: the empty waiting room ------------------------------------- */
+.landing { position: relative; min-height: calc(100vh - 0px); overflow: hidden; background: var(--paper); }
+.landing-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: 62% 50%;
+}
+/* the photograph's left wall is already empty; this only steadies the type */
+.landing-scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(100deg, rgba(250,250,248,0.97) 0%, rgba(250,250,248,0.9) 34%, rgba(250,250,248,0.15) 62%, rgba(250,250,248,0) 100%);
+}
+.landing-in {
+  position: relative; max-width: 1248px; margin: 0 auto;
+  padding: clamp(48px, 11vh, 130px) 24px 64px; max-width: 1248px;
+}
+.landing-mark { margin-bottom: 26px; }
+.landing-word {
+  font-family: var(--font-brand); font-weight: 200; font-size: clamp(46px, 7.4vw, 92px);
+  letter-spacing: var(--track-wide); line-height: 1; margin: 0; color: var(--ink);
+}
+.landing-sub {
+  font-family: var(--font-brand); font-size: 13px; font-weight: 300;
+  letter-spacing: 0.1em; color: var(--text-2); margin: 12px 0 46px;
+}
+.landing-lead {
+  font-size: clamp(19px, 2.3vw, 27px); line-height: 1.45; max-width: 21ch;
+  margin: 0 0 22px; color: var(--text);
+}
+.landing-lead strong { font-family: var(--font-brand); font-weight: 400; }
+.landing-thesis {
+  font-size: var(--t-body); line-height: 1.62; max-width: 46ch;
+  color: var(--text-2); margin: 0 0 34px;
+}
+.landing-go {
+  font-family: var(--font-brand); font-size: 15px; color: var(--paper);
+  background: var(--ink); border: 1px solid var(--ink); padding: 13px 26px; cursor: pointer;
+}
+.landing-go:disabled { opacity: 0.45; cursor: default; }
+@media (max-width: 720px) {
+  .landing-scrim { background: rgba(250,250,248,0.94); }
+  .landing-lead { max-width: none; }
 }

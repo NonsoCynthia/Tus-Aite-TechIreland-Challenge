@@ -6,8 +6,9 @@ import { Overview } from './surfaces/Overview'
 import { List } from './surfaces/List'
 import { Patient } from './surfaces/Patient'
 import { Run } from './surfaces/Run'
+import { Landing } from './surfaces/Landing'
 
-export type Surface = 'overview' | 'run' | 'list'
+export type Surface = 'landing' | 'overview' | 'run' | 'list'
 
 const HOSPITALS = [
   { hipe: '9001', name: "St Brendan's University Hospital" },
@@ -22,21 +23,26 @@ export const RUNNABLE_DATE = DATES[DATES.length - 1]
 export function App() {
   const [hospital, setHospital] = useState('9001')
   const [date, setDate] = useState(RUNNABLE_DATE)
-  const [surface, setSurface] = useState<Surface>('overview')
+  const [surface, setSurface] = useState<Surface>('landing')
   const [patient, setPatient] = useState<string | null>(null)
   const health = useQuery({ queryKey: ['health'], queryFn: api.health })
   const name = HOSPITALS.find((h) => h.hipe === hospital)?.name ?? hospital
 
+  if (surface === 'landing') {
+    return <Landing hospital={hospital} date={date} name={name}
+                    onEnter={() => setSurface('overview')} />
+  }
+
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand-lockup">
+        <button className="brand-lockup" onClick={() => setSurface('landing')} aria-label="Back to the start">
           <Mark size={30} />
           <div className="brand-text">
             <div className="brand-word">Tús Áite</div>
             <div className="brand-sub">decision support</div>
           </div>
-        </div>
+        </button>
 
         <div className="scope">
           <select className="picker" value={hospital} onChange={(e) => setHospital(e.target.value)}

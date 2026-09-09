@@ -39,6 +39,23 @@ export const api = {
         n: number; median: number; mean: number; max: number
         over_1y: number; over_2y: number
       } | null
+      /** Per-referral clinical facts the cohort payload does not carry: news2
+          only exists here, and the reading's age is the point. */
+      clinical: Record<string, {
+        news2: number | null
+        obs_datetime: string | null
+        reading_age_days: number | null
+        pain: number | null
+        mts_category: string | null
+        /** A weighted random draw over the specialty's mix, independent of
+            acuity. A record field, never evidence. */
+        icd10am_code: string | null
+        referral_date: string | null
+        referral_received_date: string | null
+        sent_for_triage_date: string | null
+        triage_date: string | null
+        turnaround_days: number | null
+      }>
     }>(`/api/operations/${hospital}/${date}`),
 
   context: (hospital: string, pathway: string) =>

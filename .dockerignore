@@ -1,0 +1,23 @@
+# Build context is the repo root, so keep it to what the image actually needs.
+**/node_modules
+**/.venv
+**/.venv-*
+.venv-orch
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.git
+.playwright-mcp
+
+# generated data and downloads: the container reads the live service, not files
+dataset/out
+dataset/data
+dataset/sample
+dataset/generator/calibration/_raw
+kg/out
+
+# source images: only the copies already in web/public are served
+web/brand_assets
+web/dist
+**/.DS_Store
+**/.env
