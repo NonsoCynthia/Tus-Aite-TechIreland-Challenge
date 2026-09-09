@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
 import { useQuery } from '@tanstack/react-query'
 import { api, bandOf, BANDS } from '../lib/api'
@@ -48,7 +48,7 @@ function useRows(hospital: string, date: string) {
   return { rows, decision: decision.data, loading: cohort.isPending, error: cohort.error }
 }
 
-export function List({ hospital, date }: { hospital: string; date: string }) {
+export function List({ hospital, date, onOpen }: { hospital: string; date: string; onOpen: (pw: string) => void }) {
   const { rows, decision, loading, error } = useRows(hospital, date)
   const [tab, setTab] = useState('Urgent')
 
@@ -120,7 +120,7 @@ export function List({ hospital, date }: { hospital: string; date: string }) {
                   : <>No clinical timeframe applies to this category, so nothing here can be “late”.</>}
               </p>
             )}
-            <RowTable rows={groups[k] ?? []} ranked={ranked} outside={k === 'Outside'} />
+            <RowTable rows={groups[k] ?? []} ranked={ranked} outside={k === 'Outside'} onOpen={onOpen} />
           </Tabs.Content>
         ))}
       </Tabs.Root>
@@ -128,9 +128,21 @@ export function List({ hospital, date }: { hospital: string; date: string }) {
   )
 }
 
-function RowTable({ rows, ranked, outside }: { rows: Row[]; ranked: boolean; outside: boolean }) {
+const PAGE = 20
+
+function RowTable({ rows, ranked, outside, onOpen }: { rows: Row[]; ranked: boolean; outside: boolean; onOpen: (pw: string) => void }) {
+  const [page, setPage] = useState(0)
+  // switching category resets to the top of that category, never mid-list
+  useEffect(() => { setPage(0) }, [rows])
+
   if (!rows.length) return <p className="muted pad-y">Nobody in this group.</p>
+
+  const pages = Math.ceil(rows.length / PAGE)
+  const from = page * PAGE
+  const slice = rows.slice(from, from + PAGE)
+
   return (
+    <>
     <table className="rows">
       <thead>
         <tr>
@@ -142,13 +154,33 @@ function RowTable({ rows, ranked, outside }: { rows: Row[]; ranked: boolean; out
         </tr>
       </thead>
       <tbody>
-        {rows.map((r) => <PatientRow key={r.pathway_number} r={r} ranked={ranked} outside={outside} />)}
+        {slice.map((r) => <PatientRow key={r.pathway_number} r={r} ranked={ranked} outside={outside} onOpen={onOpen} />)}
       </tbody>
     </table>
+
+    {pages > 1 && (
+      <nav className="pager" aria-label="Pages within this category">
+        <span className="pager-of num">
+          {from + 1}&ndash;{Math.min(from + PAGE, rows.length)} of {rows.length}
+          {ranked && <span className="muted"> &middot; in suggested order</span>}
+        </span>
+        <span className="pager-btns">
+          <button className="pg" onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}>Previous</button>
+          {Array.from({ length: pages }, (_, i) => i).map((i) => (
+            <button key={i} className={'pg pg-n num' + (i === page ? ' is-on' : '')}
+                    onClick={() => setPage(i)} aria-current={i === page}>{i + 1}</button>
+          ))}
+          <button className="pg" onClick={() => setPage((p) => Math.min(pages - 1, p + 1))}
+                  disabled={page === pages - 1}>Next</button>
+        </span>
+      </nav>
+    )}
+    </>
   )
 }
 
-function PatientRow({ r, ranked, outside }: { r: Row; ranked: boolean; outside: boolean }) {
+function PatientRow({ r, ranked, outside, onOpen }: { r: Row; ranked: boolean; outside: boolean; onOpen: (pw: string) => void }) {
   const target = r.crt_threshold_days
   const wait = r.adjusted_wait_days ?? 0
   const over = target != null && wait > target
@@ -156,7 +188,9 @@ function PatientRow({ r, ranked, outside }: { r: Row; ranked: boolean; outside: 
   const age = r.reading_age_days
 
   return (
-    <tr className="row">
+    <tr className="row is-clickable" tabIndex={0} role="button"
+        onClick={() => onOpen(r.pathway_number)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(r.pathway_number) } }}>
       <td className="c-rank num">
         {outside ? <span className="muted">—</span> : r.position != null ? r.position : ''}
       </td>

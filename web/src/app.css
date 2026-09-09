@@ -8,14 +8,22 @@
   padding: 12px 24px; border-bottom: 1px solid var(--rule);
   background: var(--surface);
 }
-.brand-lockup { display: flex; align-items: center; gap: 10px; }
+.brand-lockup {
+  display: flex; align-items: center; gap: 11px;
+  padding-right: 18px; border-right: 1px solid var(--rule);
+}
+.brand-text { display: flex; flex-direction: column; gap: 1px; }
+/* Jost ExtraLight at 0.14em, per the kit */
 .brand-word {
   font-family: var(--font-brand); font-weight: 200;
-  letter-spacing: var(--track-wide); font-size: 15px; line-height: 1.1;
+  letter-spacing: var(--track-wide); font-size: 17px; line-height: 1.05;
+  color: var(--ink); white-space: nowrap;
 }
+/* the kit requires "decision support" to travel with the mark in any
+   clinical setting, so it is part of the lockup and not optional chrome */
 .brand-sub {
-  font-family: var(--font-brand); font-size: 10px; color: var(--text-2);
-  letter-spacing: 0.08em; text-transform: lowercase;
+  font-family: var(--font-brand); font-size: 10px; font-weight: 300;
+  color: var(--text-2); letter-spacing: 0.1em; white-space: nowrap;
 }
 .scope { display: flex; gap: 8px; margin-left: 20px; }
 .picker {
@@ -238,3 +246,170 @@
 .contrib-track { height: 6px; background: var(--bg-sunk); display: block; }
 .contrib-track i { display: block; height: 100%; background: var(--text-3); }
 .contrib-track i.is-wait { background: var(--clay); }
+
+/* --- pagination ----------------------------------------------------------- */
+.pager {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; padding: 14px 2px 0;
+}
+.pager-of { font-size: var(--t-small); color: var(--text-2); }
+.pager-btns { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
+.pg {
+  font: inherit; font-size: var(--t-small); color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--rule-firm);
+  padding: 5px 11px; min-height: 30px; cursor: pointer;
+}
+.pg:hover:not(:disabled) { color: var(--text); border-color: var(--text-3); }
+.pg:disabled { opacity: 0.4; cursor: default; }
+.pg-n { min-width: 30px; padding: 5px 8px; }
+.pg-n.is-on {
+  color: var(--paper); background: var(--ink); border-color: var(--ink);
+}
+
+/* --- the journey: a dated list, then an axis to scale --------------------- */
+.journey { margin: 12px 0 30px; }
+.j-cols {
+  display: grid; grid-template-columns: 268px 1fr; gap: 28px;
+  border: 1px solid var(--rule); background: var(--surface); padding: 18px 20px;
+}
+@media (max-width: 880px) { .j-cols { grid-template-columns: 1fr; } }
+.j-h {
+  font-family: var(--font-brand); font-size: 11px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-2); margin-bottom: 12px;
+}
+.j-h .num { color: var(--text); font-weight: 500; text-transform: none; letter-spacing: 0; }
+
+/* intake: the mark's stem, with one bar per step */
+.j-steps { list-style: none; margin: 0; padding: 0 0 0 15px; border-left: var(--spine-w) solid var(--rule-firm); }
+.j-steps li { position: relative; padding: 0 0 11px 0; display: grid; gap: 1px; }
+.j-steps li::before {
+  content: ''; position: absolute; left: -15px; top: 7px;
+  width: 11px; height: var(--spine-bar); background: var(--text-3);
+}
+.j-steps li.is-clinical::before { background: var(--clay); width: 15px; }
+.j-d { font-size: 10px; color: var(--text-2); }
+.j-t { font-size: var(--t-small); color: var(--text); line-height: 1.3; }
+.j-x { font-size: 10px; color: var(--text-3); }
+.j-steps li.is-clinical .j-t { color: var(--clay); font-weight: 600; }
+
+/* the wait: the LENGTH is the argument, so it is drawn to scale */
+.j-axis { position: relative; height: 74px; }
+.j-line { position: absolute; left: 0; right: 0; top: 12px; height: var(--spine-w); background: var(--rule-firm); }
+.j-silence {
+  position: absolute; left: 0; right: 0; top: 4px; height: 21px;
+  background: repeating-linear-gradient(-45deg, transparent 0 5px, var(--bg-sunk) 5px 10px);
+  border-left: 2px solid var(--clay);
+}
+.j-mark { position: absolute; top: 0; display: flex; flex-direction: column; align-items: center; width: 128px; text-align: center; transform: translateX(-50%); }
+.j-mark i { display: block; width: var(--spine-w); height: 26px; background: var(--text); }
+.j-mark.is-now i { background: var(--ink); }
+.j-mark.is-target i { background: var(--text-3); }
+/* a target only days into a years-long wait would hang off the left edge */
+.j-mark.is-early { align-items: flex-start; text-align: left; transform: none; }
+.j-mt { font-size: 11px; color: var(--text); margin-top: 6px; line-height: 1.25; }
+.j-md { font-size: 10px; color: var(--text-2); }
+.j-silence-note { font-size: 11px; color: var(--text-2); margin: 2px 0 0; line-height: 1.5; }
+.j-silence-note strong { color: var(--clay); }
+
+/* --- patient ------------------------------------------------------------- */
+.back {
+  font: inherit; font-size: var(--t-small); color: var(--text-2);
+  background: none; border: 0; padding: 0 0 14px; cursor: pointer;
+}
+.back:hover { color: var(--text); }
+.p-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 24px; flex-wrap: wrap; margin-bottom: 22px;
+}
+.p-head h1 { font-size: 24px; }
+.p-sub { display: flex; align-items: center; gap: 12px; margin-top: 6px; font-size: var(--t-small); flex-wrap: wrap; }
+.chip {
+  display: inline-block; padding: 3px 9px; font-size: 11px;
+  color: var(--paper); letter-spacing: 0.02em;
+}
+.p-wait { text-align: right; }
+.p-wait-n { font-family: var(--font-brand); font-size: 40px; font-weight: 300; line-height: 1; }
+.p-wait-l { font-size: var(--t-small); color: var(--text-2); margin-top: 3px; }
+.p-sec { margin-bottom: 28px; }
+.p-note { font-size: var(--t-small); color: var(--text-2); max-width: 76ch; line-height: 1.55; margin: 10px 0 0; }
+.p-note strong { color: var(--text); }
+.vitals { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+@media (max-width: 900px) { .vitals { grid-template-columns: repeat(3, 1fr); } }
+.vital { background: var(--surface); padding: 12px 14px; }
+/* a cited vital carries a clay underline: the agent actually used this one */
+.vital.is-cited { box-shadow: inset 0 -2px 0 var(--clay); }
+.vital-k { font-size: 11px; color: var(--text-2); line-height: 1.3; }
+.vital-v { font-family: var(--font-brand); font-size: 20px; font-weight: 300; margin-top: 4px; }
+.notread { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.chip-x {
+  border: 1px solid var(--rule-firm); background: var(--surface);
+  padding: 5px 10px; font-size: var(--t-small); color: var(--text-2);
+}
+.chip-x strong { color: var(--text); }
+.warn {
+  border-left: 3px solid var(--clay); background: var(--surface-2);
+  padding: 12px 16px; max-width: 76ch; font-size: var(--t-body); line-height: 1.55;
+}
+.row.is-clickable { cursor: pointer; }
+
+/* --- the run -------------------------------------------------------------- */
+.run-panel { border: 1px solid var(--rule); background: var(--surface); padding: 22px 24px; max-width: 920px; }
+.run-top { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 20px; }
+.run-btn {
+  font-family: var(--font-brand); font-size: 15px; font-weight: 400;
+  color: var(--paper); background: var(--ink); border: 1px solid var(--ink);
+  padding: 11px 22px; cursor: pointer; letter-spacing: 0.01em;
+}
+.run-btn:hover:not(:disabled) { background: #1b2d6e; }
+.run-btn:disabled { opacity: 0.55; cursor: default; }
+.run-meta { font-size: var(--t-small); color: var(--text-2); }
+.run-id { color: var(--text-3); }
+
+/* steps when data arrives; never interpolates between polls */
+.run-bar { height: 10px; background: var(--bg-sunk); overflow: hidden; }
+.run-bar i {
+  display: block; height: 100%; background: var(--clay);
+  transition: width var(--t-fast) linear;
+}
+.run-count { margin-top: 8px; font-size: var(--t-small); color: var(--text-2); }
+.run-n { font-family: var(--font-brand); font-size: 22px; font-weight: 300; color: var(--text); }
+.run-of { color: var(--text-2); }
+
+.lanes { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.lane {
+  display: grid; grid-template-columns: 18px 150px 1fr auto; align-items: center;
+  gap: 12px; padding: 12px 14px; background: var(--surface); font-size: var(--t-small);
+}
+.lane-dot { width: 9px; height: 9px; background: var(--rule-firm); }
+.lane.is-live .lane-dot { background: var(--clay); }
+.lane.is-done .lane-dot { background: var(--text-3); }
+.lane-a { color: var(--text-2); }
+.lane.is-live .lane-a, .lane.is-done .lane-a { color: var(--text); }
+.lane-r { color: var(--text-3); }
+.lane-s { color: var(--text-2); }
+.lane.is-todo { opacity: 0.55; }
+
+.run-done { margin-top: 22px; border-left: 3px solid var(--clay); background: var(--surface-2); padding: 16px 18px; }
+.run-done-h { font-size: var(--t-body); }
+.run-done-h .num { font-family: var(--font-brand); font-size: 20px; font-weight: 300; }
+.run-done-p { font-size: var(--t-small); color: var(--text-2); margin: 8px 0 14px; max-width: 76ch; line-height: 1.55; }
+.run-go {
+  font: inherit; font-size: var(--t-small); color: var(--text);
+  background: var(--surface); border: 1px solid var(--rule-firm);
+  padding: 8px 16px; cursor: pointer;
+}
+.run-go:hover { border-color: var(--text-3); }
+
+/* --- provenance graph: the one dark surface inside a light screen --------- */
+.prov { border: 1px solid var(--rule-firm); background: #0B1436; }
+.prov-canvas { position: relative; width: 100%; }
+.prov-note {
+  font-size: var(--t-small); color: #C4B6A6; margin: 0;
+  padding: 11px 16px; border-top: 1px solid rgba(196,182,166,0.18);
+  max-width: none; line-height: 1.5;
+}
+.prov-note strong { color: #FAFAF8; }
+.prov-load {
+  display: flex; align-items: center; justify-content: center; height: 100%;
+  color: #8E93A8; font-size: var(--t-small);
+}

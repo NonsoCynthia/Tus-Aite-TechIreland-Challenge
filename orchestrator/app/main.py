@@ -18,6 +18,7 @@ from typing import Any
 
 import concurrent.futures as cf
 import datetime as _dt
+import time
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -36,18 +37,37 @@ TOKEN = os.environ.get("RETRIEVAL_BEARER_TOKENS", "").split(",")[0].strip()
 DIST = Path(os.environ.get("UI_DIST", Path(__file__).resolve().parents[2] / "web" / "dist"))
 
 app = FastAPI(title="Tus Aite orchestrator", version="0.1.0")
-_client = httpx.Client(base_url=RETRIEVAL, timeout=30.0,
-                       headers={"Authorization": f"Bearer {TOKEN}"} if TOKEN else {})
+# retrieval runs one uvicorn worker and every handler makes a blocking psycopg
+# call, so it is easy to swamp: the operations fetch alone opens 16 connections
+# and a run is looping the cohort at the same time. Cap our side rather than
+# discover the ceiling as a 502 mid-demo.
+_client = httpx.Client(
+    base_url=RETRIEVAL,
+    timeout=httpx.Timeout(30.0, connect=5.0),
+    limits=httpx.Limits(max_connections=24, max_keepalive_connections=12),
+    headers={"Authorization": f"Bearer {TOKEN}"} if TOKEN else {},
+)
 
 
-def _get(path: str) -> Any:
-    try:
-        r = _client.get(path)
-    except httpx.HTTPError as exc:
-        raise HTTPException(502, f"retrieval unreachable: GET {path}") from exc
-    if r.status_code >= 400:
-        raise HTTPException(r.status_code, f"retrieval GET {path} -> {r.status_code}")
-    return r.json()
+def _get(path: str, *, attempts: int = 3) -> Any:
+    """GETs are idempotent, so a transient pool or timeout failure is retried
+    rather than surfaced. The error names the RETRIEVAL path, not /api, so
+    whoever reads it knows which service actually failed."""
+    last: Exception | None = None
+    for i in range(attempts):
+        try:
+            r = _client.get(path)
+        except httpx.HTTPError as exc:
+            last = exc
+            time.sleep(0.15 * (i + 1))
+            continue
+        if r.status_code >= 500 and i < attempts - 1:
+            time.sleep(0.15 * (i + 1))
+            continue
+        if r.status_code >= 400:
+            raise HTTPException(r.status_code, f"retrieval GET {path} -> {r.status_code}")
+        return r.json()
+    raise HTTPException(502, f"retrieval unreachable after {attempts} attempts: GET {path}") from last
 
 
 # ---------------------------------------------------------------- reads

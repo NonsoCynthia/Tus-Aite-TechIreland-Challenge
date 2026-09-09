@@ -4,8 +4,10 @@ import { api } from './lib/api'
 import { Mark } from './components/Mark'
 import { Overview } from './surfaces/Overview'
 import { List } from './surfaces/List'
+import { Patient } from './surfaces/Patient'
+import { Run } from './surfaces/Run'
 
-export type Surface = 'overview' | 'list' | 'run'
+export type Surface = 'overview' | 'run' | 'list'
 
 const HOSPITALS = [
   { hipe: '9001', name: "St Brendan's University Hospital" },
@@ -21,6 +23,7 @@ export function App() {
   const [hospital, setHospital] = useState('9001')
   const [date, setDate] = useState(RUNNABLE_DATE)
   const [surface, setSurface] = useState<Surface>('overview')
+  const [patient, setPatient] = useState<string | null>(null)
   const health = useQuery({ queryKey: ['health'], queryFn: api.health })
   const name = HOSPITALS.find((h) => h.hipe === hospital)?.name ?? hospital
 
@@ -28,9 +31,9 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand-lockup">
-          <Mark size={26} color="var(--ink)" />
-          <div>
-            <div className="brand-word">TÚS ÁITE</div>
+          <Mark size={30} />
+          <div className="brand-text">
+            <div className="brand-word">Tús Áite</div>
             <div className="brand-sub">decision support</div>
           </div>
         </div>
@@ -52,10 +55,10 @@ export function App() {
         </div>
 
         <nav className="surfaces" aria-label="Views">
-          {(['overview', 'list'] as Surface[]).map((k) => (
+          {(['overview', 'run', 'list'] as Surface[]).map((k) => (
             <button key={k} className={'surf' + (surface === k ? ' is-on' : '')}
-                    onClick={() => setSurface(k)} aria-current={surface === k}>
-              {k === 'overview' ? 'Overview' : 'The list'}
+                    onClick={() => { setSurface(k); setPatient(null) }} aria-current={surface === k}>
+              {k === 'overview' ? 'Overview' : k === 'run' ? 'Run the agents' : 'The order'}
             </button>
           ))}
         </nav>
@@ -70,7 +73,12 @@ export function App() {
 
       <main>
         {surface === 'overview' && <Overview hospital={hospital} date={date} name={name} />}
-        {surface === 'list' && <List hospital={hospital} date={date} />}
+        {surface === 'run' && (
+          <Run hospital={hospital} date={date} onDone={() => setSurface('list')} />
+        )}
+        {surface === 'list' && (patient
+          ? <Patient hospital={hospital} date={date} pathway={patient} onBack={() => setPatient(null)} />
+          : <List hospital={hospital} date={date} onOpen={setPatient} />)}
       </main>
     </div>
   )
