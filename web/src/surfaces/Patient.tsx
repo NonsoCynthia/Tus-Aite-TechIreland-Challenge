@@ -325,6 +325,11 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
           specialty={specialtyFull(reference, row.specialty_hipe)}
           alpha={placed?.alpha ?? dec.data?.alpha ?? null}
           peers={peers}
+          /* The capacity lane's evidence is served date-blind -- the same ward
+             snapshot and clinic series on all 14 hospital-days -- so it needs
+             the day selected to be able to say it is not that day. Nothing in
+             the lane is fetched or filtered by it. */
+          date={date}
         />
       </section>
 

@@ -160,7 +160,7 @@
 
      what the marker sits on     ink            LIGHT   DARK
      the bare track              --text         13.59   18.09
-     fill step 0                 --text          8.76    9.19
+     fill step 0                 --text          8.76    9.13
      fill step 1                 --text          5.07    5.86
      fill step 2                 --paper         5.86    5.86
      fill step 3                 --sev-3-fg      8.67    7.43
@@ -199,7 +199,17 @@
   position: absolute; top: -1px; bottom: -1px; width: 1px;
   background: var(--text);
 }
-.sevbar-m[data-on="fill"] { transform: translateX(-1px); }
+/* The 1px sits INSIDE the track in two cases, not one.
+   `left: 100%` puts the element at x in [W, W+1] of a box that clips at W, so a
+   line drawn at the very end of the track is not faint -- it is absent. That is
+   every referral still INSIDE its target, because Patient.tsx passes
+   `of = target / max(1, wait, target)`, which is exactly 1.0 whenever the wait
+   has not passed the target: 35 of the 165 with a target on 2026-08-30,
+   including PW-DEMO-02 (88 of 91), the planted fixture whose stated purpose is
+   to show a 13-week timeframe. The reference line the bar exists to be read
+   against was missing on precisely the referrals that had not crossed it.
+   The fill case already needed the same pull, for the same reason. */
+.sevbar-m[data-on="fill"], .sevbar-m[data-at="end"] { transform: translateX(-1px); }
 .sevbar[data-sev="2"] .sevbar-m[data-on="fill"] { background: var(--paper); }
 .sevbar[data-sev="3"] .sevbar-m[data-on="fill"] { background: var(--sev-3-fg); }
 .sevbar[data-sev="4"] .sevbar-m[data-on="fill"] { background: var(--sev-4-fg); }
@@ -224,24 +234,41 @@
    those steps the mark is its edge and its word, and that is why the legend
    prints the word inside the swatch rather than beside it.
 
-   THE SECOND TONE is drawn here too, and it is measured the same way. The
-   quiet mark at the breach step is --sev-2-bg inside a --sev-3-bg edge, and
-   the useful fact about it is that its EDGE is the very colour the solid chip
-   is FILLED with -- which is what makes the two read as one step rather than
-   as two objects, and is the sentence the note under the strip now makes:
+   THE SECOND TONE is drawn here too, and it is measured the same way. Which
+   STEP of it is the placing surface's: List keys the breach step (a rule that
+   fired), Overview keys the integrity step (a date that is not the day
+   selected), and Severity.tsx takes that as a prop rather than assuming. So
+   both steps are measured, not just the one this file used to know about.
 
-     ground        fill-vs-ground   edge-vs-ground   word on its own fill
-     --bg               1.36             8.67                7.19
-     --surface          1.42             9.06                7.19
-     --surface-2        1.32             8.38                7.19
-     dark --bg          1.33             7.43                7.03
-     dark --surface     1.16             6.48                7.03
-     dark --surface-2   1.05             5.86                7.03
+   The useful fact about either is that its EDGE is the very colour the solid
+   chip at that step is FILLED with -- which is what makes the quiet mark and
+   the solid one read as one step rather than as two objects, and is the
+   sentence the note under the strip makes.
 
-   The fill column is a tint by design, exactly as steps 1 and 2 are, and the
-   edge clears the 3:1 WCAG 1.4.11 floor for a meaningful object on all six --
-   so the quiet mark is carried by its edge and its word, and nothing rests on
-   that pale fill. */
+   Recomputed from the tokens for this table, against the rules below rather
+   than against a neighbouring comment: at step 3 the word is --sev-2-fg on
+   --sev-2-bg and the edge is --sev-3-bg; at step 4 both are --sev-4-bg.
+
+                      step 3 (breach)                 step 4 (integrity)
+     ground        fill    edge    word            fill    edge    word
+     --bg          1.36    8.67    7.19            1.36   11.07    8.12
+     --surface     1.42    9.06    7.19            1.42   11.57    8.12
+     --surface-2   1.32    8.38    7.19            1.32   10.70    8.12
+     dark --bg     1.33    7.43    7.03            1.33   11.05    8.32
+     dark --surf   1.16    6.48    7.03            1.16    9.63    8.32
+     dark --surf-2 1.05    5.86    7.03            1.05    8.72    8.32
+
+   The fill column is a tint by design, exactly as steps 1 and 2 are, and it is
+   the SAME tint at both steps -- both quiet rules fill with --sev-2-bg -- so
+   the fill is not what separates them and never was. The edge clears the 3:1
+   WCAG 1.4.11 floor for a meaningful object on all twelve, and step 4's edge
+   and word are above step 3's in every row: 8.67 -> 11.07 and 7.19 -> 8.12 on
+   light, 7.43 -> 11.05 and 7.03 -> 8.32 on dark. The quiet mark is carried by
+   its edge and its word, and nothing rests on that pale fill.
+
+   No surface places this strip twice, so no legend shows both columns at once;
+   the two are measured together only so the comparison between them is on
+   record. */
 .sevleg {
   display: flex; flex-wrap: wrap; align-items: baseline;
   gap: var(--d1) var(--d3);

@@ -394,16 +394,55 @@
 /* --- 4 the journey ------------------------------------------------------- */
 .pt-journey { margin: 0; }
 /* Past target, recoloured on the axis itself. It is the same fact as the
-   header's wait bar, so it climbs the same four steps rather than sitting flat
-   whatever the overrun. The step arrives as a class on the Journey root because
-   the ratio is the header's to compute, not the axis's. That also frees clay
-   for the silence hatch below, which is then the one clay mark here. */
+   header's wait bar, so it is drawn on the SAME RAMP -- not merely the same
+   0-4 scale. The step arrives as a class on the Journey root because the ratio
+   is the header's to compute, not the axis's.
+
+   Steps 1 and 2 used to be --sev-1-edge and --sev-2-edge, one step below
+   severity.css's SevBar the whole way up the bottom half. Both marks read the
+   same waitSev off the same referral and painted it two different browns about
+   200px apart -- and that half is the majority. Recounted from the live API
+   (/api/cohort/9001/2026-08-30, adjusted_wait_days over crt_threshold_days):
+   130 of the 165 referrals with a target are past it, and 71 of those 130 sit
+   in the half where the two ramps disagreed -- 28 at step 1, 43 at step 2.
+   tokens.css credits that 71 to step 2 alone. The count is real and the
+   attribution is not; tokens.css is not this file's to correct, so it is
+   flagged here rather than copied.
+
+   MEASURED HERE, not carried over, against the stretch of axis this segment
+   recolours (--rule-firm) -- and the light ground is the only one it can
+   reach: Journey renders from Patient alone, inside .pad.pt, and no
+   [data-surface="dark"] subtree (.boot, .rail, .prov, .runlay, .cg) holds one.
+
+     step 1  --sev-2-edge  1.73    was --sev-1-edge at 1.15, which is not a
+     step 2  --clay        3.49    segment at all for the 28 referrals a day
+     step 3  --sev-3-bg    5.16    at step 1; 43 more move up to 3.49
+     step 4  --sev-4-bg    6.60
+
+   Strictly rising, and every step rises from where it stood. Against the page
+   (--bg), which is what the segment's long edges sit on: 2.90 / 5.86 / 8.67 /
+   11.07, rising too.
+
+   ON THE DARK GROUND, if a Journey ever landed on one, steps 1 and 2 are one
+   step: --sev-2-edge resolves there to exactly --clay, both 1.47 against
+   --rule-firm composited over --bg. That flat step is severity.css's own,
+   inherited with its ramp and written down there as well. It is still the
+   better of the two, because the OLD step 1 resolves on dark to exactly
+   --rule-firm: 1.00 against the axis -- not weak, absent.
+
+   WHAT THIS COSTS. Clay is no longer the one clay mark on this axis: at step 2
+   the overdue segment and .j-silence's clay rule are the same colour on the
+   same axis, and their two legend swatches below are identical. They stay two
+   different marks -- a solid horizontal fill of the axis line against a 2px
+   vertical rule over a hatch -- and each legend line carries its own word and
+   its own number, which is the standing invariant. A reserved colour is a
+   weaker guarantee than a measured contrast, so the contrast won. */
 .j-overdue {
   position: absolute; top: 12px; height: var(--spine-w);
   background: var(--rule-firm);
 }
-.pt-journey.is-sev-1 .j-overdue, .pt-journey.is-sev-1 .j-leg.is-overdue i { background: var(--sev-1-edge); }
-.pt-journey.is-sev-2 .j-overdue, .pt-journey.is-sev-2 .j-leg.is-overdue i { background: var(--sev-2-edge); }
+.pt-journey.is-sev-1 .j-overdue, .pt-journey.is-sev-1 .j-leg.is-overdue i { background: var(--sev-2-edge); }
+.pt-journey.is-sev-2 .j-overdue, .pt-journey.is-sev-2 .j-leg.is-overdue i { background: var(--clay); }
 .pt-journey.is-sev-3 .j-overdue, .pt-journey.is-sev-3 .j-leg.is-overdue i { background: var(--sev-3-bg); }
 .pt-journey.is-sev-4 .j-overdue, .pt-journey.is-sev-4 .j-leg.is-overdue i { background: var(--sev-4-bg); }
 .j-legend {

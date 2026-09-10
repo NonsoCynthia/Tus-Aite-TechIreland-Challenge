@@ -303,7 +303,12 @@ function metric(r: Row, key: SortKey, ref: Reference | undefined): number | null
   switch (key) {
     case 'wait': return r.adjusted_wait_days
     case 'over': return ratioOf(r, ref)
-    case 'news2': return r.clin?.news2 ?? null
+    // Ordering is a channel. The Outside tab IS the refused set, its three cells
+    // all read "not applied · adult scale", and the NEWS2 header sorts in every
+    // tab -- so sorting there ranked three children by the adult scores the
+    // product had just refused to show them by. Nulls sort last and the
+    // pathway_number tiebreak keeps the tab deterministic.
+    case 'news2': return isRefusedPaediatric(r.specialty_hipe) ? null : (r.clin?.news2 ?? null)
     case 'age': return r.clin?.reading_age_days ?? null
     case 'priority': return r.rank?.priority ?? null
     default: return null

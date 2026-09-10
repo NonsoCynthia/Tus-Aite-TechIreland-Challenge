@@ -9,7 +9,7 @@ import {
   breachPhrase, crtDays, failed, isRefusedPaediatric, rule, ruleStatement, specialtyFull,
   specialtyName,
 } from '../lib/ref'
-import { SevBar, SevChip, SevLegend } from '../components/Severity'
+import { QUIET_OFF_DAY, SevBar, SevChip, SevLegend, SevQuiet } from '../components/Severity'
 import {
   SAFE_OCCUPANCY, SEV_INTEGRITY, sevBooked, sevBreach, sevOccupancy, sevReadingAge, type Sev,
 } from '../lib/severity'
@@ -37,6 +37,23 @@ const GAR_WORD = { G: 'Green', A: 'Amber', R: 'Red' } as const
 /** --icon-sm. The token floor for an icon that carries meaning; the readouts
  *  used to draw theirs at 12px, the smallest mark in the product. */
 const ICON = 14
+
+/** THE QUIET MARKS THIS SURFACE DRAWS, and the only ones its key may show.
+ *
+ *  Exactly one, at SEV_INTEGRITY: a date that is not the day selected, drawn on
+ *  the cited session in the specialty panel, on the cited session in Clinic
+ *  capacity, and on the ward snapshot. Every one of those goes through
+ *  <SevQuiet mark={QUIET_OFF_DAY}>, so the three marks and this key read the
+ *  same object and cannot name different steps.
+ *
+ *  NOT the rule step. A rule that fired is drawn on this surface too, in the
+ *  Rules panel, but it is drawn SOLID there -- one verdict per rule on a panel
+ *  with room for it, not one per row of a 595-mark table -- so List's quiet
+ *  mark has no referent here and this key must not show it.
+ *
+ *  A module constant rather than an inline array: a fresh array on every render
+ *  would re-subscribe the legend's audit on every render. */
+const QUIET_HERE = [QUIET_OFF_DAY]
 
 /** NTPF Outpatient Waiting List by Speciality, OpenData_OPNational02_2026.csv,
  *  snapshot 30/07/2026. Counted from the file itself, which is in this repo at
@@ -394,9 +411,18 @@ export function Overview({ hospital, date, name, reference, onOpenList }: {
           BELOW the reconciliation band and the no-run notice on purpose. Both
           of those are prose that says its own state in words, and a key strip
           between the header and a role="alert" would push the one thing on this
-          page that outranks everything else down the screen. */}
+          page that outranks everything else down the screen.
+
+          THE QUIET GROUP IS THIS SURFACE'S, passed rather than inherited. The
+          strip's default is List's mark -- a rule that fired, at step 3 -- and
+          this surface draws no such thing: it draws the quiet tone at step 4
+          only, on a date that is not the day selected. Placed with no prop, the
+          key taught the wrong step for the loudest signal the product has and
+          omitted the only quiet mark on the page. QUIET_HERE is the whole
+          answer, declared once at the top of this file and drawn from by every
+          one of those three marks. */}
       <div className="ov-key">
-        <SevLegend />
+        <SevLegend quiet={QUIET_HERE} />
         <ReadoutBand s={s} d={d} decNote={decNote} reference={reference} />
       </div>
 
@@ -804,10 +830,10 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun, date }: {
                                 {citedDay === date
                                   ? <span className="num">{shortDate(citedDay)}</span>
                                   : (
-                                    <SevChip sev={SEV_INTEGRITY} tone="quiet"
-                                             title={`not ${longDate(date)}, the day selected`}>
+                                    <SevQuiet mark={QUIET_OFF_DAY}
+                                              title={`not ${longDate(date)}, the day selected`}>
                                       {shortDate(citedDay)}
-                                    </SevChip>
+                                    </SevQuiet>
                                   )}
                               </span>
                             </>
@@ -1266,10 +1292,10 @@ function ClinicPanel({ ops, reference, d, date }: {
                       {c.cited_session_date == null
                         ? <span className="ov-none">none cited</span>
                         : off
-                          ? <SevChip sev={SEV_INTEGRITY} tone="quiet"
-                                     title={`not ${longDate(date)}, the day selected`}>
+                          ? <SevQuiet mark={QUIET_OFF_DAY}
+                                      title={`not ${longDate(date)}, the day selected`}>
                               {shortDate(c.cited_session_date)}
-                            </SevChip>
+                            </SevQuiet>
                           : <span className="ov-cited-tag">{shortDate(c.cited_session_date)}</span>}
                     </td>
                     <td className="c-n num">
@@ -1483,10 +1509,10 @@ function WardRow({ w, reference, date }: {
       </td>
       <td className="c-n num c-dim">
         {off ? (
-          <SevChip sev={SEV_INTEGRITY} tone="quiet"
-                   title={`not ${longDate(date)}, the day selected`}>
+          <SevQuiet mark={QUIET_OFF_DAY}
+                    title={`not ${longDate(date)}, the day selected`}>
             {shortDate(w.snapshot)} {clockTime(w.snapshot)}
-          </SevChip>
+          </SevQuiet>
         ) : (
           <>{shortDate(w.snapshot)} {clockTime(w.snapshot)}</>
         )}

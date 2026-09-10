@@ -112,8 +112,13 @@
   --sev-1-edge: #BFB6A4;   /* so it vanished the moment a row was hovered       */
 
   --sev-2-fg:   #523C31;   /* attention  text 7.19  fill-vs-page  1.36  tinted   */
-  --sev-2-bg:   #E6D5CB;   /* deepened from a lighter tint. 71 of the 130         */
-  --sev-2-edge: #B08D79;   /* past-target referrals live at step 2.               */
+  --sev-2-bg:   #E6D5CB;   /* deepened from a lighter tint. Of the 130 past      */
+  --sev-2-edge: #B08D79;   /* target, 43 are at step 2 and 71 at steps 1-2 --    */
+                           /* recounted: 28/43/39/20 across steps 1-4. An earlier */
+                           /* version of this line credited the 71 to step 2      */
+                           /* alone. It is the pair, which is still the majority  */
+                           /* of past-target referrals and still the reason this  */
+                           /* step has to carry its weight.                       */
   /* The edge is stated honestly, because an earlier version of this comment
      claimed it cleared the 3:1 WCAG 1.4.11 floor and named no ground -- the same
      unnamed-ground error that already put a wrong fill column in this file once.

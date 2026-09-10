@@ -1,14 +1,17 @@
-import type { ReactNode } from 'react'
-import { sevBreach, type Sev } from '../lib/severity'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { SEV_INTEGRITY, sevBreach, type Sev } from '../lib/severity'
 import './severity.css'
 
 /** The one severity primitive. Every attention state in the product renders
  *  through this, so a reader learns the scale once.
  *
- *  Three shapes, one scale:
+ *  Four shapes, one scale:
  *    <SevChip>   a filled block carrying a value. The distance channel.
  *    <SevBar>    a magnitude drawn against a track, with the same four steps.
- *    <SevLegend> the four steps named, once, above the thing they mark.
+ *    <SevQuiet>  one of those steps drawn without its fill, from a QuietMark
+ *                that says what it means on the surface drawing it.
+ *    <SevLegend> the steps named, once, above the thing they mark -- the four
+ *                solid ones always, plus the quiet marks THAT SURFACE draws.
  *
  *  The value is ALWAYS rendered. Colour is never the only channel, both because
  *  WCAG 2.2 SC 1.4.1 requires it and because a filled block with no number
@@ -56,7 +59,10 @@ export function sevAria(sev: Sev): string {
  *  while the table below it drew 37, of which 20 were the rule that fired: the
  *  same step, in a tone the legend never showed. 54% of the marks on screen
  *  were a shape the reader had no key for, and the two objects are not subtly
- *  different: a solid block at 8.67:1 against the page and a tint at 1.42:1.
+ *  different: a solid block at 8.67:1 against the page, and a tint at 1.36:1
+ *  against that same page (1.42 on --surface, where the ranked table sits).
+ *  Both grounds are named on purpose: an unnamed ground is how four wrong
+ *  figures got published in this family of files.
  *  Both tones go through this function now, and both are drawn. */
 function blockClass(sev: Sev, tone: 'fill' | 'quiet'): string {
   return `sev sev-${sev} sev-${tone}`
@@ -69,6 +75,168 @@ function blockClass(sev: Sev, tone: 'fill' | 'quiet'): string {
  *  means the legend follows the scale if that step ever moves, which is the
  *  same contract blockClass has for the classes. */
 const RULE_SEV = sevBreach(false)
+
+/** WHAT A QUIET MARK MEANS, as a value rather than as a comment.
+ *
+ *  The quiet tone is not a fifth step. It is one of the four steps drawn
+ *  without its fill, and which step it is -- and what it means -- belongs to
+ *  the SURFACE, not to the scale:
+ *
+ *    List      step 3, the breach step     a rule that fired, one per breaching row
+ *    Overview  step 4, the integrity step  a date that is not the day selected
+ *
+ *  That contract used to be a sentence in this file telling the next author
+ *  what to do, which is exactly how it broke: the strip was placed on Overview
+ *  and went on printing List's mark -- a step Overview never draws -- while the
+ *  mark Overview does draw had no key at all. A comment cannot be read by the
+ *  file that violates it.
+ *
+ *  So a quiet mark is a VALUE now. The legend prints these, and SevQuiet draws
+ *  from the same object, so one declaration feeds both and a surface cannot key
+ *  one step and draw another. The half a shared object cannot check -- whether
+ *  the WORDS still fit, and whether a surface declared a mark it never draws --
+ *  is what the audit below checks, out loud, in the browser. */
+export type QuietMark = {
+  /** The step drawn without its fill. Taken from the scale at the constants
+   *  below, never typed as a number here, so a mark follows its step if that
+   *  step ever moves -- the same contract blockClass has for the classes. */
+  sev: Exclude<Sev, 0>
+  /** What the mark means ON THE SURFACE THAT DRAWS IT, printed beside the chip
+   *  in the same voice as the ladder's own words. */
+  label: string
+  /** Why that step is drawn quiet here rather than solid. Joined into the note
+   *  under the strip, so the reason is on screen and not only in a comment. */
+  why: string
+}
+
+/** Narrows a step to a DRAWABLE one, in one place rather than at each mark.
+ *
+ *  Step 0 is not a step, it is the absence of a mark: SevChip renders bare
+ *  children for it, so a QuietMark that arrived at 0 would key a chip that is
+ *  not on the screen. Neither source below can be 0 -- sevBreach(false) is the
+ *  breach step by that function's own definition, and SEV_INTEGRITY is the top
+ *  of the scale -- so this asserts NON-ZERO-NESS and never the number, which is
+ *  what keeps a mark following its step if that step ever moves. */
+const drawable = (sev: Sev) => sev as Exclude<Sev, 0>
+
+/** List's, and the default -- see SevLegend for why there is a default at all.
+ *  One per breaching row in the rule column. */
+export const QUIET_RULE_FIRED: QuietMark = {
+  sev: drawable(RULE_SEV),
+  label: 'a rule that fired',
+  why: 'a rule fires on most rows that breach, and a field of solid blocks would outshout the table',
+}
+
+/** Overview's. Its three quiet marks -- the cited session in the specialty
+ *  panel, the cited session in Clinic capacity, the ward snapshot -- all make
+ *  the same claim: this date is not the day selected above.
+ *
+ *  Quiet rather than solid at a step whose SOLID form that surface keeps for a
+ *  figure that does not reconcile. Counted from /api/operations/9001 over all
+ *  14 hospital-days: all 7 wards carry 2026-08-30 and all 7 clinics carry
+ *  2026-08-28 on every one of them, so on the 12 days that are neither, all 14
+ *  of these dates are marked at the same time. Fourteen solid blocks at the
+ *  loudest step the product has, on most days, saying only that the evidence is
+ *  date-blind -- and drowning the one thing that step is for. */
+export const QUIET_OFF_DAY: QuietMark = {
+  sev: drawable(SEV_INTEGRITY),
+  label: 'a date that is not the day selected',
+  why: 'every ward and clinic here carries the same snapshot, so on most days all fourteen dates are marked at once, and the solid block at this step is kept for a figure that does not reconcile',
+}
+
+/* --- the contract, checked rather than trusted -----------------------------
+   A quiet chip registers itself while it is on screen; the legend compares what
+   is mounted against what it was told to print, and says so when the two
+   disagree -- in BOTH directions, because this fault had both: a mark shown
+   that the surface never draws, and a mark drawn that the key never shows.
+
+   Why a runtime check and not a required prop, which the type checker would
+   enforce for free: List.tsx already places this strip with no prop and is not
+   this change's file to edit, so `quiet` has to keep a default, and a default
+   is precisely what a third surface would inherit in silence. The check is what
+   makes the default safe. It is the first thing the console says on a surface
+   that got it wrong.
+
+   Development only. A clinician must never be shown a developer's error, and
+   the demo is served from `vite build` output where this is dead. The next
+   author to place the strip is by definition running the dev server.
+
+   Named marks are compared by identity and unnamed ones (List's own
+   <SevChip tone="quiet">) by step, so the older call site is covered too. */
+const AUDIT = (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true
+
+/** What a mounted quiet chip registers: the mark itself when it has one, and
+ *  its step either way. Exported because it names quietMismatch's input. */
+export type QuietKey = Exclude<Sev, 0> | QuietMark
+const quietDrawn = new Map<QuietKey, number>()
+const quietWatchers = new Set<() => void>()
+let quietQueued = false
+
+/** Counted, not flagged: the same mark is drawn 7 times on one Overview table,
+   and StrictMode mounts every effect twice. */
+function quietBump(what: QuietKey, by: number) {
+  const n = (quietDrawn.get(what) ?? 0) + by
+  if (n > 0) quietDrawn.set(what, n)
+  else quietDrawn.delete(what)
+  /* Coalesced to one pass per commit. The legend sits ABOVE the marks it
+     explains, so its own mount effect runs before theirs and would see an empty
+     map; and half these tables arrive with a later query. So the legend
+     subscribes and re-checks instead of looking once. */
+  if (quietQueued) return
+  quietQueued = true
+  queueMicrotask(() => {
+    quietQueued = false
+    for (const w of quietWatchers) w()
+  })
+}
+
+/** THE AUDIT'S WHOLE RULE, as one pure function: a surface's key must show the
+ *  quiet marks that surface draws, and no others.
+ *
+ *  Lifted out of the component so it can be exercised without a browser, which
+ *  is the only way this check itself gets checked. Rollup drops it from the
+ *  built bundle -- nothing in the app calls it outside the DEV branch below.
+ *
+ *  Returns one sentence per disagreement, in both directions. Named marks are
+ *  compared by identity, so two marks that share a step but not their words are
+ *  still told apart; an unnamed quiet chip (List's <SevChip tone="quiet">)
+ *  registers only its step, so it satisfies any declared mark at that step. */
+export function quietMismatch(quiet: QuietMark[], drawn: Iterable<QuietKey>): string[] {
+  const wrong: string[] = []
+  const seen = new Set<QuietKey>([...drawn])
+  /* A SevQuiet registers BOTH its mark and its step, so an undeclared named
+     mark would otherwise be reported twice for one chip -- once by name and
+     once as a bare step. The name is the more useful of the two, so a step is
+     only reported when nothing named claims it. */
+  const named = new Set<Sev>()
+  for (const k of seen) if (typeof k !== 'number') named.add(k.sev)
+  for (const k of seen) {
+    if (typeof k === 'number') {
+      if (!quiet.some((m) => m.sev === k) && !named.has(k)) {
+        wrong.push(`drawn here but not in this key: a quiet mark at step ${k} (${SEV_WORD[k]})`)
+      }
+    } else if (!quiet.includes(k)) {
+      wrong.push(`drawn here but not in this key: "${k.label}"`)
+    }
+  }
+  for (const m of quiet) {
+    if (!seen.has(m) && !seen.has(m.sev)) {
+      wrong.push(`in this key but drawn nowhere: "${m.label}" at step ${m.sev} (${SEV_WORD[m.sev]})`)
+    }
+  }
+  return wrong
+}
+
+/** Renders nothing. It exists to hold the effect that says "this mark is on
+ *  screen", which is why it can sit inside a chip without taking a flex gap or
+ *  a table cell. */
+function QuietAudit({ what }: { what: QuietKey }) {
+  useEffect(() => {
+    quietBump(what, 1)
+    return () => quietBump(what, -1)
+  }, [what])
+  return null
+}
 
 export function SevChip({ sev, children, title, tone = 'fill' }: {
   sev: Sev
@@ -91,7 +259,29 @@ export function SevChip({ sev, children, title, tone = 'fill' }: {
           without changing, and positioned out of flow so it takes no width, no
           flex gap and no line height. */}
       <span className="sev-sr">, {sevAria(sev)}</span>
+      {/* Renders no node. A quiet chip drawn here without a QuietMark -- which
+          today is List's rule column only -- is still counted, by step, so the
+          audit can tell that surface's legend it is keying a real mark. */}
+      {AUDIT && tone === 'quiet' && <QuietAudit what={sev} />}
     </span>
+  )
+}
+
+/** A quiet mark, drawn FROM the object the legend prints.
+ *
+ *  Prefer this to <SevChip tone="quiet"> at every call site: the step comes
+ *  from the mark, so the key and the mark cannot name different steps, and the
+ *  mark registers itself by identity so the audit can check the words too. */
+export function SevQuiet({ mark, children, title }: {
+  mark: QuietMark
+  children: ReactNode
+  title?: string
+}) {
+  return (
+    <>
+      <SevChip sev={mark.sev} tone="quiet" title={title}>{children}</SevChip>
+      {AUDIT && <QuietAudit what={mark} />}
+    </>
   )
 }
 
@@ -140,11 +330,16 @@ export function SevBar({ sev, value, of, label, height = 6 }: {
            inversions of this ramp into the product. So the side is stated, not
            inferred, and severity.css colours the marker from it. */
         <i className="sevbar-m" data-on={m <= v ? 'fill' : 'track'}
+           data-at={m >= 1 ? 'end' : undefined}
            style={{ left: `${m * 100}%` }} />
       )}
     </span>
   )
 }
+
+/** A module constant, not an inline default: a fresh `[QUIET_RULE_FIRED]` on
+ *  every render would re-subscribe the audit on every render. */
+const DEFAULT_QUIET: QuietMark[] = [QUIET_RULE_FIRED]
 
 /** The scale, named. Place it above the thing it marks.
  *
@@ -173,14 +368,59 @@ export function SevBar({ sev, value, of, label, height = 6 }: {
  *  It also draws BOTH TONES, because the table does. Four fill chips explained
  *  4 of the 37 marks on the List's first screen and left 20 -- the rule that
  *  fired, one on every breaching row -- looking like a different object
- *  entirely: solid at 8.67:1 beside a tint at 1.42:1, both meaning the same
+ *  entirely: solid at 8.67:1 beside a tint at 1.36:1 on the page, both the same
  *  step, on the same screen. The quiet chip is shown as what it is rather than
  *  the row chip being made solid, because the table was deliberately cut from
  *  62 solid marks to 8 to answer a saturation complaint, and teaching the
  *  reader a mark costs nothing while re-adding 20 solid blocks would spend
  *  that fix.
+ *
+ *  WHICH quiet marks is the CALLER'S to say, because it is the caller's fact.
+ *  `quiet` is the marks this surface actually draws, and the only right answer
+ *  is that set exactly: a key that shows a mark its surface never draws is the
+ *  same fault as one that flatters its own swatches, and a key that omits one
+ *  leaves the reader without the loudest signal on the page. An empty array is
+ *  a legitimate answer -- a surface that draws no quiet mark shows no quiet
+ *  group and no sentence about one -- and it is an answer the old comment could
+ *  not even express.
+ *
+ *  There is a DEFAULT, and it is a compromise, not a convenience. Making
+ *  `quiet` required would have the type checker catch every future call site
+ *  for nothing, but List.tsx:1163 already places this strip with no prop and is
+ *  not this change's file to touch. So the default is List's mark, and the
+ *  audit above is what stops a third surface from inheriting it in silence.
+ *  If List ever passes `quiet={[QUIET_RULE_FIRED]}` itself, delete the default
+ *  and make the prop required: that is strictly better than a checked default.
  */
-export function SevLegend({ className }: { className?: string }) {
+export function SevLegend({ className, quiet = DEFAULT_QUIET }: {
+  className?: string
+  /** The quiet marks THIS surface draws -- all of them, and nothing else. */
+  quiet?: QuietMark[]
+}) {
+  /* Development only and dead in the built bundle: does this surface draw
+     exactly the quiet marks this strip is printing? Both directions, because
+     the fault this exists to catch had both. See "the contract, checked rather
+     than trusted" above for why it is checked here and not by the type. */
+  const said = useRef('')
+  useEffect(() => {
+    if (!AUDIT) return
+    const check = () => {
+      const now = quietMismatch(quiet, quietDrawn.keys()).join(' | ')
+      if (now === said.current) return
+      said.current = now
+      if (now) {
+        console.error(
+          `SevLegend: the key does not match the quiet marks this surface draws -- ${now}. ` +
+          'Pass `quiet` to <SevLegend>, naming every quiet mark this surface draws and no ' +
+          'others (components/Severity.tsx).',
+        )
+      }
+    }
+    quietWatchers.add(check)
+    check()
+    return () => { quietWatchers.delete(check) }
+  }, [quiet])
+
   return (
     <div className={className ? `sevleg ${className}` : 'sevleg'}>
       <span className="sevleg-t lab">how far past a line</span>
@@ -196,27 +436,29 @@ export function SevLegend({ className }: { className?: string }) {
           </li>
         ))}
       </ol>
-      {/* The second tone, which is 54% of the marks on the first screen below
-          this strip and had no key at all.
+      {/* The second tone, which on List is 54% of the marks on the first screen
+          below this strip and had no key at all.
 
-          Not a fifth step, so not inside the <ol> above: it is one of those
-          four steps drawn in the other tone, and the markup says that by
-          keeping the ladder to itself and labelling this separately.
+          Not a fifth step, so not inside the <ol> above: each of these is one
+          of those four steps drawn in the other tone, and the markup says so by
+          keeping the ladder to itself and labelling these separately.
 
-          Only the step sevBreach gives, and only one chip: the tone also
-          carries the integrity mark at step 4, but that is drawn on Overview,
-          which does not place this legend -- and a legend that shows a mark its
-          surface never draws is the same fault as one that flatters its own
-          swatches. If this strip is ever placed on Overview, this group grows.
+          ONE GROUP PER MARK THIS SURFACE DRAWS -- List's rule at step 3,
+          Overview's off-day date at step 4 -- each with the sentence that says
+          what the tone means there. The step is read off the mark, so this
+          cannot show a step the caller's own chips do not draw.
 
-          No triangle icon, though the real chip carries one: the icon is List's
-          composition, not the tone's, and copying it here would be exactly the
-          drift blockClass exists to prevent. What identifies the tone is the
-          pale fill inside a solid edge, and that IS the real thing. */}
-      <span className="sevleg-g">
-        <span className="sevleg-t lab">a rule that fired</span>
-        <span className={blockClass(RULE_SEV, 'quiet')} data-sev={RULE_SEV}>{SEV_WORD[RULE_SEV]}</span>
-      </span>
+          No triangle icon, though List's real chip carries one: the icon is
+          List's composition, not the tone's, and copying it here would be
+          exactly the drift blockClass exists to prevent. What identifies the
+          tone is the pale fill inside a solid edge, and that IS the real
+          thing. */}
+      {quiet.map((m) => (
+        <span className="sevleg-g" key={m.label}>
+          <span className="sevleg-t lab">{m.label}</span>
+          <span className={blockClass(m.sev, 'quiet')} data-sev={m.sev}>{SEV_WORD[m.sev]}</span>
+        </span>
+      ))}
       {/* THREE STATES, NOT TWO.
 
           This note used to say "an unmarked number is inside the line". On the
@@ -253,9 +495,12 @@ export function SevLegend({ className }: { className?: string }) {
         A mark grades a measurement, never a person: how far a wait is past its target, how old a
         reading is, how far a ward is past its safe line. Every mark carries its own value. An
         unmarked number is inside its line, or has no line at all: no target applies to Routine
-        or Uncategorised. A missing one says so in words. The pale chip is one of those
-        four steps drawn without its fill, bounded by the colour that fill uses: a rule fires on
-        most rows that breach, and a field of solid blocks would outshout the table.
+        or Uncategorised. A missing one says so in words.
+        {/* The pale chip's sentence is the CALLER'S, and there is none at all when the
+            caller draws no quiet mark: on a surface with no pale chip on it, a sentence
+            explaining pale chips is one more mark with no referent. */}
+        {quiet.length > 0 && ' A pale chip is one of those four steps drawn without its fill, ' +
+          `bounded by the colour that fill uses: ${quiet.map((m) => m.why).join('; ')}.`}
       </p>
     </div>
   )

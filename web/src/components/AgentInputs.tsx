@@ -19,7 +19,14 @@ import type { Observation } from '../lib/types'
  *  (coordinator/app/priority.py:158-162). The ward is drawn after that, never
  *  before.
  *
- *  WHAT WAS READ IS A CITATION, NEVER A GUESS.
+ *  WHAT WAS READ IS A CITATION, NEVER A GUESS -- AND IT CARRIES ITS DATE.
+ *
+ *  The capacity evidence is served date-blind: core.bed_status and
+ *  core.clinic_sessions are read latest-first with no date predicate, so all 14
+ *  hospital-days get the SAME 2026-08-30 ward snapshot and the same clinic
+ *  series ending 2026-08-28. On any day but 2026-08-30 the figures in this lane
+ *  are therefore dated FORWARD of the day selected, and they used to print
+ *  undated. CapacityAsOf says so now, in the Overview's own words.
  *
  *  `citedSession ?? newest` used to stand where readDate is computed. With no
  *  citation to hand it substituted the newest session in the series, and the
@@ -107,11 +114,23 @@ const dateShort = (s: string) =>
   new Date(s).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })
 const stamp = (s: string | null) =>
   s ? new Date(s).toLocaleString('en-IE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
+/** The Overview's as-of formatter (Overview.tsx:131-132), copied so the two
+ *  surfaces print one date one way. */
+const longDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })
+/** The calendar day a timestamp falls on, as the API writes dates -- and null
+ *  when it does not write one. Overview.tsx:138 can slice the same ten
+ *  characters unguarded because /operations types its snapshot non-null; here
+ *  `snapshot_datetime` is nullable, and slicing anything else would manufacture
+ *  a "day" to compare the selected date against, which is a guess. */
+const DAY_RE = /^\d{4}-\d{2}-\d{2}(?:$|[T ])/
+const dayOf = (s: string | null | undefined): string | null =>
+  s != null && DAY_RE.test(s) ? s.slice(0, 10) : null
 
 export function AgentInputs({
   obs, recordedTotal, agentTotal, when, ageDays, stats, cited, applied,
   urgencyScore, capacityScore, capacityDetail, capacity, citedWard, citedSession,
-  specialty, alpha, peers,
+  specialty, alpha, peers, date,
 }: {
   obs: Observation | undefined
   recordedTotal: number | null
@@ -133,6 +152,11 @@ export function AgentInputs({
   /** How many referrals carry this exact capacity score, and how many are in
    *  this specialty. Counted from the decision, not asserted. */
   peers: { same: number; inSpecialty: number } | null
+  /** The hospital-day selected in the top bar. The capacity evidence below is
+   *  served date-blind, so this is the only thing that can date it -- and it is
+   *  used for NOTHING else: no figure here is fetched, filtered or scored by
+   *  it. */
+  date: string
 }) {
   const wards = capacity?.wards ?? []
   const primary = wards.find((w) => w.ward_id === citedWard)
@@ -238,6 +262,10 @@ export function AgentInputs({
             </p>
           )}
 
+          {/* Dated before it is drawn: the ward panel and the clinic series
+              below are the same rows on every hospital-day. */}
+          <CapacityAsOf ward={primary} sessions={sessions} selected={date} />
+
           {primary ? (
             <WardPanel w={primary} pressure={wp}
                        read={citedWard != null
@@ -328,6 +356,87 @@ export function AgentInputs({
   )
 }
 
+/** THE AS-OF STATEMENT, borrowed whole from the Overview.
+ *
+ *  /api/context is not keyed by hospital-day: it returns the same
+ *  2026-08-30T20:00:00 ward snapshot and the same five sessions ending
+ *  2026-08-28 whatever day is selected. So on 2026-08-24 this lane drew a ward
+ *  reading taken six days LATER than the day selected, and four clinic sessions
+ *  that had not been held, with nothing on the page saying so. The Overview
+ *  flags exactly that at SEV_INTEGRITY on its ward and clinic panels
+ *  (Overview.tsx:497-524, placed at :704, :1218 and :1374); this is the same
+ *  panel, the same chip and the same sentence, down to the class names, because
+ *  a reader who opens both surfaces must find ONE fact stated once rather than
+ *  two phrasings of it.
+ *
+ *  On the default day, 2026-08-30, the snapshot IS the day selected and no
+ *  session is dated after it, so this renders nothing and the lane is unchanged.
+ *
+ *  Only sessions dated AFTER the day selected are named. A series running up to
+ *  the selected day is an ordinary record of clinics already held and is not a
+ *  date problem; a session dated after it has not happened.
+ *
+ *  A snapshot with no readable date is an ABSENCE of information, not a match:
+ *  it is said in words rather than assumed to be the day selected. No
+ *  hospital-day is inferred from the snapshot either -- /operations is keyed by
+ *  hospital AND day, this component has no hospital, and a day guessed from the
+ *  evidence being dated is the same guess twice. */
+function CapacityAsOf({ ward, sessions, selected }: {
+  /** The ward drawn below this line, and the only one it speaks for. */
+  ward: CapacityWard | undefined
+  sessions: ClinicSession[]
+  selected: string
+}) {
+  const snapDay = ward ? dayOf(ward.latest_bed_status?.snapshot_datetime) : null
+  const undated = ward != null && snapDay == null
+  const wardOff = snapDay != null && snapDay !== selected
+  const ahead = sessions.map((s) => s.session_date).filter((d) => d > selected)
+  if (!undated && !wardOff && ahead.length === 0) return null
+
+  const days = [...new Set(snapDay != null && wardOff ? [snapDay, ...ahead] : ahead)].sort()
+  const span = days.length === 0 ? null
+    : days.length === 1 ? longDate(days[0])
+      : `${longDate(days[0])} to ${longDate(days[days.length - 1])}`
+  const both = wardOff && ahead.length > 0
+  // The subject names exactly what the span covers and no more. A series
+  // running from before the selected day into the days after it is PARTLY
+  // dated forward, and "the clinic sessions below are as of ..." would then be
+  // a claim about the past sessions too, which is false.
+  const clinics = ahead.length === sessions.length
+    ? 'the clinic sessions below'
+    : `${ahead.length} of the ${sessions.length} clinic sessions below`
+  const what = both ? `The ward figures and ${clinics}`
+    : wardOff ? 'The ward figures below'
+      : clinics.charAt(0).toUpperCase() + clinics.slice(1)
+  // Overview's sentence is borrowed word for word; only the verb agrees with
+  // the subject, which is singular in the one case where a lone clinic session
+  // is dated forward and no ward is.
+  const verb = !wardOff && ahead.length === 1 ? 'is' : 'are'
+  const source = both
+    ? 'core.bed_status and core.clinic_sessions are read latest-first with no date filter, so every hospital-day is served this same snapshot and this same series.'
+    : wardOff
+      ? 'core.bed_status is read latest-first with no date filter, so every hospital-day is served this same snapshot.'
+      : 'core.clinic_sessions is read latest-first with no date filter, so every hospital-day is served this same series.'
+
+  return (
+    <div className="ov-asof is-off">
+      <SevChip sev={SEV_INTEGRITY}>
+        <CalendarDays size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden />
+        {span ? <span className="num">{span}</span> : 'no snapshot date'}
+      </SevChip>
+      <span>
+        {undated && (
+          <>
+            The ward figures below carry no snapshot date this page can read, so it cannot be
+            said whether they were taken on {longDate(selected)}, the day selected above.{' '}
+          </>
+        )}
+        {span && <>{what} {verb} as of {span}, not {longDate(selected)}, the day selected above. {source}</>}
+      </span>
+    </div>
+  )
+}
+
 /** Whether this ward's snapshot is the one the capacity agent cited -- and if
  *  it is not, WHY it is not. Four states, because they are four different
  *  claims and only one of them is true on a day nothing ran. */
@@ -372,8 +481,10 @@ const WARD_READ: Record<WardRead, string> = {
  *
  *  The ward's nominal establishment is /operations' summed `nominal_beds`, and
  *  it is deliberately absent rather than approximated: /operations is keyed by
- *  hospital-day and this component is given neither a hospital nor an as-of
- *  date. Substituting it here would not have removed the contradiction anyway
+ *  hospital AND day, and while `AgentInputs` now takes the selected date so the
+ *  lane can date its evidence (CapacityAsOf above), it is given no hospital and
+ *  neither is this panel. Substituting it here would not have removed the
+ *  contradiction anyway
  *  -- W-9001-02 is 91 occupied against a nominal 90, over its establishment on
  *  surge beds. 91 of the 92 recorded is the only pair that reconciles. */
 function WardPanel({ w, read, pressure }: {
