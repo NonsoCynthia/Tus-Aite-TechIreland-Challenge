@@ -96,9 +96,13 @@ const NTPF_BAND_ROWS = [
 const NTPF_BAND_TOTAL = NTPF_BAND_ROWS.reduce((a, b) => a + b.n, 0)
 const NTPF_BANDS = NTPF_BAND_ROWS.map((b) => ({ ...b, share: b.n / NTPF_BAND_TOTAL }))
 
-/** dataset/out/referral_daily.csv: 70,022 rows, and `removal_date` is null in
- *  every one of them. The list in this dataset only ever accretes. */
-const DAILY_ROWS = 70_022
+/* DAILY_ROWS lived here: 70,022, the row count of dataset/out/referral_daily.csv,
+   printed as the evidence that nothing ever leaves this list. That file is the
+   GENERATOR's output and is not what gets loaded -- the sample profile puts
+   8,161 rows in core.referral_daily, 4,063 of them at 9001 -- so the screen was
+   citing a figure 8.6x the data it was drawing, and would have drifted again on
+   any reload. The count now comes from /api/hospital-days, which this panel
+   already fetches, so it follows the data and needs no second request. */
 
 /** How many day-columns the intake chart will draw. Past this the chart scrolls
  *  and the panel says how many of the series it is showing: 59 columns in a
@@ -997,11 +1001,33 @@ function IntakePanel({ days, date }: {
       : `${fmt(list.length)} days holding a cohort`
     : undefined
 
+  // The evidence for the claim above the chart. Both figures come from
+  // core.referral_daily on the response this panel already has. Either being
+  // null means the read failed, and a failed read is not the finding "none were
+  // removed" -- so the line is dropped rather than printed as a nought.
+  const rowsHeld = days.data?.referral_days
+  const removed = days.data?.removed
+  const intakeEvidence = rowsHeld == null || removed == null
+    ? undefined
+    : removed === 0
+      ? `${fmt(rowsHeld)} referral-days are recorded for this hospital, and not one of them carries a removal date.`
+      : `${fmt(rowsHeld)} referral-days are recorded for this hospital, and ${fmt(removed)} carry a removal date, so a rise in the counts above is not intake on its own.`
+
+  // The claim follows its own evidence rather than standing over it. "Nothing
+  // has ever left this list" was written unconditionally, so the day a removal
+  // appeared in the data the sentence would have been false with nothing to
+  // catch it, which is the same fault as the constant it replaced.
+  const intakeClaim = removed == null
+    ? 'Net change per day. Whether anything has left this list could not be read.'
+    : removed === 0
+      ? 'Net change per day is intake: nothing has ever left this list.'
+      : 'Net change per day is arrivals minus departures: some referrals have left this list.'
+
   return (
     <Panel icon={TrendingUp} title="Intake" note={note}
-           cite="Net change per day is intake: nothing has ever left this list."
-           citeLabel="how intake is counted"
-           citeMore={`dataset/out/referral_daily.csv holds ${fmt(DAILY_ROWS)} rows and removal_date is null in every one of them.`}>
+           cite={intakeClaim}
+           citeLabel={intakeEvidence ? 'how intake is counted' : undefined}
+           citeMore={intakeEvidence}>
       <PanelState q={days}>
         {!first && <p className="ov-quiet">No day in this hospital's history holds a cohort.</p>}
         {first && last && (

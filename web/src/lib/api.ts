@@ -125,6 +125,15 @@ export const api = {
       runnable: string | null
       today: string
       today_has_cohort: boolean
+      /** How many referral-day rows this hospital holds, and how many carry a
+          removal date. The Intake panel reads a rise in the counts above as
+          arrivals, which is only honest if nobody ever leaves, and these two are
+          that claim's evidence.
+          NULL means the read FAILED, not that the answer is zero: the panel
+          drops the line rather than printing a nought as though it were a
+          finding. */
+      referral_days: number | null
+      removed: number | null
     }>(`/api/hospital-days/${hospital}`),
 
   refreshDays: async (hospital: string) => {

@@ -358,6 +358,23 @@ if older:
           len(get(f"/api/cohort/{HOSP}/{probe}")["referrals"]) != len(rows),
           "an older day should hold fewer referrals than the newest")
 
+print("\n18. the Intake panel's claim is evidenced from the data, not from a file")
+# The panel reads a rise in the day counts as arrivals, which is only honest if
+# nobody ever leaves. That used to be evidenced by a constant -- 70,022, the row
+# count of the GENERATOR's output file, while the loaded table holds 8,161 -- so
+# the screen cited a figure 8.6x the data it drew. These two now travel on the
+# response the panel already fetches.
+#
+# Deliberately NOT pinned to a row count: it follows the profile, and pinning it
+# is the exact failure being fixed. What is pinned is that the fact is READABLE
+# and that it says what the visible claim says.
+hd = get(f"/api/hospital-days/{HOSP}")
+check("the referral-day count is served, not typed in",
+      isinstance(hd.get("referral_days"), int) and hd["referral_days"] > 0,
+      f"referral_days={hd.get('referral_days')!r} (null means the read failed)")
+check("nothing has left this list, which is what the panel claims",
+      hd.get("removed") == 0, f"removed={hd.get('removed')!r}")
+
 print(f"\n{'=' * 62}\n  {len(ok)} passed, {len(failed)} failed")
 if failed:
     print("  FAILED: " + "; ".join(failed))

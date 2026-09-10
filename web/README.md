@@ -179,12 +179,8 @@ matters. **No clinical figure is one of them:** every wait, breach, score, ward 
 on screen is fetched at runtime.
 
 The first kind describes the outside world, and each would go out of date quietly: nothing breaks, no test
-fails, the figure on screen is simply wrong. There are three.
+fails, the figure on screen is simply wrong. There are two.
 
-- **`DAILY_ROWS = 70_022`** at `src/surfaces/Overview.tsx:101`. The row count of the intake file
-  `dataset/out/referral_daily.csv`, printed on screen as a fact about the data. **No endpoint serves this number
-  today**, so there is nothing to check it against and nothing to notice when it changes. This needs addressing:
-  either an endpoint that counts the file, or the claim comes off the screen.
 - **The national waiting-list figures** at `src/surfaces/Overview.tsx:82`: snapshot date, totals, four band
   counts. The source is republished monthly. An earlier hand-typed total had drifted by 1,278 people, which is
   why the total on screen is now derived from the four counts rather than typed beside them.
@@ -219,7 +215,7 @@ the sample holds only the two largest hospitals and loses the contrast between a
   referrals, 165 with a target, 305 ranked, 7 wards. On the full set they fail on the counts. That is the
   tripwire working, but the numbers must be updated before the checks mean anything again.
 - **Targets apply to 165 of the sample's 308 referrals.** The other 143 have no target and can never be late, so
-  a count of breaches is always out of 165. `DAILY_ROWS` above is also the sample's row count.
+  a count of breaches is always out of 165.
 
 Everything else follows the data: hospitals, the days that hold a list, target days and specialty names are read
 at runtime, so six hospitals appear with no code change. Two of the six are private sites carrying capacity and

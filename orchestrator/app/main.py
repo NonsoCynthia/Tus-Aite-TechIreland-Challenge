@@ -153,6 +153,26 @@ def hospital_days(hospital_hipe: str, window: int = 60) -> dict[str, Any]:
 
     found.sort(key=lambda x: x[0])
     days = [{"date": d, "referrals": n} for d, n in found]
+
+    # The Intake panel reads a rise in these counts as arrivals, which is only
+    # honest if nobody ever leaves. It used to evidence that with a constant --
+    # the row count of dataset/out/referral_daily.csv, 70,022 -- which is the
+    # GENERATOR's output file and not what gets loaded: the sample profile puts
+    # 8,161 rows in this table, 4,063 of them this hospital's. The screen was
+    # citing a figure 8.6x the data it was drawing. So the fact is read from the
+    # table the panel is already showing, and travels on this response because
+    # the panel already asks for it.
+    #
+    # NULL, never 0, when the read fails: query() returns [] rather than raising
+    # (sources.py), and "0 referral-days recorded, none removed" would read as
+    # evidence when it is actually a dead connection. The UI drops the line.
+    counted = query(
+        "SELECT count(*) AS referral_days, "
+        "       count(*) FILTER (WHERE removal_date IS NOT NULL) AS removed "
+        "  FROM core.referral_daily WHERE hospital_hipe = %s",
+        (hospital_hipe,))
+    intake = counted[0] if counted else {}
+
     out = {
         "hospital_hipe": hospital_hipe,
         "days": days,
@@ -160,6 +180,8 @@ def hospital_days(hospital_hipe: str, window: int = 60) -> dict[str, Any]:
         "runnable": days[-1]["date"] if days else None,
         "today": today.isoformat(),
         "today_has_cohort": any(d["date"] == today.isoformat() for d in days),
+        "referral_days": intake.get("referral_days"),
+        "removed": intake.get("removed"),
     }
     _days_cache[hospital_hipe] = out
     return out
