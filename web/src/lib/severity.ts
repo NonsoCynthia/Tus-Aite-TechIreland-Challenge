@@ -96,12 +96,17 @@ export function sevNews2Sub(score: number | null): Sev {
  *  point apart, and the drawn line is the only thing that says what the colour
  *  means. One constant, both jobs. */
 export const SAFE_OCCUPANCY = 85
+/** The step-3 boundary, exported for the same reason SAFE_OCCUPANCY is: a screen
+ *  that names a threshold in words must read it from the band that draws it. One
+ *  line in AgentInputs read SAFE_OCCUPANCY and the very next one had 95 typed
+ *  in, which is the drift the first export existed to stop. */
+export const CROWDED_OCCUPANCY = 95
 
 /** Occupancy against the safe-operating line. */
 export function sevOccupancy(pct: number | null): Sev {
   if (pct == null) return 0
   if (pct < SAFE_OCCUPANCY) return 0
-  if (pct < 95) return 1
+  if (pct < CROWDED_OCCUPANCY) return 1
   if (pct < 100) return 3
   return 4
 }

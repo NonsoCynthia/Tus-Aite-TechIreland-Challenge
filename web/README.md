@@ -1,62 +1,156 @@
 # Clinician interface
 
-The screens a clinician reads: the ranked list, one patient's evidence, the hospital
-overview, a run in progress, the decision record and the cohort graph.
+The screens a clinician reads: the hospital overview, the ranked list, one patient's evidence, a run in
+progress, the decision record and the cohort graph. React 19 and TypeScript, built by Vite, served as static
+files by the orchestrator in [`../orchestrator/`](../orchestrator/).
 
-React 19 and TypeScript, built by Vite, served as static files by the orchestrator in
-[`../orchestrator/`](../orchestrator/).
+**Nothing clinical is worked out here.** Every figure on screen arrives over `/api/*`: the ordering from
+[`../coordinator/`](../coordinator/README.md), the scores from [`../urgency-agent/`](../urgency-agent/README.md)
+and [`../capacity-agent/`](../capacity-agent/README.md). This track owns how those numbers are shown, and
+refusing to show one without the caveat that belongs to it. Three decisions taken elsewhere bind these screens,
+all recorded in `conductor/tracks/<track>/decisions.md`, where the numbering restarts per track:
 
-**Nothing clinical is worked out here.** Every figure on screen arrives over `/api/*`.
-The ordering comes from [`../coordinator/`](../coordinator/README.md), the scores from
-[`../urgency-agent/`](../urgency-agent/README.md) and
-[`../capacity-agent/`](../capacity-agent/README.md). What this track owns is how those
-numbers are shown, and refusing to show one without the caveat that belongs to it.
-
-Three decisions made on other tracks limit what these screens may say. They are recorded
-in `conductor/tracks/<track>/decisions.md`, and the numbering restarts on each track, so
-the track name matters as much as the number.
-
-- Capacity is a measure of **pressure**, not spare capacity. It sets one weight for a
-  whole hospital-day and never moves one person past another.
-  (`coordinating-agent_20260906`, ADR-007)
-- Paediatric referrals are **refused, not scored**. A refused row must never show an
-  adult NEWS2 as if it were that child's acuity, and must never be sorted on one.
-  (`explainable-agent-based-triage_20260828`, ADR-007)
-- The urgency score uses NEWS2 only, and is knowingly incomplete. 31% of Urgent
-  referrals score zero. (`explainable-agent-based-triage_20260828`, ADR-004)
+- Capacity measures **pressure**, not spare capacity: one weight for a whole hospital-day, never moving one
+  person past another. (`coordinating-agent_20260906`, decision 7)
+- Paediatric referrals are **refused, not scored**, so such a row must never show an adult NEWS2 as that child's
+  acuity, and must never be sorted on one. (`explainable-agent-based-triage_20260828`, decision 7)
+- The urgency score uses NEWS2 only and is knowingly incomplete: 31% of Urgent referrals score zero.
+  (`explainable-agent-based-triage_20260828`, decision 4)
 
 ## Get it running
 
-Before any of this you need three things: Docker running, a copy of `.env` made from
-`.env.example`, and access to the dataset. The data is **gated**: the page is public but
-the files are not, and Thabang approves each person by hand, in a browser. There is no way
-to request it from a script, and a rejected request is final. Ask first if you are unsure.
+You need Docker running, a copy of `.env` made from `.env.example`, and access to the dataset. The data is
+**gated**: the page is public but the files are not, and Thabang approves each person by hand, in a browser.
+There is no way to request it from a script, and a rejected request is final. Ask first if you are unsure.
 `dataset/docs/GETTING_THE_DATA.md` walks through it.
 
 ```bash
-# 1. From the repo root, not from web/. This starts the database, pgadmin,
-#    Oxigraph and retrieval. It does NOT start the interface. There is no
-#    `make ui` and no `make web`.
+# 1. From the repo root, not web/. Starts the database, pgadmin, Oxigraph and
+#    retrieval. It does NOT start the interface. There is no `make ui`.
 make up
 
 # 2. The interface. The bundle is compiled inside the image, so nothing you
-#    build on your own machine is used, and --build is needed every time.
+#    build on your own machine is used and --build is needed every time.
 docker compose up -d --build orchestrator
 
-# 3. Open http://localhost:8080
-#    The port comes from UI_PORT, which is not in .env or .env.example, so
-#    8080 is the only value that applies unless you set it yourself.
+# 3. Open http://localhost:8080. The port comes from UI_PORT, which is not in
+#    .env or .env.example, so 8080 applies unless you set it yourself.
 
-# 4. Optional. Live reload while you work, with the container above still up.
+# 4. Optional: live reload, with the container above still up.
 cd web && npm install && npm run dev     # serves :5173
+
+# 5. Before you push. `npm run build` runs the compiler with checking turned
+#    off, so this is the only real type check.
+./node_modules/.bin/tsc --noEmit -p tsconfig.json
 ```
 
-`npm run dev` sends `/api` calls to `127.0.0.1:8080` rather than straight to retrieval.
-Retrieval allows no cross-origin calls and the access token must never reach the browser,
-so the browser has to see the API on the same address as the page. In the container that
-is literally true: one process serves both.
+`npm run dev` sends `/api` calls to `127.0.0.1:8080` rather than straight to retrieval. Retrieval refuses calls
+that come from a different address, and the access token must never reach the browser, so the browser has to see
+the API on the same address as the page. In the container that is literally true: one process serves both.
 
-## The endpoints these screens use
+There are no unit tests, no linter and no formatter here. Standing in for them is
+`orchestrator/tests/demo_path.py`, 81 checks against the running system rather than against mocks. It starts a
+real run, so do not use it during a demo.
+
+## How it is put together
+
+```
+src/
+  main.tsx       mounts the app, loads tokens.css then app.css, sets the fetch defaults
+  App.tsx        the shell: side rail, top bar, hospital and day pickers, Run
+  tokens.css     every colour, spacing, type and motion value. Nothing else declares one
+  app.css        the shell, and every shared piece with no stylesheet of its own
+  surfaces/      one screen per file, each with its own stylesheet
+  components/    severity marks, disclosures, vitals, agent inputs, journey, compare,
+                 override, provenance, the mark
+  lib/           api calls, types, target days, the NEWS2 tables, the severity scale
+```
+
+There is no router: `App.tsx:73` holds which screen is showing as ordinary state, and the rail sets it.
+
+**A stylesheet is imported by the one module that owns it.** The rationale lives in that module's opening
+comment; the stylesheet only spends tokens. A screen takes one name prefix and one file, so `overview.css` owns
+`.ov-` and nothing else. A shared component gets its own file only when it is a primitive used on many screens,
+today `Severity` and `Aside`; the rest live in `app.css`, being composed into the shell. Load order is
+`tokens.css`, then `app.css`, then each screen's sheet as that screen is imported, which is what lets
+`patient.css` retune a shared piece in place.
+
+## The screens
+
+| screen | the question it answers |
+|---|---|
+| `Landing.tsx` | What am I looking at, and how big is it? |
+| `Overview.tsx` | What is the state of this hospital-day before I touch anything? |
+| `List.tsx` | In what order should I work, and why is each row where it is? |
+| `Patient.tsx` | Why is this person here? |
+| `Run.tsx` | What is about to happen, and did it? Opens over the page, not as a destination |
+| `CohortGraph.tsx` | What does the whole decision look like as evidence? |
+| `DecisionRecord.tsx` | What was decided, and against which rules? |
+
+`List.tsx` is the largest file here and the one to read first: nine columns wide, each row expanding in place
+into the evidence behind that position.
+
+## The design system
+
+**Colour is declared in one file.** `tokens.css` holds every value: brand constants, then the light set, then
+the dark set. Dark is not a page theme but opt in for a subtree, since the rail is dark while the table beside
+it is light. No other stylesheet holds a colour literal. The one licensed exception is in TypeScript: the graph
+library needs literal fills, so `Provenance.tsx` and `CohortGraph.tsx` carry palette objects, and `Mark.tsx`
+carries two because it draws a shape.
+
+**Five colours are reserved for the clinical categories** and mean only a category: urgent, semi-urgent,
+routine, uncategorised, outside the ranking. Red, amber and green appear nowhere else, not even for Manchester
+triage, which has its own colour vocabulary and is shown in a neutral register instead. The class names are
+assembled by joining strings in two places, `List.tsx:196` and `Patient.tsx:45`, so a plain text search for
+`cat-semiurgent` finds nothing: a tidy-up once deleted the rules on that reasoning and two categories lost
+their colour.
+
+**The severity scale is the main visual language.** One scale, four steps, every attention state rendered
+through it, so a reader learns it once.
+
+| step | word | how it is drawn |
+|---|---|---|
+| 1 | noted | a hairline |
+| 2 | attention | a tint |
+| 3 | high | a solid block |
+| 4 | severe | a solid block with a ring around it |
+
+Step 0 is not a step, it is the absence of a mark. Steps escalate by **fill area** before hue, because a solid
+block carries across a room and 11px of coloured text does not. What drives a step is always a number, never a
+category: how far past target as a multiple, how old a reading is, one vital's NEWS2 contribution, ward
+occupancy against the safe line, clinic slots booked. One band function per axis, all in `lib/severity.ts` from
+line 57. Data that does not reconcile is fixed at step 4, the loudest thing the product can say, because a
+clinician can act on a bad number.
+
+**Colour is never the only channel.** A mark always renders its own value; the step is spoken to a screen reader
+as a word plus its place in the scale (`Severity.tsx:49` gives "marked severe (4 of 4)"); fill area grows with
+the step; and the legend names the steps in words on the same screen, painted from the same code the marks use.
+
+Before changing a value: the smallest type is 11px (`tokens.css:188`) and **must not be raised**, since the
+ranked table is measured to the pixel, 1716 for nine columns (`List.tsx:153`), and one step up reflows it. There
+are no drop shadows, gradients or glows either; depth comes from four grounds and two weights of rule.
+
+## How a screen gets its data
+
+One trace: a clinician opens the ranked list, and one wait figure with its mark appears.
+
+1. `main.tsx:4-5` loads the tokens and shell styles and sets the fetch defaults: no refetch on window focus,
+   30 seconds before a value is stale, one retry.
+2. `App.tsx` holds the hospital and the day. The day is not hardcoded: it asks `/api/hospital-days/{hospital}`
+   which days hold a list, and defaults to the newest one that can be scored.
+3. `List.tsx:204-217` fires four calls, for the cohort, the operations snapshot, the decision and the overrides,
+   merging them into one row per referral with any live override spliced in. A 404 on the decision is the normal
+   "nothing has run yet" and is not retried.
+4. The row carries a wait of 871 days and category code 1. The target comes from `crtDays()` in `lib/ref.ts:33`,
+   which reads `/api/reference` and returns 28; the cohort row's own copy is a first-paint fallback only. The
+   ratio is 31.1, which `sevWaitRatio()` at `lib/severity.ts:57` turns into step 4.
+5. `List.tsx:1566` draws the cell: the number, a bar at step 4, then "31.1 times over a 28-day target" below. No
+   chip here, deliberately: the bar already carries the graded channel for that exact fact. `list.css` resolves
+   step 4 to a token and `tokens.css` resolves the token.
+
+The legend above the table paints its steps from the same code the marks use, so key and mark cannot drift.
+
+### The endpoints these screens use
 
 | path | what it carries |
 |---|---|
@@ -75,98 +169,68 @@ is literally true: one process serves both.
 | `/api/overrides` | records what a clinician did |
 | `/api/hospital-days/{hospital}/refresh` | looks again for days that hold a list |
 
-Defined in `orchestrator/app/main.py`, typed in `src/lib/api.ts`. A path matching none of
-them returns a page, not a 404, so a 200 does not prove an endpoint exists.
+Defined in `orchestrator/app/main.py`, typed in `src/lib/api.ts`. A path matching none of them returns a page,
+not a 404, so a 200 does not prove an endpoint exists.
 
-## Read this before trusting the screen
+## Things to be aware of
 
-- **An override belongs to one ranking, not to a date.** Run the agents again and you get
-  a new ranking, so earlier placements are shown as "not applied" rather than quietly
-  moved onto a list they were never made against.
-- **Targets apply to 165 of the 308 referrals.** The other 143 have no target, so they
-  can never be late. A count of breaches is always out of 165.
-- **Ward and clinic figures are the same on every day.** They are read newest-first with
-  no date filter, so each panel shows its own snapshot date and says so when they differ.
-  They must never be labelled as the selected day's.
-- **An old reading is missing information, not good news.** Its age is always shown
-  beside it, and no reassuring word is allowed to stand in for the number.
-- **Five colours are reserved for the clinical categories** and are used in exactly five
-  places. Two of those class names are assembled in code rather than written out, so a
-  search for them finds nothing. A tidy-up once deleted them and two categories lost
-  their colour.
+**Some numbers are typed into this code rather than fetched.** They fall into two kinds, and the difference
+matters. **No clinical figure is one of them:** every wait, breach, score, ward figure, rule verdict and position
+on screen is fetched at runtime.
 
-## Three numbers are typed into this code, not fetched
+The first kind describes the outside world, and each would go out of date quietly: nothing breaks, no test
+fails, the figure on screen is simply wrong. There are three.
 
-Each is correct against this repository today. Each would go out of date quietly: nothing
-breaks, no test fails, the figure on screen is simply wrong.
+- **`DAILY_ROWS = 70_022`** at `src/surfaces/Overview.tsx:101`. The row count of the intake file
+  `dataset/out/referral_daily.csv`, printed on screen as a fact about the data. **No endpoint serves this number
+  today**, so there is nothing to check it against and nothing to notice when it changes. This needs addressing:
+  either an endpoint that counts the file, or the claim comes off the screen.
+- **The national waiting-list figures** at `src/surfaces/Overview.tsx:82`: snapshot date, totals, four band
+  counts. The source is republished monthly. An earlier hand-typed total had drifted by 1,278 people, which is
+  why the total on screen is now derived from the four counts rather than typed beside them.
+- **The category-code to name map** at `src/lib/api.ts:171`. Code 3 ranks above code 2, so sorting on the raw
+  number puts Routine above Semi-Urgent: always go through `bandOf()` at `src/lib/api.ts:178`. It also has no
+  entry for code 4, "Excluded", which `/api/reference` publishes, so an excluded referral would show as
+  "Uncategorised". No code 4 exists in the data today, so that one is latent rather than live.
 
-| number | where | what makes it go stale |
-|---|---|---|
-| The national waiting-list figures | `src/surfaces/Overview.tsx:82` | The source is republished monthly. An earlier hand-typed total had already drifted by 1,278 people |
-| `DAILY_ROWS = 70_022` | `src/surfaces/Overview.tsx:101` | The row count of the intake file. Load a different data profile and it changes with nothing to notice |
-| The category-code to name map | `src/lib/api.ts:171-178` | Code 3 ranks above code 2, so sorting on the raw number puts Routine above Semi-Urgent. Always go through `bandOf()` |
+The second kind is clinical rubrics and published thresholds, which belong in code rather than in a database
+row. The NEWS2 band tables at `src/lib/news2.ts` mirror `../urgency-agent/urgency_agent/news2.py`; the 85% safe
+occupancy line is a published figure (Bagust, Place and Posnett, British Medical Journal 1999); the ward and
+clinic weights of 0.7 and 0.3 mirror the capacity agent's own settings file. These are checked rather than
+trusted: the patient page recomputes the NEWS2 total and the capacity blend from the parts, compares them with
+what the agent returned, and shows a visible warning when the two disagree.
 
-## Which slice of the data you loaded
+**An override belongs to one ranking, not to a date.** Run the agents again and you get a new ranking, so
+earlier placements show as "not applied" rather than being quietly moved onto a list they were never made against.
 
-`make load` fetches the **sample** by default: 2 hospitals and 609 referrals, about 1.3 MB.
-The full set is 6 hospitals and 5,200 referrals, about 11 MB.
+**Ward and clinic figures are the same on every day.** They are read newest first with no date filter, so each
+panel shows its own snapshot date and says so when they differ. Never label them as the selected day's.
 
-```bash
-make load FETCH_PROFILE=full
-```
+**An old reading is missing information, not good news.** Its age is always shown beside it, and no reassuring
+word may stand in for the number.
 
-The dataset track's own advice is to **use `full` for anything you show people**, because
-the sample holds only the two largest hospitals and so leaves out the contrast between a
-640-bed teaching hospital and a 110-bed district one, which is part of what the data
-exists to show. See `dataset/docs/GETTING_THE_DATA.md`.
+**Which slice of the data you loaded matters.** `make load` fetches the **sample** by default: 2 hospitals, 609
+referrals, about 1.3 MB. The full set is 6 hospitals and 5,200 referrals, about 11 MB, via
+`make load FETCH_PROFILE=full`. The dataset track's advice is to use `full` for anything you show people, since
+the sample holds only the two largest hospitals and loses the contrast between a 640-bed teaching hospital and a
+110-bed district one. Two things before you switch:
 
-Two things to know before you switch:
+- **The 81 checks in `orchestrator/tests/demo_path.py` are pinned to the sample's exact numbers**: 308
+  referrals, 165 with a target, 305 ranked, 7 wards. On the full set they fail on the counts. That is the
+  tripwire working, but the numbers must be updated before the checks mean anything again.
+- **Targets apply to 165 of the sample's 308 referrals.** The other 143 have no target and can never be late, so
+  a count of breaches is always out of 165. `DAILY_ROWS` above is also the sample's row count.
 
-- **The 81 checks in `demo_path.py` are pinned to the sample's exact numbers**: 308
-  referrals, 165 with a target, 305 ranked, 7 wards, and so on. On the full set they fail
-  on the counts. That is the tripwire working as intended, not a broken system, but the
-  numbers have to be updated before the checks mean anything again.
-- **`DAILY_ROWS` in `src/surfaces/Overview.tsx:101` is the sample's row count** and is
-  typed in, so it will be quietly wrong until someone changes it.
+Everything else follows the data: hospitals, the days that hold a list, target days and specialty names are read
+at runtime, so six hospitals appear with no code change. Two of the six are private sites carrying capacity and
+no referrals by design, and picking one shows a short screen saying so rather than an empty list.
 
-Everything else follows the data. The hospital list, the days that hold a list, the target
-days and the specialty names are all read at runtime, so six hospitals appear without any
-code change. Two of the six are private sites that carry capacity and no referrals by
-design: picking one shows a short screen saying so, rather than an empty list.
-
-## Layout
-
-```
-src/
-  App.tsx        the shell: side rail, top bar, hospital and day pickers, Run
-  tokens.css     every colour, spacing and motion value. No colour is written anywhere else
-  surfaces/      one screen per file
-  components/    the pieces screens share: vitals, agent inputs, severity marks, Aside
-  lib/           api calls, types, target days, NEWS2 tables, the severity scale
-```
-
-## Checks
-
-```bash
-cd web
-./node_modules/.bin/tsc --noEmit -p tsconfig.json   # the real type check
-npm run build
-python3 ../orchestrator/tests/demo_path.py          # 81 checks, needs the stack running
-```
-
-**`npm run build` does not fail on a type error.** It runs the compiler with checking
-turned off, so run the first command yourself.
-
-**There are no unit tests, no linter and no formatter** in this folder. What stands in for
-them is `demo_path.py`, which makes 81 checks against the running system rather than
-against mocks, plus the review record in `BUILD_LEDGER.md`. It starts a real run, so do
-not use it during a demo.
-
-## More documentation
+## Where to look next
 
 | | |
 |---|---|
 | [BUILD_LEDGER.md](BUILD_LEDGER.md) | What was built and what was found: every task with its evidence, every review finding, and what was deliberately left alone |
 | [DESIGN_PACK.md](DESIGN_PACK.md) | The full interface specification: screens, components, exact wording, the data contract. Where it and this file disagree, it wins |
 | [`../coordinator/README.md`](../coordinator/README.md) | What produced the order these screens draw |
+| [`../urgency-agent/README.md`](../urgency-agent/README.md) | Where the NEWS2 tables mirrored in `src/lib/news2.ts` come from |
 | [`../retrieval/README.md`](../retrieval/README.md) | The service the orchestrator reads from |

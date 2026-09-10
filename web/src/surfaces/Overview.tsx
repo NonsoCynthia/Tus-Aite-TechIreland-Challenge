@@ -1280,7 +1280,7 @@ function ClinicPanel({ ops, reference, d, date }: {
              : undefined}
            cite="The agent read one session per clinic. Every other session in the series is context and was not scored."
            citeLabel="why the clinic is the constraint"
-           citeMore={'DATASET_README.md:623: "most outpatient referrals need a clinic appointment, not a bed, so this is where the real constraint usually sits".'}>
+           citeMore={'DATASET_README.md:625: "most outpatient referrals need a clinic appointment, not a bed, so this is where the real constraint usually sits".'}>
       <PanelState q={ops}>
         <AsOf what="Cited clinic sessions" taken={cited} selected={date}
               source="core.clinic_sessions is read latest-first with no date filter, so every hospital-day is served this same series." />

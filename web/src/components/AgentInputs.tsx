@@ -1,6 +1,6 @@
 import { BedDouble, CalendarDays, Stethoscope, TriangleAlert } from 'lucide-react'
 import { Vitals, type AgeStats } from './Vitals'
-import { SAFE_OCCUPANCY, SEV_INTEGRITY, sevOccupancy } from '../lib/severity'
+import { CROWDED_OCCUPANCY, SAFE_OCCUPANCY, SEV_INTEGRITY, sevOccupancy } from '../lib/severity'
 import { SevBar, SevChip } from './Severity'
 import { Aside } from './Aside'
 import type { Observation } from '../lib/types'
@@ -508,7 +508,7 @@ function WardPanel({ w, read, pressure }: {
   // fill is never the only channel and the threshold is never implied.
   const state = sev === 0 ? null
     : sev === 1 ? `past the ${SAFE_OCCUPANCY}% safe line`
-      : sev === 3 ? 'past 95%'
+      : sev === 3 ? `past ${CROWDED_OCCUPANCY}%`
         : 'no free bed'
 
   return (
