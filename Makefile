@@ -23,7 +23,8 @@ RATIONALE_STYLE ?= technical
 .PHONY: up down build migrate seed fetch load generate calibrate verify \
         kg-views retrieval-build retrieval-test retrieval-lint retrieval-typecheck \
         urgency-run capacity-run coordinator-run rationale-build rationale-run \
-        rationale-test rationale-lint rationale-typecheck rationale-check demo-run \
+        rationale-api-up rationale-api-down rationale-test rationale-lint \
+        rationale-typecheck rationale-check demo-run \
         dataset-test test reset psql logs volumes
 
 ## --- Bring the stack up ---
@@ -118,6 +119,12 @@ coordinator-run:
 
 rationale-build:
 	docker compose build rationale
+
+rationale-api-up:
+	docker compose up -d rationale-api
+
+rationale-api-down:
+	docker compose rm -f -s rationale-api
 
 rationale-run:
 	docker compose run --rm rationale \

@@ -120,6 +120,30 @@ services:
       retrieval:
         condition: service_started
 
+  rationale-api:
+    build:
+      context: .
+      dockerfile: rationale/Dockerfile
+    container_name: triage_rationale_api
+    profiles: ["api"]
+    entrypoint:
+      [
+        "uvicorn",
+        "rationale.app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8010",
+      ]
+    environment:
+      RETRIEVAL_BASE_URL: http://retrieval:8000
+      RETRIEVAL_BEARER_TOKENS: ${RETRIEVAL_BEARER_TOKENS}
+    ports:
+      - "${RATIONALE_PORT:-8010}:8010"
+    depends_on:
+      retrieval:
+        condition: service_started
+
 volumes:
   db_data:
   pgadmin_data:

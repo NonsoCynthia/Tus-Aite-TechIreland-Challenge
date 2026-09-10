@@ -13,17 +13,42 @@ The `rationale/` package now contains:
 
 | File | Purpose |
 |---|---|
+| `app/main.py` | FastAPI wrapper for frontend/backend integration. |
 | `client.py` | Calls the retrieval service with the shared bearer token. |
 | `config.py` | Reads the repo-root `.env` and finds retrieval settings. |
 | `models.py` | Defines `EvidenceItem`, `EvidencePack`, and `Rationale`. |
-| `evidence_pack.py` | Converts `GET /decisions/...` responses into evidence packs. |
+| `evidence_pack.py` | Converts retrieval decision/evidence responses into evidence packs. |
 | `render.py` | Deterministically renders technical audit text or clinician prose from cited evidence. |
 | `cli.py` / `__main__.py` | Runs rationale generation from the command line. |
-| `tests/` | Unit tests for packing, rendering, config, client, and CLI behavior. |
+| `tests/` | Unit tests for packing, rendering, config, client, CLI behavior, and API behavior. |
 
-The first version is deliberately deterministic. An LLM can be added later as a
+The current version is deliberately deterministic. An LLM can be added later as a
 wording layer, but only after this evidence pack exists; the model should receive
 the evidence bundle and rewrite it, not decide which evidence matters.
+
+## Current Implementation State
+
+Implemented:
+
+- CLI rationale generation with `python -m rationale` or `make rationale-run`.
+- Docker Compose support for the CLI through the `rationale` service.
+- HTTP API support through the `rationale-api` service for frontend/backend integration.
+- `technical` output for audit/debug review, including cited graph node IRIs and resolved
+  properties.
+- `clinician` output for readable prose, hiding graph node IDs from the visible text while keeping
+  `citation_iris` in JSON responses for traceability.
+- Direct single-placement rationale lookup through retrieval's
+  `GET /evidence/{hospital}/{date}/{pathway}` endpoint, avoiding full-decision timeouts.
+- CPC/CRT evidence resolution aligned with the KG by using `referral_state_valid_from` for
+  `ReferralState` citations.
+- Unit tests for client behavior, evidence packing, rendering, CLI behavior, and the API wrapper.
+
+Not implemented yet:
+
+- LLM rewriting or prompt-cached wording.
+- A clinician web UI.
+- User-facing authentication/authorization on the rationale API. The API is currently intended for
+  local/internal Compose use and calls retrieval with the shared retrieval bearer token.
 
 ## How It Works
 
@@ -40,11 +65,16 @@ EvidencePack
         |
         v
 deterministic rationale text
+        |
+        +--> CLI output
+        |
+        +--> HTTP JSON for frontend integration
 ```
 
-Every evidence sentence includes the cited graph node IRI returned by the
-retrieval service. That keeps the rationale auditable: each claim can be traced
-back to the node that supports it.
+The technical style includes the cited graph node IRI returned by the retrieval service in the
+visible text. The clinician style hides those node IDs from the prose, but JSON output and API
+responses still include `citation_iris` so each claim can be traced back to the supporting graph
+node.
 
 ## Rationale Layer Change
 
@@ -63,18 +93,19 @@ The upstream coordinator/retrieval path was also aligned for rationale evidence:
 `referral_state_valid_from` in cohort rows, and the coordinator uses it for `referral_state` citations.
 That matches the KG's `ReferralState` IRI template and lets CPC/CRT rationale evidence resolve.
 
-## Current Collaborator Status
+## Collaborator Notes
 
-The rationale layer is implemented as a deterministic CLI, not an LLM service. It reads resolved
-evidence from retrieval, builds one evidence pack per ranked placement, and renders either technical
-audit output or clinician-facing prose. The default style is `technical`; pass `--style clinician` for
-plain prose suitable for review.
+The rationale layer is implemented as a deterministic Python package with both a CLI and a small
+FastAPI wrapper. It reads resolved evidence from retrieval, builds one evidence pack per ranked
+placement, and renders either technical audit output or clinician-facing prose. The default style is
+`technical`; pass `--style clinician` for plain prose suitable for review.
 
 What has been done:
 
 - Added the `rationale/` package with a retrieval client, evidence-pack models, renderer, CLI, tests,
   and this README.
-- Added `rationale/Dockerfile` and a `docker compose run --rm rationale ...` workflow for teammates.
+- Added `rationale/Dockerfile`, a `docker compose run --rm rationale ...` workflow for teammates,
+  and a `rationale-api` Compose service for frontend/backend integration.
 - Changed rationale `--pathway` mode to call `GET /evidence/{hospital}/{date}/{pathway}` directly, so
   it avoids full-decision timeouts on larger ranked lists.
 - Changed retrieval cohort output to include `referral_state_valid_from`.
@@ -212,6 +243,50 @@ Return machine-readable output:
 
 ```bash
 python -m rationale --hospital 9004 --as-of 2026-08-30 --format json
+```
+
+## Run As An HTTP API
+
+Use the API when another application, such as the planned clinician frontend, needs rationale text
+over HTTP.
+
+Start the service from the repo root:
+
+```bash
+make rationale-api-up
+```
+
+The API listens on `http://localhost:${RATIONALE_PORT:-8010}`. The main endpoint is:
+
+```http
+GET /rationale/{hospital_hipe}/{as_of_date}/{pathway_number}?style=clinician
+```
+
+Example:
+
+```bash
+curl "http://localhost:${RATIONALE_PORT:-8010}/rationale/9001/2026-08-30/PW-9001-000007?style=clinician"
+```
+
+Response shape:
+
+```json
+{
+  "hospital_hipe": "9001",
+  "as_of_date": "2026-08-30",
+  "pathway_number": "PW-9001-000007",
+  "style": "clinician",
+  "text": "Referral PW-9001-000007 is shown for clinician review...",
+  "citation_iris": [
+    "referral-state/9001/PW-9001-000007/2026-08-25"
+  ]
+}
+```
+
+Stop it with:
+
+```bash
+make rationale-api-down
 ```
 
 ## Test It

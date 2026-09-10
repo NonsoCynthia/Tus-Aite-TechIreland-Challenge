@@ -93,9 +93,9 @@ Implementation tools: Python 3.12, SPARQL over Oxigraph, rdflib/httpx.
 - Names the exact urgency signals, capacity constraints, CPC category, and CRT status.
 - Prevents the language model from changing scores, changing rank, or introducing unsupported facts.
 
-Current implementation tools: Python 3.12, httpx, deterministic template rendering. Planned wording
-layer: Anthropic Python SDK, `claude-opus-5`, prompt caching, Message Batches API for bulk validation
-runs.
+Current implementation tools: Python 3.12, FastAPI, httpx, Docker Compose, deterministic template
+rendering. Planned wording layer: Anthropic Python SDK, `claude-opus-5`, prompt caching, Message
+Batches API for bulk validation runs.
 
 ### 8. Clinician Interface
 
@@ -160,7 +160,7 @@ coordinator/ ranked list + Decision/cites triples
 retrieval/ FastAPI mediator over Postgres + Oxigraph
         |
         v
-rationale/ technical audit output or clinician prose
+rationale/ CLI + HTTP API for technical audit output or clinician prose
         |
         v
 planned clinician interface
@@ -183,7 +183,7 @@ Clinician accept/reorder/override, logged back to graph
 | Graph client/building | rdflib, httpx |
 | Simulation | SimPy |
 | Data/calibration | pandas, numpy, Pydantic v2 |
-| LLM rationale layer | Anthropic Python SDK, `claude-opus-5` |
+| Rationale layer | FastAPI, httpx, deterministic renderer; LLM wording layer planned |
 | Dependency management | uv |
 | Local services | Docker Compose |
 | Testing | pytest, pytest-cov |
@@ -217,6 +217,8 @@ Docker invocations.
 | `make capacity-run` | Run the capacity agent for the same inputs. |
 | `make coordinator-run` | Post a ranked decision using the scores for that `RUN_ID`. |
 | `make rationale-run` | Render rationale output for a hospital/date, optionally one `PATHWAY`. |
+| `make rationale-api-up` | Start the rationale HTTP API for frontend/backend integration. |
+| `make rationale-api-down` | Stop and remove the rationale HTTP API container. |
 | `make demo-run` | Run urgency, capacity, coordinator, then rationale in sequence. |
 
 Common variables:
@@ -251,6 +253,13 @@ at real KG state nodes rather than using `referral_date`, which is not the `Refe
 
 Detailed rationale setup, usage, implementation notes, and collaborator status are in
 [`rationale/README.md`](rationale/README.md).
+
+For frontend integration, start the rationale API:
+
+```bash
+make rationale-api-up
+curl "http://localhost:${RATIONALE_PORT:-8010}/rationale/9001/2026-08-30/PW-9001-000007?style=clinician"
+```
 
 See `conductor/product.md`, `conductor/tech-stack.md`, and
 `conductor/tracks/explainable-agent-based-triage_20260828/spec.md` for the detailed project plan.
