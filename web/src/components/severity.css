@@ -1,0 +1,45 @@
+/* The severity scale. Values and rationale live in tokens.css; this file only
+   spends them.
+
+   The escalation is FILL AREA first: steps 1 and 2 are a hairline and a tint,
+   steps 3 and 4 are solid blocks. That is what carries across a room, and it is
+   why the two solid steps also flip their text to paper. */
+
+.sev {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 1px var(--d2); border-radius: var(--radius);
+  border: 1px solid transparent; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sev-1 { color: var(--sev-1-fg); background: var(--sev-1-bg); border-color: var(--sev-1-edge); }
+.sev-2 { color: var(--sev-2-fg); background: var(--sev-2-bg); border-color: var(--sev-2-edge); }
+.sev-3 { color: var(--sev-3-fg); background: var(--sev-3-bg); border-color: var(--sev-3-edge); }
+.sev-4 { color: var(--sev-4-fg); background: var(--sev-4-bg); border-color: var(--sev-4-edge); }
+
+/* 3 and 4 are the two that must read at distance, so they get weight as well
+   as fill -- two channels, not one. */
+.sev-3, .sev-4 { font-weight: 600; }
+
+/* `quiet` keeps the tinted register at the top two steps, for a surface that
+   already has something louder to say. The hue still escalates; only the fill
+   is withheld. */
+.sev-quiet.sev-3 { color: var(--sev-2-fg); background: var(--sev-2-bg); border-color: var(--sev-3-bg); }
+.sev-quiet.sev-4 { color: var(--sev-4-bg); background: var(--sev-2-bg); border-color: var(--sev-4-bg); }
+
+/* --- the bar ------------------------------------------------------------- */
+.sevbar {
+  position: relative; display: block; width: 100%; min-width: 40px;
+  background: var(--bg-sunk); border: 1px solid var(--rule);
+  overflow: hidden;
+}
+.sevbar-f { position: absolute; inset: 0 auto 0 0; background: var(--text-3); }
+.sevbar[data-sev="1"] .sevbar-f { background: var(--sev-1-edge); }
+.sevbar[data-sev="2"] .sevbar-f { background: var(--sev-2-edge); }
+.sevbar[data-sev="3"] .sevbar-f { background: var(--sev-3-bg); }
+.sevbar[data-sev="4"] .sevbar-f { background: var(--sev-4-bg); }
+/* the threshold, drawn over the fill so it is legible at every step */
+.sevbar-m {
+  position: absolute; top: -1px; bottom: -1px; width: 1px;
+  background: var(--text); opacity: 0.7;
+}

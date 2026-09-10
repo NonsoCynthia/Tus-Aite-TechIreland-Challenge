@@ -40,6 +40,62 @@
   --cat-routine-wash: #EDF3EF;
   --cat-uncat-wash:   #F0F1F4;
 
+  /* --- SEVERITY. Four steps, one scale, used for every "this needs attention"
+     state in the product. NOT a triage category: the reserved red/amber/green
+     above belong to CPC bands and to TrolleyGAR, and nothing else may borrow
+     them.
+
+     Why this exists. Every attention state used to be carried by a hairline:
+     the reconciliation alarm by a 3px --rule-firm edge at 1.55:1, a
+     year-old reading by a 1px dashed underline at 1.75:1, and a referral 31x
+     past target by a class that restated the base class verbatim and therefore
+     did nothing at all. None of that reads across a room, which is the whole
+     job.
+
+     What makes it legible is FILL AREA before hue. A solid block carries at
+     five metres; 11px of coloured text does not. So the steps escalate from a
+     hairline, through a tint, to a solid fill.
+
+     Both channels were solved rather than guessed, and both rise monotonically
+     -- the first draft of these values did not, which is the same fault as the
+     NEWS2 ladder they replace, whose most severe step was LESS contrasty than
+     the one below it:
+
+        step   text on its own fill     fill against the page
+        sev-1        6.27:1                   1.08:1
+        sev-2        6.67:1                   1.18:1
+        sev-3        7.04:1                   7.35:1
+        sev-4       11.07:1                  11.57:1
+
+     One honest limitation. --sev-3's fill sits within 1.1:1 of --cat-urgent in
+     LUMINANCE, because clay and the triage red are naturally close in
+     lightness; they separate on saturation (23% against 69%), not brightness.
+     They are kept out of each other's registers: a band chip is an 8px swatch
+     beside its name, a severity mark is a filled block carrying a numeral. Do
+     not put them side by side in the same shape.
+
+     The hue is clay, the brand's own accent, darkened rather than reddened.
+     --sev-4 is a brown at 29% saturation; --cat-urgent is a red at 69%. They
+     are not mistakable for one another.
+
+     Every use pairs the step with its number or its word. Colour is never the
+     only channel. */
+  --sev-1-fg:   #545B6E;   /* noted      text 6.27  fill-vs-page  1.08  hairline */
+  --sev-1-bg:   #F7F6F2;
+  --sev-1-edge: #C9C3B7;
+
+  --sev-2-fg:   #664C40;   /* attention  text 6.67  fill-vs-page  1.18  tinted   */
+  --sev-2-bg:   #F3EBE6;
+  --sev-2-edge: #C9AB9B;
+
+  --sev-3-fg:   #FAFAF8;   /* high       text 7.04  fill-vs-page  7.35  SOLID    */
+  --sev-3-bg:   #6B5044;
+  --sev-3-edge: #6B5044;
+
+  --sev-4-fg:   #FAFAF8;   /* severe     text 11.07 fill-vs-page 11.57  SOLID    */
+  --sev-4-bg:   #47352D;
+  --sev-4-edge: #47352D;
+
   /* --- 2. LIGHT: every working surface ------------------------------------ */
   --bg:         #FAFAF8;   /* the page                                  */
   --bg-sunk:    #F2F1EC;   /* a well: table headers, inset strips       */
@@ -127,6 +183,24 @@
   --cat-semi-wash:    rgba(138, 90, 18, 0.20);
   --cat-routine-wash: rgba(47, 93, 69, 0.20);
   --cat-uncat-wash:   rgba(90, 97, 114, 0.24);
+
+  /* Severity on ink. The two solid steps stay solid and gain lightness rather
+     than losing it, because on a dark ground a darker fill would vanish. */
+  --sev-1-fg:   #A9B0C6;   /* text 6.56  fill-vs-ground  1.27 */
+  --sev-1-bg:   #1C2758;
+  --sev-1-edge: rgba(196, 182, 166, 0.32);
+
+  --sev-2-fg:   #C9AE9F;   /* text 6.90  fill-vs-ground  1.33 */
+  --sev-2-bg:   #3A2A2E;
+  --sev-2-edge: #7A5B4D;
+
+  --sev-3-fg:   #0B1436;   /* text 7.43  fill-vs-ground  7.43 */
+  --sev-3-bg:   #C0A091;
+  --sev-3-edge: #C0A091;
+
+  --sev-4-fg:   #0B1436;   /* text 11.05 fill-vs-ground 11.05 */
+  --sev-4-bg:   #E0C6B4;
+  --sev-4-edge: #E0C6B4;
 }
 
 /* --- glass. depth through blur, never light through glow. -----------------
