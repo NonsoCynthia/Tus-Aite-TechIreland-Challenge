@@ -9,7 +9,14 @@
        --cat-* below. Nothing else may use them, including MTS, which carries
        its own colour vocabulary and is therefore shown in a neutral register.
      - clay marks ONE element per composition.
-     - no gradients, glows or drop shadows. Depth comes from blur and hairlines.
+     - no gradient, glow or drop shadow on any SURFACE of the UI. No panel,
+       chip, rule, bar, button or glyph carries a blend, and every box-shadow
+       is inset. Depth comes from ground steps, hairlines and blur.
+       Two linear-gradient declarations exist in the product and neither is one
+       of those things: a hatch built from hard stops (.j-silence, app.css) and
+       a single-token alpha veil over the landing photograph (.landing-scrim,
+       app.css). Both are argued at the point of use. There is no third, and
+       nothing here licenses one.
 
    Structure, in three layers:
      1. brand constants and triage hues -- identical on every ground
@@ -33,12 +40,26 @@
   --cat-uncat:       #5A6172;   /* no category recorded  */
   --cat-outside:     #6B6257;   /* not scored, not placed */
 
-  /* Tints of the same hues, for a fill behind a label rather than a signal.
-     Held here so a component never mixes its own and drifts off the palette. */
-  --cat-urgent-wash:  #FBEEEC;
-  --cat-semi-wash:    #FAF2E4;
-  --cat-routine-wash: #EDF3EF;
-  --cat-uncat-wash:   #F0F1F4;
+  /* Four --cat-*-wash tints stood here, and four more on dark below: "for a
+     fill behind a label rather than a signal". Eight declarations, ZERO
+     consumers, so all eight are gone.
+
+     Checked the way this palette's own trap demands and not by a naive grep.
+     The only two places a cat- class name is BUILT rather than written are
+     List.tsx:195 (TAB_TOKEN) and Patient.tsx:44 (chipClass), and both
+     concatenate to .cat-urgent / .cat-semiurgent / .cat-routine /
+     .cat-uncategorised / .cat-outside -- every one of which resolves in
+     app.css:212-215 and app.css:267 to the SOLID hue, never to a wash. No .ts
+     or .tsx file calls setProperty('--...') or assembles a custom-property
+     name any other way, so there was no runtime path either.
+
+     Removed rather than left, for the same reason --lift-1/--lift-2 were
+     removed below -- and with more urgency than those had. An unused token is
+     a rule breach waiting for someone to reach for it; an unused token holding
+     a RESERVED triage hue is worse, because red/amber/green may only ever mean
+     a CPC band, so the first non-triage fill that reaches for one breaks the
+     top rule of this palette. If a tinted band fill is ever genuinely wanted,
+     add it then, with its consumer in the same commit. */
 
   /* --- SEVERITY. Four steps, one scale, used for every "this needs attention"
      state in the product. NOT a triage category: the reserved red/amber/green
@@ -158,8 +179,51 @@
   --t-section:  15px;
   --t-body:     14px;
   --t-data:     15px;   /* the primary numeral in a cell                    */
-  --t-small:    12px;   /* the floor. nothing carrying meaning goes below.  */
-  --t-micro:    11px;   /* uppercase labels ONLY, never a value             */
+  --t-small:    12px;   /* running prose, and a value read on its own       */
+  --t-micro:    11px;   /* the annotation step, and the floor. see below.   */
+
+  /* --- what --t-micro is actually for -------------------------------------
+     This token used to be labelled "uppercase labels ONLY, never a value".
+     Counted across the eight stylesheets: 126 declarations set a font-size to
+     this token, and 9 of them sit in a rule that also sets
+     text-transform: uppercase. Seven per cent. (That count is a live check --
+     it is why this paragraph does not spell the reference out, which would
+     make the grep return 127 and the number wrong on the day it was written.) Those 9 are also the ONLY
+     `text-transform: uppercase` declarations in the product, so nothing
+     inherits its way onto the honoured side of that count -- and four further
+     rules (app.css:314, overview.css:198, list.css:356, list.css:454) set
+     `text-transform: none` at this size, cancelling an inherited uppercase on
+     purpose. A rule kept 7% of the time is worse than either answer, because
+     it makes a grep for the breach useless: the breach is the norm.
+
+     So the rule is restated to match what the token does. --t-micro is the
+     ANNOTATION step: text attached to something larger that is never read on
+     its own.
+       - the uppercase eyebrow and column head (.lab, and the 8 selectors that
+         uppercase themselves)
+       - a unit or suffix beside a number  (.readout-u, .n2 .of, .lane-of)
+       - an id or a rule code              (.ev-rid, .run-id, .ov-rule-id)
+       - the text inside a chip, pill or legend key
+                                           (.chip, .pt-tag, .rule-chip, .ov-nat-w)
+       - a count or axis annotation on a figure already drawn to scale
+                                           (.pt-bar-n, .pt-bar-v, .ov-occ-n)
+       - a caption or footnote             (.pt-caption, .ov-cite, .ev-cav)
+     Uppercase was never the test. Being SECONDARY to something larger is.
+
+     The real floor for a value. 11px is the floor of the whole product: no
+     rule in any stylesheet sets a font-size below it, by token or by literal
+     (the only other sub-12px literal is list.css:905's disclosure caret, also
+     11px, which carries no text). A value MAY be set at --t-micro, and many
+     are, on the one condition the code does keep: it must be secondary. The
+     primary numeral in a cell is --t-data; a figure at --t-micro is a suffix
+     on a larger number, or an annotation on a mark already drawn to scale, or
+     a repeat of something stated at size elsewhere. Do not set a figure here
+     that appears nowhere else larger, and do not set a value smaller than the
+     label beside it.
+
+     Do NOT raise this token. The ranked table's nine columns are measured to
+     the pixel -- NINE_COL_PX = 1716 against 302 of chrome, with two exact-fit
+     widths and zero spare -- and 11px to 12px reflows it. */
   --track-wide: 0.14em; /* the wordmark's letterspacing                     */
   --track-lab:  0.08em; /* uppercase eyebrows                               */
 
@@ -204,10 +268,8 @@
   --rule-firm:  rgba(196, 182, 166, 0.32);
   --accent:     #C4B6A6;    /* taupe is the accent on dark, per the kit */
   --focus:      #C4B6A6;
-  --cat-urgent-wash:  rgba(163, 42, 30, 0.18);
-  --cat-semi-wash:    rgba(138, 90, 18, 0.20);
-  --cat-routine-wash: rgba(47, 93, 69, 0.20);
-  --cat-uncat-wash:   rgba(90, 97, 114, 0.24);
+  /* the dark half of the four --cat-*-wash tints went with the light half; see
+     the note beside the triage hues above. */
 
   /* Severity on ink. The two solid steps stay solid and gain lightness rather
      than losing it, because on a dark ground a darker fill would vanish. */

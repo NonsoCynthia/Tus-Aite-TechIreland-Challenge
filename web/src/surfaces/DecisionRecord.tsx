@@ -40,6 +40,15 @@ const WHOLE_LIST: Record<string, WholeListVerdict | undefined> = {
 /** How many override rows to draw at once, and how many each click adds. */
 const OVR_PAGE = 25
 
+/** `dec-40afec5c-a8d5-4af1-ab39-c198d24458e3` -> `dec-40afec5c`.
+ *
+ *  Only for the log's provenance column, and only because seven nowrap columns
+ *  of 40-character identifiers is a table nobody can read across. The full id
+ *  is on the cell's title, this decision's own is printed in full in .rec-meta
+ *  at the top of the page, and what the column has to do is let a reviewer see
+ *  that two rows came from two different decisions. */
+const shortDec = (id: string) => (id.length > 12 ? id.slice(0, 12) : id)
+
 /** The decision as an auditable record.
  *
  *  README feature 10 promises "evidence-backed rule-violation output for
@@ -59,6 +68,23 @@ const OVR_PAGE = 25
  *  summed into one "excluded" figure: a whole specialty leaving the list is a
  *  coverage statement, a missing observation is a data-quality incident, and
  *  adding them together loses the difference.
+ *
+ *  THE OVERRIDE LOG NAMES ITS DECISION, ROW BY ROW.
+ *
+ *  GET /api/overrides is scoped to a hospital-DAY, not to a decision, and a
+ *  hospital-day accumulates one decision per run: 30 rows came back for
+ *  9001/2026-08-30 and 29 of them were recorded against 27 other decision ids.
+ *  The log drew all 30 identically, so a From of 21 and a To of 1 -- a position
+ *  in an ordering some earlier run produced -- sat in a table on the page of
+ *  the decision that produced neither, with nothing on the row to say so. On
+ *  the one surface whose whole job is to be checkable, that is another run's
+ *  ordering presented as this one's.
+ *
+ *  Every row now carries the decision it was recorded against, and the section
+ *  states how the count splits before the table is read. Nothing is withheld:
+ *  the log is the record of what people did on this hospital-day, and dropping
+ *  the rows this decision cannot explain would make the record say less than it
+ *  knows. What it may not do is let them pass as this decision's.
  */
 export function DecisionRecord({ hospital, date, reference }: {
   hospital: string; date: string; reference: Reference | undefined
@@ -104,6 +130,17 @@ export function DecisionRecord({ hospital, date, reference }: {
   const d = dec.data
   // A 404 from /api/overrides is normal: it means nobody has acted yet.
   const ovrRows = ovr.data?.overrides ?? []
+  // Counted, never asserted, and in three groups rather than two: a row with no
+  // decision_id at all is not the same thing as a row from another decision,
+  // and a log that quietly folded the first into the second would be making up
+  // a provenance it does not have.
+  const ovrOwn = ovrRows.filter((o) => o.decision_id === d.decision_id).length
+  const ovrNone = ovrRows.filter((o) => !o.decision_id).length
+  const ovrElsewhere = ovrRows.length - ovrOwn - ovrNone
+  const ovrOtherDecisions = new Set(
+    ovrRows.filter((o) => o.decision_id && o.decision_id !== d.decision_id)
+      .map((o) => o.decision_id),
+  ).size
 
   // Every rule the coordinator tested, tallied. RULE-ORDER and RULE-TIEBREAK
   // come from the decision's own whole-list booleans, not from counting rows.
@@ -321,11 +358,40 @@ export function DecisionRecord({ hospital, date, reference }: {
           Recorded actions
           <span className="sec-note">
             agent.overrides · {fmt(ovrRows.length)}{' '}
-            {ovrRows.length === 1 ? 'action' : 'actions'}, newest first
+            {ovrRows.length === 1 ? 'action' : 'actions'} on this hospital-day, newest first
+            {ovrRows.length > 0 && <> · {fmt(ovrOwn)} against this decision</>}
           </span>
         </h2>
         {ovrRows.length > 0 ? (
           <>
+            {/* Said BEFORE the table, not under it: the numbers in From and To
+                are unreadable until a reader knows which ordering each row is
+                counting in. */}
+            <p className="p-note measure">
+              The log is scoped to this hospital-day, and a hospital-day holds one decision per
+              run.{' '}
+              <strong className="num">{fmt(ovrOwn)}</strong> of these{' '}
+              <strong className="num">{fmt(ovrRows.length)}</strong>{' '}
+              {ovrRows.length === 1 ? 'action' : 'actions'}{' '}
+              {ovrOwn === 1 ? 'was' : 'were'} recorded against{' '}
+              <span className="num">{d.decision_id}</span>, the decision on this page.
+              {ovrElsewhere > 0 && (
+                <> <strong className="num">{fmt(ovrElsewhere)}</strong>{' '}
+                  {ovrElsewhere === 1 ? 'was' : 'were'} recorded against{' '}
+                  <span className="num">{fmt(ovrOtherDecisions)}</span> earlier{' '}
+                  {ovrOtherDecisions === 1 ? 'decision' : 'decisions'} for this same hospital-day.
+                  A From and a To are positions in the ordering their own decision produced, so on
+                  those rows the two numbers name places in a list this run never built, and the
+                  rules table and the ledger above say nothing about them. They are kept because
+                  the log is the record of what people did, and they are marked because they are
+                  not this decision's.</>
+              )}
+              {ovrNone > 0 && (
+                <> <strong className="num">{fmt(ovrNone)}</strong>{' '}
+                  {ovrNone === 1 ? 'carries' : 'carry'} no decision id at all, so which ordering{' '}
+                  {ovrNone === 1 ? 'its' : 'their'} positions belong to is not on the record.</>
+              )}
+            </p>
             {/* The log is the FULL history and it was drawn in full: no slice,
                 no cap. A Reason column at white-space: normal makes a row about
                 55px, so 200 overrides is ~11,000px of table and a year of a busy
@@ -334,28 +400,56 @@ export function DecisionRecord({ hospital, date, reference }: {
             <div className="ovr-vp">
               <table className="rules ovr-log">
                 <thead>
+                  {/* Decision sits AFTER Reason on purpose. record.css wraps
+                      and width-caps the log's Reason column by position
+                      (.ovr-log td:nth-child(5)), so a column inserted ahead of
+                      it would silently hand those rules to the wrong column and
+                      leave the reasons nowrap. Provenance and clinician also
+                      belong together: they are the two columns that say who
+                      and against what. */}
                   <tr>
                     <th>When</th><th>Referral</th><th className="c-n">From</th>
-                    <th className="c-n">To</th><th>Reason</th><th>Recorded as</th>
+                    <th className="c-n">To</th><th>Reason</th><th>Decision</th>
+                    <th>Recorded as</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ovrRows.slice(0, ovrShown).map((o) => (
-                    <tr key={o.override_id}>
-                      <td className="num">{new Date(o.created_at).toLocaleString('en-IE')}</td>
-                      <td className="num">{o.pathway_number}</td>
-                      <td className="c-n num">{o.from_position ?? '—'}</td>
-                      <td className="c-n num">
-                        {o.to_position ?? '—'}
-                        {o.from_position === o.to_position && <span className="muted"> · confirmed</span>}
-                      </td>
-                      <td>{o.reason}
-                        {o.rule_warning_accepted && (
-                          <span className="warn-chip">category boundary crossed, accepted</span>)}
-                      </td>
-                      <td className="num">{o.clinician_id}</td>
-                    </tr>
-                  ))}
+                  {ovrRows.slice(0, ovrShown).map((o) => {
+                    // The one comparison the log turns on. Positions are held
+                    // in the quieter ink when it is false, so a reader scanning
+                    // the From/To columns alone cannot pick up another
+                    // ordering's numbers as this one's -- but the word in the
+                    // Decision column is what carries it, never the tone.
+                    const own = !!o.decision_id && o.decision_id === d.decision_id
+                    const pos = 'c-n num' + (own ? '' : ' muted')
+                    return (
+                      <tr key={o.override_id}>
+                        <td className="num">{new Date(o.created_at).toLocaleString('en-IE')}</td>
+                        <td className="num">{o.pathway_number}</td>
+                        <td className={pos}>{o.from_position ?? '—'}</td>
+                        <td className={pos}>
+                          {o.to_position ?? '—'}
+                          {o.from_position === o.to_position && <span className="muted"> · confirmed</span>}
+                        </td>
+                        <td>{o.reason}
+                          {o.rule_warning_accepted && (
+                            <span className="warn-chip">category boundary crossed, accepted</span>)}
+                        </td>
+                        <td className="num">
+                          {!o.decision_id ? (
+                            <span className="muted">not recorded</span>
+                          ) : own ? (
+                            <span title={o.decision_id}>this decision</span>
+                          ) : (
+                            <span className="muted" title={o.decision_id}>
+                              {shortDec(o.decision_id)} · an earlier decision
+                            </span>
+                          )}
+                        </td>
+                        <td className="num">{o.clinician_id}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

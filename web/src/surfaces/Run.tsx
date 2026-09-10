@@ -191,9 +191,25 @@ export function Run({ hospital, name, date, runnable, onClose, onSeeGraph, onSee
                       </ul>
                     ) : (
                       <ul className="run-ba-l">
+                        {/* NOT "N people are waiting".
+                            This screen can see a LIST, not a population. Every
+                            figure in this panel is counted from the cohort
+                            payload, which is a set of referral rows: the count
+                            of rows is a fact about the list, and a headcount of
+                            a waiting room is a claim about people that nothing
+                            on this screen is in a position to make. Landing.tsx
+                            made this correction in these words about this same
+                            cohort, so the two screens say the same thing about
+                            the same rows.
+
+                            It is NOT a hedge and must not become one: the count
+                            is as large, as immediate and as true as it was, and
+                            no disclaimer and no synthetic-data label goes near
+                            it. The fix is in the noun, which costs the screen
+                            nothing. */}
                         <li>
-                          <b className="num">{fmt(before.n)}</b> people are waiting. The longest has
-                          waited <b className="num">{fmt(before.longest)}</b> days.
+                          <b className="num">{fmt(before.n)}</b> referrals are on this list. The
+                          longest has waited <b className="num">{fmt(before.longest)}</b> days.
                         </li>
                         <li>
                           <b className="num">{fmt(before.withTarget)}</b> of them have a target

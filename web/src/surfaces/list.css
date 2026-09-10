@@ -787,14 +787,40 @@
 .ev-vu { font-size: var(--t-micro); color: var(--text-3); }
 
 .ev-cap { display: grid; gap: 1px; background: var(--rule); }
+/* Four tracks, one fact each: the label, the identifier, the value, the note.
+   Every row here puts its children in that order, and the one row that has
+   only three of them is named below rather than left to auto-placement.
+
+   Track 1 was 96px. "CLINIC SESSION" measures 101.7px at 11px / 600 / 0.08em
+   (.lab, tokens.css:269) in SF, the first hit in the --font-data stack on this
+   machine -- so the label the clinic-session row just added wrapped to two
+   lines while "CLINIC SERIES" (90.8px) beside it and "BED STATUS" (79.1px)
+   above it each stayed on one, which is a ragged column nobody chose. 112px
+   carries the longest of the three and leaves room for a wider substitute
+   face. It is paid for out of track 3, which has slack to spare: measured
+   against the live 9001/2026-08-30 payload, the widest value any row draws is
+   the ward line at 345.4px in a track 526px wide at the NARROWEST width this
+   grid is ever laid out at.
+
+   That narrowest width is 1056px of content, and it is a floor rather than a
+   guess: the table's min-width is 1138px on seven columns (List.tsx COL), the
+   expander's td spans the whole table, and .ev + .ev-grid's border + .ev-b +
+   this row's own padding take 82px of it. Below a 1236px viewport .lst-vp
+   scrolls sideways rather than letting the table get narrower. */
 .ev-cap-r {
-  display: grid; grid-template-columns: 96px 128px 1fr auto;
+  display: grid; grid-template-columns: 112px 128px 1fr auto;
   align-items: baseline; gap: var(--d3);
   background: var(--surface-2); padding: var(--d2) var(--d3);
 }
 .ev-cap-k { font-size: var(--t-small); color: var(--text); }
 .ev-cap-v { font-size: var(--t-small); color: var(--text-2); }
 .ev-cap-v b { color: var(--text); font-weight: 650; }
+/* The row drawn when operations has not loaded (List.tsx:2130) has three
+   children, not four: there is no identifier to print, so its value took the
+   identifier's 128px track by auto-placement and wrapped inside it -- 168px of
+   cited keys in 128px -- while the 1fr track beside it held a 170px note and
+   ~700px of nothing. It is given the two middle tracks by name instead. */
+.ev-cap-r > .lab + .ev-cap-v { grid-column: 2 / -2; }
 .ev-cap-d { font-size: var(--t-micro); color: var(--text-3); }
 .ev-cap-sum {
   margin-top: var(--d2); font-size: var(--t-micro); color: var(--text-3);
@@ -870,7 +896,34 @@
   .recon { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ev-grid { grid-template-columns: minmax(0, 1fr); }
   .ev-vitals { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .ev-cap-r { grid-template-columns: 96px 1fr; }
+  /* Two tracks, and the rows still have four children, so BOTH of the last
+     two have to be told to span. Only .ev-cap-d was, and the value then
+     auto-placed into the label track -- 96px before the change above, 112px
+     now -- and its text was squeezed there: on the ward row already, and on
+     the clinic-session row as soon as that row landed.
+
+     Working the placement through rather than trusting it (CSS Grid 8.5, and
+     the flow is sparse because nothing here is `dense`): .lab takes r1c1, the
+     identifier takes r1c2, and the cursor is left in column 2 or past it. The
+     value's definite column-start of 1 is lower than that either way, so the
+     row advances and it takes row 2 entire; the note's column-start of 1 is
+     then NOT lower than the cursor's 1, so its row advances only while it
+     overlaps -- row 2 is taken, so it lands on row 3. Three stacked full-width
+     lines, nothing squeezed, whichever way the cursor is book-kept.
+     The three-child row needs the same full-width span for the same reason.
+     Its own rule above is the more specific selector and would otherwise keep
+     2 / -2 here, so it is restated in this selector list, where an equally
+     specific declaration later in the file is the one that lands.
+
+     Worth knowing before anything else in this block is trusted: the box these
+     rules reshape does not actually get narrower here. This grid sits inside
+     the table, whose min-width holds it at no less than 1056px of content at
+     any viewport (see .ev-cap-r above), so a 1100 viewport arrives here with
+     exactly the width a 1236 one does and .lst-vp scrolls sideways instead. The squeeze was a real defect
+     at any width and is fixed; the premise under the whole query is somebody
+     else's to unpick. */
+  .ev-cap-r { grid-template-columns: 112px 1fr; }
+  .ev-cap-v, .ev-cap-r > .lab + .ev-cap-v { grid-column: 1 / -1; }
   .ev-cap-d { grid-column: 1 / -1; }
   .ev-rules li { grid-template-columns: 78px 1fr; }
   .ev-rd, .ev-rw { grid-column: 1 / -1; }

@@ -499,9 +499,21 @@ export function List({ hospital, date, reference, onOpen }: {
   }, [rows, reference])
 
   /** The state before ranking, which the client asked for by name: how many
-   *  people are waiting, and with what, so that running the agents is a step
-   *  the reader chooses rather than a screen they arrive at. Everything here is
-   *  counted from the cohort, so it is true of a day nothing has scored. */
+   *  are waiting, and with what, so that running the agents is a step the
+   *  reader chooses rather than a screen they arrive at. Everything here is
+   *  counted from the cohort, so it is true of a day nothing has scored.
+   *
+   *  WORDING. Every figure in this panel is counted off `rows`, which is the
+   *  cohort's referrals -- so the headline counts ROWS and says referrals.
+   *  Landing.tsx made the same change first and argues it at length: this
+   *  screen can see a list, not a population, and the dataset plants
+   *  PW-DEMO-06/07 (one pair of referrals across two hospitals) and
+   *  PW-COLLIDE-01 (the same pathway number at two hospitals) precisely so
+   *  that a list holding more rows than it holds people is representable.
+   *  This is NOT a hedge and must not become one: the numeral is as large and
+   *  as immediate as it was, nothing qualifies it, and the synthetic-data
+   *  label the client had removed does not come back. The fix is in the noun,
+   *  and it costs the screen nothing. */
   const pre = useMemo(() => {
     if (ranked || !rows.length) return null
     const waits = rows.map((r) => r.adjusted_wait_days ?? 0).sort((a, b) => a - b)
@@ -609,8 +621,8 @@ export function List({ hospital, date, reference, onOpen }: {
       {!ranked && pre && (
         <section className="lst-pre" aria-label="The list before any ranking">
           <h2 className="pre-h">
-            <strong className="num">{fmt(figures.onList)}</strong> people are waiting here, and
-            nothing has scored them yet.
+            <strong className="num">{fmt(figures.onList)}</strong> referrals are on this list,
+            and nothing has scored them yet.
           </h2>
           <div className="pre-figs">
             <PreFig k={`already past their target, of the ${fmt(figures.withTarget)} that have one. `
@@ -620,7 +632,7 @@ export function List({ hospital, date, reference, onOpen }: {
             <PreFig k={`days waited, median. The spread is ${fmt(pre.min)} to ${fmt(pre.max)} days.`}>
               <b className="num">{fmt(pre.median)}</b>
             </PreFig>
-            <PreFig k="the furthest past target anyone here is">
+            <PreFig k="the furthest past target any referral here is">
               {pre.worst != null && pre.worst > 1
                 ? (
                   <SevChip sev={sevWaitRatio(pre.worst)}
@@ -628,7 +640,7 @@ export function List({ hospital, date, reference, onOpen }: {
                     <b className="num">{ratioText(pre.worst)}×</b>
                   </SevChip>
                 )
-                : <span className="muted">nobody here is past a target</span>}
+                : <span className="muted">no referral here is past a target</span>}
             </PreFig>
             <PreFig k={'readings older than a year. A stale normal reading is an absence of '
               + 'information, not reassurance, so the age is graded on its own.'}>
@@ -882,7 +894,7 @@ function SortKeyLadder({ alpha, ranked, reference, ties }: {
     },
     {
       k: 'Referral date',
-      w: 'Oldest first, so two people the scores cannot separate are separated by their wait.',
+      w: 'Oldest first, so two referrals the scores cannot separate are separated by their wait.',
       rule: 'RULE-TIEBREAK',
       note: ties.exact > 0
         ? `${ties.exact} pairs here are equal at every decimal place, so priority genuinely `

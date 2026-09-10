@@ -6,9 +6,10 @@ import {
 } from 'lucide-react'
 import { api, BANDS, bandOf } from '../lib/api'
 import {
-  breachPhrase, crtDays, failed, rule, ruleStatement, specialtyFull, specialtyName,
+  breachPhrase, crtDays, failed, isRefusedPaediatric, rule, ruleStatement, specialtyFull,
+  specialtyName,
 } from '../lib/ref'
-import { SevBar, SevChip } from '../components/Severity'
+import { SevBar, SevChip, SevLegend } from '../components/Severity'
 import {
   SAFE_OCCUPANCY, SEV_INTEGRITY, sevBooked, sevBreach, sevOccupancy, sevReadingAge, type Sev,
 } from '../lib/severity'
@@ -38,20 +39,44 @@ const GAR_WORD = { G: 'Green', A: 'Amber', R: 'Red' } as const
 const ICON = 14
 
 /** NTPF Outpatient Waiting List by Speciality, OpenData_OPNational02_2026.csv,
- *  snapshot 2026-07-30, 682,279 people over the 57 non-SDC specialties.
+ *  snapshot 30/07/2026. Counted from the file itself, which is in this repo at
+ *  dataset/generator/calibration/_raw/, over EVERY row of that snapshot: 77
+ *  adult and child rows carrying 58 distinct specialty labels.
+ *
+ *  This block used to cite "682,279 people over the 57 non-SDC specialties".
+ *  There is no SDC in that file -- no such column, no such label, and nothing
+ *  marking any row as excludable. The figure was the snapshot with the two
+ *  `Small Volume Specialties` rows dropped (1,278 people; bands 1,021 / 194 /
+ *  36 / 27), which is exactly where both the 57 and the 682,279 came from. A
+ *  citation is the one thing on this page a judge can reproduce, so what is
+ *  cited is now what the file says when nothing is taken out of it.
+ *
+ *  TWO totals, because the file carries two and they disagree. Its Total
+ *  column sums to 683,553; its four band columns sum to 683,557, and 18 of the
+ *  77 rows do not add up on their own. The shares below are of the band sum,
+ *  because the bands are what they are computed from; the Total column figure
+ *  is cited beside it rather than quietly reconciled away.
  *
  *  NTPF publishes the bands in months. The day boundaries below are the ones
  *  every wait in this dataset was cut on, so bucketing this hospital on
  *  183/365/548 compares like with like rather than inventing a days-per-month
  *  constant. */
 const NTPF_SNAPSHOT = '2026-07-30'
-const NTPF_TOTAL = 682_279
-const NTPF_BANDS = [
-  { key: '0–6 months', lo: 0, hi: 183, share: 0.596263, n: 406_818 },
-  { key: '6–12 months', lo: 183, hi: 365, share: 0.225673, n: 153_972 },
-  { key: '12–18 months', lo: 365, hi: 548, share: 0.104321, n: 71_176 },
-  { key: '18 months +', lo: 548, hi: Infinity, share: 0.073743, n: 50_313 },
+/** The Total column, summed over the snapshot. */
+const NTPF_TOTAL = 683_553
+const NTPF_SPECIALTIES = 58
+const NTPF_ROWS = 77
+const NTPF_BAND_ROWS = [
+  { key: '0–6 months', lo: 0, hi: 183, n: 407_839 },
+  { key: '6–12 months', lo: 183, hi: 365, n: 154_166 },
+  { key: '12–18 months', lo: 365, hi: 548, n: 71_212 },
+  { key: '18 months +', lo: 548, hi: Infinity, n: 50_340 },
 ] as const
+/** DERIVED, never written down beside the four counts that are it: the last
+ *  hand-written copy of this figure is what drifted 1,278 people away from the
+ *  file. The shares are derived from it for the same reason. */
+const NTPF_BAND_TOTAL = NTPF_BAND_ROWS.reduce((a, b) => a + b.n, 0)
+const NTPF_BANDS = NTPF_BAND_ROWS.map((b) => ({ ...b, share: b.n / NTPF_BAND_TOTAL }))
 
 /** dataset/out/referral_daily.csv: 70,022 rows, and `removal_date` is null in
  *  every one of them. The list in this dataset only ever accretes. */
@@ -142,6 +167,19 @@ function summarise(rows: CohortReferral[]) {
 
 type SpecRow = ReturnType<typeof bySpecialty>[number]
 
+/** What /api/decision actually returns in `excluded`.
+ *
+ *  types.ts declares two fields, which is all the rest of the app reads. The
+ *  payload is the whole banded cohort row, and it carries `capacity_score`:
+ *  GET /api/decision/9001/2026-08-30 returns 0.781 on each of the three 0601
+ *  referrals. Every field picked up here is optional and is checked before it
+ *  is used, so a payload that stops carrying them degrades to "not scored"
+ *  rather than to a wrong number. */
+type ExcludedRow = Decision['excluded'][number] & Partial<{
+  specialty_hipe: string
+  capacity_score: number | null
+}>
+
 /** What the capacity agent computed, per SPECIALTY.
  *
  *  ward_pressure, clinic_pressure and capacity_score are identical for every
@@ -150,16 +188,36 @@ type SpecRow = ReturnType<typeof bySpecialty>[number]
  *  every referral in a specialty". Reading one ranking's capacity_detail and
  *  calling it the hospital's figure would be wrong; so would drawing it against
  *  a person. It is drawn against a specialty.
- */
+ *
+ *  BOTH LISTS, not just `rankings`. A specialty the urgency agent refuses (0601)
+ *  produces no ranking, so reading rankings alone made this map report the
+ *  capacity agent as absent for a specialty it had scored -- and that score is
+ *  not idle: ranking.py:147-155 builds the distinct-capacity-by-specialty dict
+ *  from every banded referral, "not about which referrals have an urgency score
+ *  yet", so 0601's 0.781 is one of the seven numbers whose mean IS this
+ *  decision's scarcity (0.778) and therefore its alpha. `placed` is what the two
+ *  sources differ on, and the table says which of the two it is looking at:
+ *  an excluded row carries the score without the ward/clinic split behind it. */
 function agentCapacity(d: Decision | undefined) {
-  const m = new Map<string, { ward: number | null; clinic: number | null; score: number }>()
+  const m = new Map<string, {
+    ward: number | null; clinic: number | null; score: number; placed: boolean
+  }>()
   for (const r of d?.rankings ?? []) {
     if (m.has(r.specialty_hipe)) continue
     m.set(r.specialty_hipe, {
       ward: r.capacity_detail?.ward_pressure ?? null,
       clinic: r.capacity_detail?.clinic_pressure ?? null,
       score: r.capacity_score,
+      placed: true,
     })
+  }
+  for (const e of (d?.excluded ?? []) as ExcludedRow[]) {
+    const code = e.specialty_hipe
+    if (code == null || m.has(code) || typeof e.capacity_score !== 'number') continue
+    // No capacity_detail on an excluded row: the score is carried, the ward and
+    // clinic halves it was built from are not. Null is "not carried", which the
+    // cells below say in those words rather than as an em dash.
+    m.set(code, { ward: null, clinic: null, score: e.capacity_score, placed: false })
   }
   return m
 }
@@ -319,10 +377,32 @@ export function Overview({ hospital, date, name, reference, onOpenList }: {
       )}
       {noRun && <BeforeRanking date={date} runnable={days.data?.runnable} />}
 
-      <ReadoutBand s={s} d={d} decNote={decNote} reference={reference} />
+      {/* THE KEY TO EVERY MARK BELOW IT, and this is the surface those marks
+          are on: App.tsx:64 opens the app here, and this screen draws roughly
+          twenty of them -- the past-target readout, a clinic bar per specialty,
+          the five staleness chips and their five bars, an occupancy bar and
+          block per ward, the booked ratio per clinic -- while the only place
+          the ladder was ever named was one tab away, on the List.
+
+          ONE strip for the whole surface, not one per panel. The scale is one
+          scale and six of the eight panels spend it, so a legend beside each
+          would be five more copies of the same ladder, each competing with that
+          panel's own citation line for the same corner of the eye. It sits here,
+          above the first mark on the page, and it is the component the marks are
+          built from -- imported, never redrawn, so the two cannot drift.
+
+          BELOW the reconciliation band and the no-run notice on purpose. Both
+          of those are prose that says its own state in words, and a key strip
+          between the header and a role="alert" would push the one thing on this
+          page that outranks everything else down the screen. */}
+      <div className="ov-key">
+        <SevLegend />
+        <ReadoutBand s={s} d={d} decNote={decNote} reference={reference} />
+      </div>
 
       <div className="ov-cols">
-        <SpecialtyPanel specs={specs} s={s} reference={reference} ops={ops} d={d} noRun={noRun} />
+        <SpecialtyPanel specs={specs} s={s} reference={reference} ops={ops} d={d}
+                        noRun={noRun} date={date} />
       </div>
 
       <div className="ov-thirds">
@@ -550,9 +630,13 @@ function SevMeter({ v, sev, empty, label }: {
 }
 
 /** A 0–1 pressure carrying no severity: the agent's own working, shown as the
- *  agent's. Neutral, because a busy ward is not an Urgent referral. */
-function Meter({ v, empty }: { v: number | null; empty: string }) {
-  if (v == null) return <span className="ov-none">{empty}</span>
+ *  agent's. Neutral, because a busy ward is not an Urgent referral.
+ *
+ *  `title` is an aside on the word that replaces a missing number, never the
+ *  only place that word is explained -- the surface says the load-bearing half
+ *  in visible text, the way the refused specialty is named in its own row. */
+function Meter({ v, empty, title }: { v: number | null; empty: string; title?: string }) {
+  if (v == null) return <span className="ov-none" title={title}>{empty}</span>
   return (
     <span className="ov-inline">
       <Bar v={v} />
@@ -577,21 +661,50 @@ const pressureUnresolved = (c: Clinic | undefined): boolean =>
 
 /* --- 2. by specialty ------------------------------------------------------ */
 
-function SpecialtyPanel({ specs, s, reference, ops, d, noRun }: {
+function SpecialtyPanel({ specs, s, reference, ops, d, noRun, date }: {
   specs: SpecRow[]
   s: ReturnType<typeof summarise>
   reference: Reference | undefined
   ops: OpsQuery
   d: Decision | undefined
   noRun: boolean
+  date: string
 }) {
   const maxN = Math.max(...specs.map((x) => x.n), 1)
   const cap = agentCapacity(d)
-  const refused = new Set(d?.refused_paediatric ?? [])
+  const scored = [...cap.values()]
+  const unplaced = scored.filter((c) => !c.placed).length
+  /* Scarcity is the mean of the distinct specialty capacity scores in the
+     cohort, refused specialties included (ranking.py:147-155). CHECKED, not
+     claimed: the arithmetic is reproduced here from the scores this table is
+     printing, and the footer says nothing about it unless it comes back to the
+     decision's own scarcity. ADR-007 fixes the sign convention, so a payload
+     that ever said "availability" would invert the mean and is not asserted
+     over either. */
+  const capMean = scored.length ? scored.reduce((a, c) => a + c.score, 0) / scored.length : null
+  const scarcityIsMean = d != null && capMean != null
+    && d.capacity_direction === 'pressure' && Math.abs(capMean - d.scarcity) < 1e-6
+  /* Rows that will draw a clinic figure NOTHING computed for this day: the
+     cited session's own number. Collected so the panel can date them all at
+     once, above the table, the way the ward and clinic panels date theirs. */
+  const citedFallback = specs
+    .filter((x) => cap.get(x.code)?.clinic == null && !noSlots(x.clinic)
+      && x.clinic?.cited_pressure != null && x.clinic?.cited_session_date != null)
+    .map((x) => x.clinic!.cited_session_date!)
 
   return (
     <Panel icon={Stethoscope} title="By specialty"
            note={`${specs.length} specialties · core.ref_specialties`}>
+      {/* The By-specialty table used to print a graded clinic pressure with no
+          date on it, in a table whose header names the selected day, on days
+          when no decision existed at all -- and on 13 of the 14 hospital-days
+          that figure is the 2026-08-28 session, which is in the FUTURE for 11
+          of them. It is dated now, in the cell and here. */}
+      {citedFallback.length > 0 && (
+        <AsOf what="The clinic sessions this table cites where the agents produced no figure"
+              taken={citedFallback} selected={date}
+              source="core.clinic_sessions is read latest-first with no date filter, so every hospital-day is served this same series. Those cells carry that date and are not graded: nothing computed a clinic pressure for the day selected." />
+      )}
       <div className="scroll-x">
         <table className="ov-t">
           <thead>
@@ -604,22 +717,48 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun }: {
               <th className="c-n">Median wait</th>
               <th className="c-n">Longest</th>
               <th className="c-bar">Ward pressure<span className="ov-th-sub">agent · beds and escalation, per specialty</span></th>
-              <th className="c-bar">Clinic pressure<span className="ov-th-sub">booked ÷ total, cited session</span></th>
+              <th className="c-bar">Clinic pressure<span className="ov-th-sub">agent's figure · else the cited session, dated</span></th>
               <th className="c-n">Capacity score<span className="ov-th-sub">agent · identical within a specialty</span></th>
             </tr>
           </thead>
           <tbody>
             {specs.map((x) => {
               const a = cap.get(x.code)
-              const clinicP = a?.clinic ?? x.clinic?.cited_pressure ?? null
-              // 0601 is refused by the URGENCY agent, so it is never PLACED.
-              // Capacity still scored it. NEWS2 is validated in
-              // adults. A coverage statement, not a missing number.
-              const isRefused = !a && rowsRefused(refused, x.code, d)
-              const empty = isRefused ? 'not ranked' : noRun ? 'no run' : '—'
+              // What the capacity agent produced FOR THIS HOSPITAL-DAY, and
+              // only that. The cited session's own figure is a different
+              // claim and is drawn as one, below.
+              const agentClinic = a?.clinic ?? null
+              const citedP = noSlots(x.clinic) ? null : x.clinic?.cited_pressure ?? null
+              const citedDay = x.clinic?.cited_session_date
+                ? dayOf(x.clinic.cited_session_date) : null
+              // A standing property of the SPECIALTY, not of a run: 0601 is
+              // refused unconditionally because NEWS2 is validated in adults,
+              // and /api/decision 404s on 13 of 14 days. Same derivation as
+              // List.tsx:475 and Patient.tsx:87. It replaced a test for "this
+              // specialty produced no ranking", which is a different fact and
+              // was answering with the word "not ranked" in three columns at
+              // once -- including the two the capacity agent had filled.
+              const refused = isRefusedPaediatric(x.code)
+              // THREE absences, and they are not the same claim. Nothing ran;
+              // this specialty is in no decision list at all; or the decision
+              // carries the score without the working behind it.
+              const empty = !d ? (noRun ? 'no run' : '—') : a ? 'not carried' : 'not scored'
+              const notCarried = a && !a.placed
+                ? 'the capacity agent scored this specialty; the decision carries the score for'
+                  + ' a referral it did not place, without the ward and clinic halves behind it'
+                : 'the decision carries this specialty’s capacity score but not the ward and'
+                  + ' clinic halves behind it'
               return (
                 <tr key={x.code}>
-                  <td className="c-name">{specialtyFull(reference, x.code)}</td>
+                  <td className="c-name">
+                    {specialtyFull(reference, x.code)}
+                    {refused && (
+                      <span className="ov-sub">
+                        no urgency score: the agent refuses this specialty, NEWS2 is validated
+                        in adults
+                      </span>
+                    )}
+                  </td>
                   <td className="c-n num">{fmt(x.n)}</td>
                   <td className="c-bar"><Bar v={x.n} max={maxN} /></td>
                   <td className="c-n num">{x.withTarget ? fmt(x.withTarget) : <span className="ov-none">none</span>}</td>
@@ -635,18 +774,62 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun }: {
                       it and neither does sevOccupancy. It stays the agent's
                       working. The occupancy itself is graded, on the ward
                       table, against the line it belongs to. */}
-                  <td className="c-bar"><Meter v={a?.ward ?? null} empty={empty} /></td>
+                  <td className="c-bar">
+                    <Meter v={a?.ward ?? null} empty={empty}
+                           title={a && a.ward == null ? notCarried : undefined} />
+                  </td>
                   <td className="c-bar">
                     {noSlots(x.clinic)
                       ? <span className="ov-none">no clinic that day</span>
-                      : <SevMeter v={clinicP} sev={sevBooked(clinicP)} empty="—"
-                                  label={`clinic ${pct(clinicP ?? 0, 0)} booked on the cited session`} />}
+                      : agentClinic != null
+                        // The agent's own figure for this hospital-day: graded,
+                        // because the day it grades is the day at the top.
+                        ? <SevMeter v={agentClinic} sev={sevBooked(agentClinic)} empty="—"
+                                    label={`clinic ${pct(agentClinic, 0)} booked on the cited session`} />
+                        : citedP != null && citedDay != null
+                          // Nothing computed a clinic pressure for the selected
+                          // day, so this is the cited session's own number and
+                          // it travels with its own date. NOT graded: a step on
+                          // the scale is "how far past a line THIS day is", and
+                          // the same figure keeps its grade one panel down in
+                          // Clinic capacity, under a column that names the
+                          // session rather than the day. One column, one
+                          // subject: a graded mark here would say the same
+                          // thing about two different days.
+                          ? (
+                            <>
+                              <Meter v={citedP} empty="—" />
+                              <span className="ov-cited-on">
+                                cited session{' '}
+                                {citedDay === date
+                                  ? <span className="num">{shortDate(citedDay)}</span>
+                                  : (
+                                    <SevChip sev={SEV_INTEGRITY} tone="quiet"
+                                             title={`not ${longDate(date)}, the day selected`}>
+                                      {shortDate(citedDay)}
+                                    </SevChip>
+                                  )}
+                              </span>
+                            </>
+                          )
+                          // Withheld rather than drawn undated: a pressure whose
+                          // session has no date cannot say what it is a pressure
+                          // of.
+                          : <span className="ov-none">{citedP != null ? 'no session cited' : empty}</span>}
                   </td>
                   <td className="c-n num">
-                    {/* The urgency agent refused this specialty; the capacity
-                        agent did not, and scored every referral in 0601. What
-                        is absent is a PLACEMENT, so that is what the cell says. */}
-                    {a ? a.score.toFixed(3) : <span className="ov-none">{empty}</span>}
+                    {/* The urgency agent refuses this specialty; the capacity
+                        agent does not, and scored every referral in 0601. This
+                        cell printed "not ranked" over a score of 0.781 that the
+                        decision carries and that scarcity is the mean of. What
+                        is absent is a PLACEMENT, so that is what is said, and
+                        the number that exists is shown. */}
+                    {a ? (
+                      <>
+                        {a.score.toFixed(3)}
+                        {!a.placed && <span className="ov-sub">scored, not placed</span>}
+                      </>
+                    ) : <span className="ov-none">{empty}</span>}
                   </td>
                 </tr>
               )
@@ -661,10 +844,22 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun }: {
               <td className="c-n num">{fmt(s.breached)}<span className="ov-of"> of {fmt(s.withTarget)}</span></td>
               <td className="c-n num">{fmt(s.median)}<span className="ov-of">d</span></td>
               <td className="c-n num">{fmt(s.longest)}<span className="ov-of">d</span></td>
-              <td colSpan={3} className="ov-of">
-                {d
-                  ? `α ${d.alpha.toFixed(3)} · scarcity ${d.scarcity.toFixed(3)}: one pair of numbers for the whole hospital-day`
-                  : 'no decision for this hospital-day'}
+              <td colSpan={3} className="ov-of ov-foot-wrap">
+                {d ? (
+                  <>
+                    α {d.alpha.toFixed(3)} · scarcity {d.scarcity.toFixed(3)}: one pair of
+                    numbers for the whole hospital-day.
+                    {scarcityIsMean && (
+                      <>
+                        {' '}Scarcity is the mean of the {fmt(scored.length)} specialty capacity
+                        scores in this table
+                        {unplaced > 0 && (
+                          <>, the {fmt(unplaced)} scored but not placed included</>
+                        )}.
+                      </>
+                    )}
+                  </>
+                ) : 'no decision for this hospital-day'}
               </td>
             </tr>
           </tfoot>
@@ -681,13 +876,6 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun }: {
   )
 }
 
-/** True when this specialty produced no ranking because it was refused, not
- *  because nothing has run. `refused_paediatric` holds pathway numbers. */
-function rowsRefused(refused: Set<string>, code: string, d: Decision | undefined): boolean {
-  if (!d || refused.size === 0) return false
-  return !d.rankings.some((r) => r.specialty_hipe === code)
-}
-
 /* --- 3. against the national picture -------------------------------------- */
 
 function NationalPanel({ s }: { s: ReturnType<typeof summarise> }) {
@@ -697,7 +885,7 @@ function NationalPanel({ s }: { s: ReturnType<typeof summarise> }) {
   return (
     <Panel icon={Layers} title="Against the national picture"
            note="adjusted wait, NTPF bands"
-           cite={`NTPF Outpatient Waiting List by Speciality · OpenData_OPNational02_2026.csv · snapshot ${NTPF_SNAPSHOT} · ${fmt(NTPF_TOTAL)} people across the 57 non-SDC specialties. Both sides are cut on the same day boundaries: 183 / 365 / 548.`}>
+           cite={`NTPF Outpatient Waiting List by Speciality · OpenData_OPNational02_2026.csv · snapshot ${NTPF_SNAPSHOT}, every row of it: ${fmt(NTPF_SPECIALTIES)} specialty labels over ${fmt(NTPF_ROWS)} adult and child rows, ${fmt(NTPF_TOTAL)} people by the file's Total column. Its four band columns sum to ${fmt(NTPF_BAND_TOTAL)}, ${NTPF_BAND_TOTAL - NTPF_TOTAL} more; that difference is inside the published file, and the national shares here are of the band sum they are counted from. Both sides are cut on the same day boundaries: 183 / 365 / 548.`}>
       <div className="ov-nat">
         {s.waitBands.map((b) => {
           const here = s.total ? b.here / s.total : 0
@@ -1100,8 +1288,20 @@ function ClinicPanel({ ops, reference, d, date }: {
                       )}
                     </td>
                     <td className="c-n num">
+                      {/* Same three absences the By-specialty table draws, for
+                          the same reason: a specialty the decision scored but
+                          did not place carries no clinic half, and "not scored"
+                          over a capacity score of 0.781 is the claim this round
+                          exists to stop. */}
                       {cap.get(c.specialty_hipe)?.clinic?.toFixed(3)
-                        ?? <span className="ov-none">{d ? 'not scored' : 'no run'}</span>}
+                        ?? (
+                          <span className="ov-none"
+                                title={cap.has(c.specialty_hipe)
+                                  ? 'the decision carries this specialty’s capacity score but not the clinic half behind it'
+                                  : undefined}>
+                            {!d ? 'no run' : cap.has(c.specialty_hipe) ? 'not carried' : 'not scored'}
+                          </span>
+                        )}
                     </td>
                   </tr>
                 )

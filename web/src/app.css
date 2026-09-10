@@ -323,11 +323,14 @@
 .j-steps li.is-clinical::before { background: var(--clay); width: 15px; }
 /* The three of these that carry a VALUE -- the step date, its detail, and the
    date under an axis mark -- were raw 10px, a size the type scale does not
-   have and does not permit for a value: --t-small is the floor and --t-micro
-   is labelled "uppercase labels ONLY, never a value". They read at the floor
-   now. The LABELS beside them (.j-h, .j-mt) stay at --t-micro, which is the
-   same 11px they already rendered, so the label/value pair inverts the way it
-   should: the number is the larger of the two. */
+   have at all. They read at --t-small now. The LABELS beside them (.j-h,
+   .j-mt) stay at --t-micro, which is the same 11px they already rendered, so
+   the pair sizes the way it should: the value is the larger of the two, which
+   is the standing rule on --t-micro (tokens.css). Note that the old wording of
+   that rule -- "uppercase labels ONLY, never a value" -- was cited here when
+   this was fixed, and has since been rewritten because 117 of its 126
+   declarations broke it. The fix stands on the restated rule: .j-mt is a
+   lowercase label at the annotation step, .j-md is its value one step up. */
 .j-d { font-size: var(--t-small); color: var(--text-2); }
 .j-t { font-size: var(--t-small); color: var(--text); line-height: 1.3; }
 .j-x { font-size: var(--t-small); color: var(--text-3); }
@@ -336,6 +339,20 @@
 /* the wait: the LENGTH is the argument, so it is drawn to scale */
 .j-axis { position: relative; height: 74px; }
 .j-line { position: absolute; left: 0; right: 0; top: 12px; height: var(--spine-w); background: var(--rule-firm); }
+/* GRADIENT 1 OF 2 in this file, and it stays: it is not what the kit's ban
+   means. `repeating-linear-gradient` with two HARD stops -- transparent for
+   0-5px, then --bg-sunk for 5-10px -- interpolates nothing. Every pixel is one
+   of exactly two values. It is CSS's only primitive for a hatch, and a hatch
+   is not a blend: it claims no light source and no elevation, which is the
+   whole of what "no gradients, glows or drop shadows. Depth comes from blur
+   and hairlines" exists to forbid.
+
+   It is also load-bearing. This band is the stretch of the wait with NOTHING
+   recorded: Journey.tsx:96 renders it only when `silent`, and legends it in
+   words and a number -- "unmeasured for N days" (.j-leg.is-silent). Hatching
+   is the standing notation for absent data, and an absence of information is
+   never reassurance. Delete it and the EXTENT of the silence leaves the axis:
+   the legend line would still say how long, and nothing would show where. */
 .j-silence {
   position: absolute; left: 0; right: 0; top: 4px; height: 21px;
   background: repeating-linear-gradient(-45deg, transparent 0 5px, var(--bg-sunk) 5px 10px);
@@ -438,7 +455,39 @@
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: 62% 50%;
 }
-/* the photograph's left wall is already empty; this only steadies the type */
+/* GRADIENT 2 OF 2, and the only genuine soft blend in the product. It stays,
+   and the reason is measured rather than asserted.
+
+   The photograph (/brand/chairs.png, 1300x873, alt="" aria-hidden) is
+   decorative. The type over it is not. Sampling that image through
+   `object-fit: cover` / `object-position: 62% 50%` and compositing each stop's
+   alpha over the pixels each text block actually covers -- --text #122056 and
+   --text-2 #545B6E against the composite, worst pixel in each block, across
+   1366x768, 1440x900, 1920x1080 and 2560x1440:
+
+       element            no scrim              with this scrim
+       .landing-word      6.28 - 6.58 : 1  AA   11.33 - 11.77 : 1  AA
+       .landing-sub       3.06 - 3.24 : 1  FAIL  5.65 -  6.12 : 1  AA
+       .landing-lead      6.28 - 7.19 : 1  AA   12.12 - 13.70 : 1  AA
+       .landing-thesis    2.47 - 2.89 : 1  FAIL  4.93 -  5.52 : 1  AA
+
+   (Block geometry computed from the rules below, `ch` taken at 0.60em, the
+   generous end, so the sampled boxes run wider than the text really does.)
+
+   Two of the four elements fail WCAG AA at every width with no veil at all.
+   The non-gradient replacement is the flat color-mix the <=720px breakpoint
+   already uses -- and the flat alpha that clears 4.5:1 everywhere is 0.52 at
+   1440x900, 0.55 at 1920x1080, 0.58 at 2560x1440, which mutes 27-34% of the
+   photograph's tonal range across the WHOLE frame. This gradient spends
+   0.90-0.97 on the third of the screen the type occupies and 0.00-0.15 on the
+   two thirds it does not. Removing it obscures MORE of the picture, not less.
+
+   Why it is not the thing the kit bans: it is not a surface. It sits in the
+   photographic plane over a decorative image, it makes no depth or elevation
+   claim, and all four stops are ONE token -- --paper at four alphas -- so
+   there is no second colour that could read as a light source. No panel, chip,
+   rule, bar or glyph anywhere in the product carries a blend. Do not add a
+   third gradient on the strength of this one. */
 .landing-scrim {
   position: absolute; inset: 0;
   background: linear-gradient(100deg,

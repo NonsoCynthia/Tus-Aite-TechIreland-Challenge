@@ -18,6 +18,29 @@ import type { Observation } from '../lib/types'
  *  specialty and priority never reads it at all
  *  (coordinator/app/priority.py:158-162). The ward is drawn after that, never
  *  before.
+ *
+ *  WHAT WAS READ IS A CITATION, NEVER A GUESS.
+ *
+ *  `citedSession ?? newest` used to stand where readDate is computed. With no
+ *  citation to hand it substituted the newest session in the series, and the
+ *  page then drew "read by the agent" against that row and stated underneath
+ *  that "One session was read. The other 4 were not scored." On 13 of the 14
+ *  hospital-days nothing has run at all -- /api/decision 404s there, which is
+ *  NORMAL, and no score and no citation reach this component -- so the page
+ *  asserted that an agent read a clinic session on a day no agent ran, and
+ *  named a specific row as the one it read.
+ *
+ *  There is no fallback now. A row is marked read only when a citation names
+ *  it, and the four states are told apart rather than collapsed:
+ *
+ *    a citation names a row in the series   that row was read, the others were not
+ *    a citation names a row NOT in it       the citation is stated, no row is marked
+ *    a score, but no citation of that kind  which row it read is not on the record
+ *    no capacity score for this referral    nothing read anything; this is context
+ *
+ *  The same rule governs the ward tag: "not the cited snapshot" says another
+ *  snapshot WAS cited, which is a claim of its own, so it is not printed on a
+ *  day when nothing cited anything.
  */
 
 export interface BedStatus {
@@ -117,8 +140,22 @@ export function AgentInputs({
   const others = wards.filter((w) => w !== primary)
   const sessions = [...(capacity?.clinic_sessions ?? [])]
     .sort((a, b) => a.session_date.localeCompare(b.session_date))
-  const newest = sessions.length ? sessions[sessions.length - 1].session_date : null
-  const readDate = citedSession ?? newest
+
+  /** Did the capacity agent score THIS referral at all?
+   *
+   *  A score OR a citation, not the score alone. A paediatric referral is
+   *  refused by the urgency agent and therefore never placed, so no ranking row
+   *  carries its capacity score -- but the capacity agent scored it anyway
+   *  (Overview says so, and GET /scores returns its two capacity citations), and
+   *  those citations are what reach this component. They are evidence that the
+   *  agent read something, and they are honoured. */
+  const capacityRan = capacityScore != null || citedWard != null || citedSession != null
+  /** The session the record NAMES. No substitute: see the header. */
+  const readDate = citedSession
+  /** ...and whether that named session is one of the rows drawn below. If the
+   *  citation names a session the context call did not return, the citation is
+   *  still true and no row here may wear it. */
+  const readInSeries = readDate != null && sessions.some((s) => s.session_date === readDate)
 
   const wp = capacityDetail?.ward_pressure ?? null
   const cp = capacityDetail?.clinic_pressure ?? null
@@ -188,15 +225,34 @@ export function AgentInputs({
             </div>
           </div>
 
+          {/* Invariant 7 and invariant 8: a hospital-day with no decision is a
+              normal state, and the thing to say about it is what the system
+              did, which is nothing. Said once at the top of the lane, because
+              everything below it is drawn from the date-blind context call and
+              is on screen either way. */}
+          {!capacityRan && (
+            <p className="pt-mini">
+              No capacity score was recorded for this referral, so nothing below was read by an
+              agent. The ward and the clinic sessions are this specialty's operational context,
+              drawn for the reader.
+            </p>
+          )}
+
           {primary ? (
-            <WardPanel w={primary} cited={primary.ward_id === citedWard} pressure={wp} />
+            <WardPanel w={primary} pressure={wp}
+                       read={citedWard != null
+                         ? (primary.ward_id === citedWard ? 'cited' : 'other')
+                         : capacityRan ? 'uncited' : 'norun'} />
           ) : (
             <p className="pt-mini">No ward is joined to this specialty.</p>
           )}
 
           {others.length > 0 && (
             <div className="pt-others">
-              <span className="lab">Also backs this specialty, not cited</span>
+              {/* "not cited" is only sayable once something WAS cited. */}
+              <span className="lab">
+                Also backs this specialty{citedWard != null && ', not cited'}
+              </span>
               {others.map((w) => (
                 <span key={w.ward_id} className="pt-other num">
                   {w.ward_id}
@@ -218,11 +274,31 @@ export function AgentInputs({
                 </span>
                 {cp != null && <span className="pt-clinic-p num">clinic pressure {n3(cp)}</span>}
               </div>
-              <ClinicSeries sessions={sessions} readDate={readDate} />
-              <p className="pt-mini">
-                One session was read. The other{' '}
-                <span className="num">{sessions.length - 1}</span> were not scored.
-              </p>
+              <ClinicSeries sessions={sessions} readDate={readInSeries ? readDate : null} />
+              {readInSeries ? (
+                <p className="pt-mini">
+                  One session was read. The other{' '}
+                  <span className="num">{sessions.length - 1}</span> were not scored.
+                </p>
+              ) : readDate != null ? (
+                <p className="pt-mini">
+                  The recorded citation names the session of{' '}
+                  <span className="num">{dateShort(readDate)}</span>, which is not among the{' '}
+                  <span className="num">{sessions.length}</span> sessions returned for this
+                  specialty, so no row above is marked as the one that was read.
+                </p>
+              ) : capacityRan ? (
+                <p className="pt-mini">
+                  The capacity agent scored this referral, but no clinic session is cited on
+                  that score, so which of these <span className="num">{sessions.length}</span>{' '}
+                  it read is not on the record. None is marked read.
+                </p>
+              ) : (
+                <p className="pt-mini">
+                  None of these <span className="num">{sessions.length}</span> sessions was
+                  read by an agent.
+                </p>
+              )}
             </div>
           )}
 
@@ -252,7 +328,18 @@ export function AgentInputs({
   )
 }
 
-/** The one ward snapshot the capacity agent cited.
+/** Whether this ward's snapshot is the one the capacity agent cited -- and if
+ *  it is not, WHY it is not. Four states, because they are four different
+ *  claims and only one of them is true on a day nothing ran. */
+type WardRead = 'cited' | 'other' | 'uncited' | 'norun'
+const WARD_READ: Record<WardRead, string> = {
+  cited: 'read by the agent',
+  other: 'not the cited snapshot',
+  uncited: 'no snapshot is cited on the record',
+  norun: 'not read: no capacity score',
+}
+
+/** The one ward snapshot the capacity agent cited, when one was.
  *
  *  GAR is an escalation status whose own vocabulary is green/amber/red. Those
  *  hues belong to CPC triage categories on this product and are not lent out,
@@ -289,8 +376,8 @@ export function AgentInputs({
  *  date. Substituting it here would not have removed the contradiction anyway
  *  -- W-9001-02 is 91 occupied against a nominal 90, over its establishment on
  *  surge beds. 91 of the 92 recorded is the only pair that reconciles. */
-function WardPanel({ w, cited, pressure }: {
-  w: CapacityWard; cited: boolean; pressure: number | null
+function WardPanel({ w, read, pressure }: {
+  w: CapacityWard; read: WardRead; pressure: number | null
 }) {
   const b = w.latest_bed_status
   const pct = num(b?.occupancy_pct)
@@ -318,8 +405,8 @@ function WardPanel({ w, cited, pressure }: {
       <div className="pt-ward-h">
         <span className="pt-ward-id num">{w.ward_id}</span>
         {w.is_primary && <span className="pt-tag">primary ward</span>}
-        <span className={'pt-tag' + (cited ? ' is-read' : '')}>
-          {cited ? 'read by the agent' : 'not the cited snapshot'}
+        <span className={'pt-tag' + (read === 'cited' ? ' is-read' : '')}>
+          {WARD_READ[read]}
         </span>
         <span className="pt-ward-t num">{stamp(b?.snapshot_datetime ?? null)}</span>
       </div>
@@ -427,8 +514,16 @@ function Fact({ k, v, note }: { k: string; v: number | null; note?: string }) {
   )
 }
 
-/** Five sessions in date order, one of them the row that was scored. */
+/** The specialty's sessions in date order, and -- only if a citation names one
+ *  of them -- which one was read.
+ *
+ *  `readDate` is null whenever no citation names a row here, and then NO row is
+ *  marked and none of them says "not read" either: "context, not read" is a
+ *  statement that something else was read, and on a day no agent ran there is
+ *  nothing for it to point at. The caller says which of the four states this
+ *  is, in words, underneath. */
 function ClinicSeries({ sessions, readDate }: { sessions: ClinicSession[]; readDate: string | null }) {
+  const anyRead = readDate != null
   const max = Math.max(1, ...sessions.map((s) => s.slots_total))
   return (
     <div className="pt-sessions">
@@ -446,7 +541,7 @@ function ClinicSeries({ sessions, readDate }: { sessions: ClinicSession[]; readD
             </span>
             <span className="pt-session-n num">{s.slots_booked}/{s.slots_total}</span>
             <span className="pt-session-x">
-              {read ? 'read by the agent' : 'context, not read'}
+              {read ? 'read by the agent' : anyRead ? 'context, not read' : 'context'}
             </span>
           </div>
         )

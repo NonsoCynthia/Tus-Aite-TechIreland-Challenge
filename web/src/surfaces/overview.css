@@ -96,6 +96,16 @@
 }
 .ov-before-cta svg { flex: none; align-self: center; }
 
+/* --- the key, and the band it sits over -----------------------------------
+   <SevLegend> is components/Severity.tsx's, imported and not redrawn, so the
+   swatches ARE the marks. It sets no margins of its own by contract, so the
+   spacing is set here -- and it is --d3, not the --d5 that separates the
+   panels: a key is not a section of the page, it belongs to what follows it.
+   No ground and no border either, and none is added here: the strip's own
+   contrast table is computed against the surface it is placed on, and giving
+   it a ground of its own would show a step 1 the page never draws. */
+.ov-key { display: grid; gap: var(--d3); }
+
 /* --- the readout band -----------------------------------------------------
    One hairline grid, no cards. The band fills the column at any width. */
 .ov-band {
@@ -208,11 +218,26 @@
   border-top: 1px solid var(--rule-firm); border-bottom: 0;
   background: var(--bg-sunk); color: var(--text-2); font-weight: 550;
 }
+/* A sentence, not a figure. td is nowrap for the columns of numbers above it,
+   and a foot that states what scarcity is the mean of is ~150 characters: left
+   nowrap it does not overflow, it WIDENS the table and puts the last data
+   column behind a horizontal scroll. It wraps inside the width the numbers
+   have already settled. */
+.ov-t tfoot td.ov-foot-wrap { white-space: normal; min-width: 320px; }
 .ov-of { color: var(--text-3); font-weight: 400; }
 .ov-none { color: var(--text-3); }
 .ov-sub {
   display: block; font-size: var(--t-micro); color: var(--text-3);
   font-weight: 400; white-space: normal;
+}
+/* The cited session's own date, under the figure drawn from it.
+   --t-small, not the --t-micro .ov-sub sits at: this line carries a DATE, and
+   the token file reserves micro for uppercase labels and "never a value". The
+   date is the whole point of the line -- it is what says the figure above it
+   is not the day named at the top of the page. */
+.ov-cited-on {
+  display: block; margin-top: 3px; font-size: var(--t-small);
+  color: var(--text-3); font-weight: 400; white-space: normal;
 }
 
 /* --- the neutral bar. the number always sits beside it. ------------------- */

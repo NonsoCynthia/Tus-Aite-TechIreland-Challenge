@@ -4,13 +4,44 @@
  *  needs attention" state in the product. See tokens.css for why the steps look
  *  the way they do and for the measured contrast of each.
  *
- *  The bands below are chosen against the real observed ranges, not invented:
+ *  The bands below are chosen against the real observed ranges, not invented.
+ *  Each range is the range of the quantity its own band function is CALLED
+ *  with, recounted from the live API over all 14 hospital-days at 9001
+ *  (2026-08-17 to 2026-08-30, 283 to 308 referrals a day):
  *
- *    wait / target      0.036x -> 31.1x   (165 rows; 143 have no target at all)
- *    reading age        12 -> 871 days    (all 308)
- *    NEWS2 sub-score    0 -> 3            (six per patient)
- *    occupancy          79.1 -> 100.0     (7 wards, 85% is the safe line)
- *    clinic booked      0.52 -> 1.00      (7 clinics)
+ *    wait / target      0.000x -> 31.107x  adjusted_wait_days / crt_days, over the
+ *                                          154-165 rows a day that have a target
+ *                                          (165 of the 308 on 2026-08-30; the other
+ *                                          143 are Routine or Uncategorised and have
+ *                                          no target, so they enter no range at all)
+ *    reading age        0 -> 871 days      one observation per referral, and every
+ *                                          referral has one, on all 14 days
+ *    NEWS2 sub-score    0 -> 3             six per patient; five of the six reach 3,
+ *                                          temperature never exceeds 1
+ *    occupancy          79.12 -> 100.00    7 wards, 85% is the safe line
+ *    clinic booked      0.520 -> 1.000     7 clinics, cited_pressure of the one cited
+ *                                          session
+ *
+ *  The last two are identical on all 14 days, and that is a property of the
+ *  data rather than a coincidence: the ward and clinic queries carry no date
+ *  predicate, so every hospital-day is served the same 2026-08-30T20:00 ward
+ *  snapshot and the same 2026-08-28 clinic session.
+ *
+ *  TWO BOTTOM ENDS WERE WRONG IN PRINT and are corrected above: the wait ratio
+ *  read 0.036x and the reading age read 12 days. Neither is the minimum of
+ *  anything. Referrals received on the day they are counted have a wait of 0
+ *  and a ratio of exactly 0.000x -- 2 of them on 2026-08-30, 3 on 2026-08-17 --
+ *  and 12 of the 308 readings on 2026-08-30 were taken on the as-of date, an
+ *  age of 0 days. 0.036 is 1/28, the smallest NON-ZERO ratio on the newest day,
+ *  and 12 is a count of rows, not a number of days.
+ *
+ *  Nothing renders this block and no boundary below reads it: a ratio at or
+ *  under 1 and an age under 90 days both score 0, so the two corrected figures
+ *  land exactly where the wrong ones did and NO BAND MOVES. What the block is
+ *  for is the claim that the boundaries were fitted to real data, which is the
+ *  one thing a reviewer checks it for -- so a figure in it that no measurement
+ *  produces costs the whole scale its provenance. Recount from the API; never
+ *  carry a figure over from a neighbouring comment.
  *
  *  Deliberately NOT driven by: NEWS2 total (148 of 308 tie at exactly 0),
  *  capacity score (identical for every referral in a specialty) or alpha (one

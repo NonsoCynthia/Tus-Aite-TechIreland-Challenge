@@ -217,12 +217,45 @@ export function SevLegend({ className }: { className?: string }) {
         <span className="sevleg-t lab">a rule that fired</span>
         <span className={blockClass(RULE_SEV, 'quiet')} data-sev={RULE_SEV}>{SEV_WORD[RULE_SEV]}</span>
       </span>
+      {/* THREE STATES, NOT TWO.
+
+          This note used to say "an unmarked number is inside the line". On the
+          wait axis that was false for every referral with NO TARGET:
+          sevWaitRatio returns 0 for a null ratio (severity.ts:27), so a Routine
+          or Uncategorised row is unmarked because there is no line -- not
+          because it is inside one. That is 143 of the 308 open at
+          9001/2026-08-30 (88 Routine, 55 Uncategorised, counted from
+          /api/cohort), against 35 that do have a target and sit inside it. The
+          legend is the one place on screen that teaches the scale, so a false
+          sentence here is worse than no sentence.
+
+          Stated in words and not as a figure, because the figure is of the
+          hospital-day: 133 of 293 on 2026-08-25, 134 of 295 on 08-27. The
+          header above already prints the day's own count under "no target
+          applies", and this strip is placed once per band tab beneath it, so
+          the wording borrows that surface's phrase rather than inventing a
+          second name for the same thing.
+
+          The other four axes the scale drives always have a line -- 90 days,
+          a sub-score above 0, 85% occupied, 75% booked -- so the third state is
+          written as the exception it is, and named by the only thing that
+          causes it. The missing-reading clause is untouched: an absent
+          measurement is an absence of information, never reassurance, and it
+          is the one state that is never carried by a mark at all.
+
+          No em dash in the aside, though the sentence wants one. In this
+          product the em dash is a GLYPH, not punctuation: it is what a cell
+          prints when it has no value (List, Overview, DecisionRecord). Setting
+          one inside the sentence that explains absence would put the
+          product's own symbol for "nothing here" in the middle of the
+          legend's definition of it. A colon and a full stop cost nothing. */}
       <p className="sevleg-n">
         A mark grades a measurement, never a person: how far a wait is past its target, how old a
-        reading is, how far a ward is past its safe line. Every mark carries its own value; an
-        unmarked number is inside the line, and a missing one says so in words. The pale chip is
-        one of those four steps drawn without its fill, bounded by the colour that fill uses: a
-        rule fires on most rows that breach, and a field of solid blocks would outshout the table.
+        reading is, how far a ward is past its safe line. Every mark carries its own value. An
+        unmarked number is inside its line, or has no line at all: no target applies to Routine
+        or Uncategorised. A missing one says so in words. The pale chip is one of those
+        four steps drawn without its fill, bounded by the colour that fill uses: a rule fires on
+        most rows that breach, and a field of solid blocks would outshout the table.
       </p>
     </div>
   )
