@@ -93,6 +93,18 @@ committed but the graph projection failed -- reported as a **distinct, non-zero 
 as success; `400` Postgres rejected the payload; `422` validation failed before either store was
 touched.
 
+## Rationale Layer Change
+
+The coordinator now uses `referral_state_valid_from` from `GET /hospitals/.../cohort/...` when building
+`referral_state` citations for the timeframe rationale. It no longer uses `referral_date` for that
+citation.
+
+The reason is graph identity: a `ReferralState` node is named as
+`referral-state/{hospital_hipe}/{pathway_number}/{valid_from}`. `referral_date` is the date the
+referral was made; it may not be the date the current waiting-list state began. Using
+`referral_state_valid_from` means rationale can dereference the exact state node cited by the ranked
+placement.
+
 ## Things this README needs you to know before you trust any output
 
 - **ADR-007 is resolved: `pressure`.** The capacity agent documents `capacity_score` as a

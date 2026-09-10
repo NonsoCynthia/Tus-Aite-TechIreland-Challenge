@@ -107,6 +107,7 @@ def _referral(pathway_number: str, **overrides: Any) -> dict[str, Any]:
         "adjusted_wait_days": 41,
         "crt_threshold_days": 28,
         "referral_date": "2026-08-01",
+        "referral_state_valid_from": "2026-08-03",
         "urgency_score": 0.8,
         "capacity_score": 0.4,
         "alpha": 0.7,
@@ -167,6 +168,11 @@ def test_timeframe_role_cites_both_referral_state_and_rule_when_applicable() -> 
 
     rule_citation = next(c for c in timeframe_citations if c["evidence_type"] == "rule")
     assert rule_citation["evidence_key"] == "RULE-CRT-URGENT"
+
+    state_citation = next(
+        c for c in timeframe_citations if c["evidence_type"] == "referral_state"
+    )
+    assert state_citation["evidence_key"] == "9004/PW-1/2026-08-03"
 
 
 def test_timeframe_role_cites_only_referral_state_when_no_rule_applies() -> None:

@@ -195,5 +195,20 @@ the graph. Per ADR-002, agents never write to Postgres or the graph directly —
 (already built) is the single mediator: `POST /scores`/`/decisions`/`/overrides` write `agent.*` first,
 then synchronously project the matching triples into the graph on success.
 
+## Rationale Layer Change
+
+The rationale layer can now be run through Docker Compose as a CLI container:
+
+```bash
+docker compose run --rm rationale \
+  --hospital 9001 \
+  --as-of 2026-08-30 \
+  --pathway PW-9001-000007
+```
+
+Retrieval now exposes `referral_state_valid_from` in coordinator cohort rows, and the coordinator uses
+that value when citing `ReferralState` evidence. This was added for rationale so CPC/CRT evidence points
+at real KG state nodes rather than using `referral_date`, which is not the `ReferralState` identifier.
+
 See `conductor/product.md`, `conductor/tech-stack.md`, and
 `conductor/tracks/explainable-agent-based-triage_20260828/spec.md` for the detailed project plan.

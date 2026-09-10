@@ -67,7 +67,7 @@ def build_citations(
 
     Args:
         referral: A ranked referral dict carrying `run_id`,
-            `hospital_hipe`, `pathway_number`, `referral_date`, `cpc`,
+            `hospital_hipe`, `pathway_number`, `referral_state_valid_from`, `cpc`,
             `triage_status`, `urgency_citations` and `capacity_citations`.
         legacy_citations: Whether to use the fallback citation set.
 
@@ -98,8 +98,12 @@ def build_citations(
     score_evidence_key = (
         f"{referral['run_id']}/{referral['hospital_hipe']}/{referral['pathway_number']}/urgency"
     )
+    referral_state_valid_from = referral.get("referral_state_valid_from") or referral[
+        "referral_date"
+    ]
     referral_state_evidence_key = (
-        f"{referral['hospital_hipe']}/{referral['pathway_number']}/{referral['referral_date']}"
+        f"{referral['hospital_hipe']}/{referral['pathway_number']}/"
+        f"{referral_state_valid_from}"
     )
     urgency_citation = {
         "evidence_type": ROLE_EVIDENCE_TYPES["urgency"][0],

@@ -108,6 +108,18 @@ services:
       oxigraph:
         condition: service_started
 
+  rationale:
+    build:
+      context: .
+      dockerfile: rationale/Dockerfile
+    profiles: ["tools"]
+    environment:
+      RETRIEVAL_BASE_URL: http://retrieval:8000
+      RETRIEVAL_BEARER_TOKENS: ${RETRIEVAL_BEARER_TOKENS}
+    depends_on:
+      retrieval:
+        condition: service_started
+
 volumes:
   db_data:
   pgadmin_data:
