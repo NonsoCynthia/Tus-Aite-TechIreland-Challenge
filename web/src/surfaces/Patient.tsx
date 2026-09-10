@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Info } from 'lucide-react'
+import { ArrowLeft, Check, Info, TriangleAlert } from 'lucide-react'
 import { api, bandOf } from '../lib/api'
 import { checkLabel, crtDays, failed, ruleStatement, specialtyFull } from '../lib/ref'
 import { plantedCase } from '../lib/planted'
+import { sevBreach, sevWaitRatio } from '../lib/severity'
+import { SevBar, SevChip } from '../components/Severity'
 import { Journey, type Event } from '../components/Journey'
 import { Provenance } from '../components/Provenance'
 import { Override } from '../components/Override'
-import { Compare } from '../components/Compare'
+import { Compare, WhatSeparates } from '../components/Compare'
 import { AgentInputs, type CapacityContext } from '../components/AgentInputs'
 import type { AgeStats } from '../components/Vitals'
 import type { Decision, Overrides, Ranking, Reference, RuleCheck } from '../lib/types'
@@ -15,18 +17,25 @@ import './patient.css'
 
 /** One referral, answering one question: why is this person here?
  *
- *  The page used to answer it in prose. Three notes did the real work — "add
- *  the six by hand and you get the same number", "it does not mean this person
- *  is near normal now", "the condition code is a weighted random draw" — and
- *  every one of them was a sentence standing in for an instrument that had not
- *  been built. This is a system, not a notebook, so each of the three is now a
- *  thing on screen: the NEWS2 sub-scores drawn against their bands, a staleness
- *  meter on the reading, and a limits panel whose chips carry their provenance.
+ *  The page used to answer it in prose. Three notes did the real work ("add the
+ *  six by hand and you get the same number", "it does not mean this person is
+ *  near normal now", "the condition code is a weighted random draw") and every
+ *  one of them was a sentence standing in for an instrument that had not been
+ *  built. This is a system, not a notebook, so each of the three is now a thing
+ *  on screen: the NEWS2 sub-scores drawn against their bands, a staleness meter
+ *  on the reading, and a limits panel whose chips carry their provenance.
  *
  *  The order follows the question. Where this person sits, then why, then what
  *  each agent actually read, then the shape of the wait, then the recorded
  *  citation chain, and last what the instrument never looked at.
  */
+
+/** --icon-sm from tokens.css, and lucide's stroke passed rather than inherited:
+ *  the default of 2 renders heavier than the 1.75 hairline chrome beside it.
+ *  V_ICON is the verdict register, matched to the three others in the product. */
+const ICON_SM_PX = 14
+const STROKE = 1.75
+const V_ICON = 12
 
 const fmt = (n: number) => n.toLocaleString('en-IE')
 const n3 = (x: number) => x.toFixed(3)
@@ -80,7 +89,7 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
   if (cohort.isLoading || ops.isLoading) {
     return (
       <div className="pad">
-        <button className="back" onClick={onBack}><ArrowLeft size={13} aria-hidden /> the list</button>
+        <button className="back" onClick={onBack}><ArrowLeft size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden /> the list</button>
         <p className="muted">Reading the referral…</p>
       </div>
     )
@@ -88,7 +97,7 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
   if (!row) {
     return (
       <div className="pad">
-        <button className="back" onClick={onBack}><ArrowLeft size={13} aria-hidden /> the list</button>
+        <button className="back" onClick={onBack}><ArrowLeft size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden /> the list</button>
         <div className="notyet">
           <strong>{pathway} is not in this hospital-day.</strong>
           <p>The cohort for {dateLong(date)} does not contain this referral. Nothing below would
@@ -111,6 +120,12 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
   // copy is only the fallback if the reference has not loaded yet.
   const target = crtDays(reference, row.cpc) ?? row.crt_threshold_days
   const overdueBy = target != null ? wait - target : null
+  // How far past target, as a multiple. This bar used not to change colour AT
+  // ALL when the wait went past the target: only the words underneath changed,
+  // which on a referral 31x past its target is the least of the three channels
+  // doing the work. 143 of the 308 have no target at all and score nothing.
+  const waitRatio = target != null && target > 0 ? wait / target : null
+  const waitSev = sevWaitRatio(waitRatio)
 
   // One citation per NEWS2 parameter, zeros included. The ranking row carries
   // them; GET /scores is the fallback for a decision served without them.
@@ -163,9 +178,9 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
 
   return (
     <div className="pad pt">
-      <button className="back" onClick={onBack}><ArrowLeft size={13} aria-hidden /> the list</button>
+      <button className="back" onClick={onBack}><ArrowLeft size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden /> the list</button>
 
-      {/* 1 — where this person is */}
+      {/* 1: where this person is */}
       <header className="pt-head">
         <div className="pt-head-l">
           <span className="lab">Referral</span>
@@ -177,8 +192,8 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
               <span>position <strong className="num">{placed.position}</strong> of{' '}
                 <span className="num">{fmt(dec.data.rankings.length)}</span></span>
             )}
-            {refused && <span className="pt-flag">outside the ranking — paediatric</span>}
-            {skipped && <span className="pt-flag">outside the ranking — no observation</span>}
+            {refused && <span className="pt-flag">outside the ranking: paediatric</span>}
+            {skipped && <span className="pt-flag">outside the ranking: no observation</span>}
             {ovrRec && (
               <span className="pt-ovr">
                 overridden{ovrRec.from_position != null && ovrRec.to_position != null
@@ -200,14 +215,24 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
             </div>
             {target != null && (
               <>
-                <div className="pt-wait-bar" role="img"
-                     aria-label={`${fmt(wait)} days waited against a ${target} day target`}>
-                  <i className="pt-wait-fill" style={{ width: `${Math.min(100, (wait / Math.max(wait, target)) * 100)}%` }} />
-                  <span className="pt-wait-tick" style={{ left: `${(target / Math.max(wait, target)) * 100}%` }} />
+                <div className="pt-wait-bar">
+                  <SevBar sev={waitSev} height={7}
+                          value={wait / Math.max(1, wait, target)}
+                          of={target / Math.max(1, wait, target)}
+                          label={`${fmt(wait)} days waited against a ${target} day target`} />
                 </div>
                 <div className="pt-wait-x num">
                   {overdueBy != null && overdueBy > 0
-                    ? `past target by ${fmt(overdueBy)} days`
+                    ? (
+                      <SevChip sev={waitSev}>
+                        past target by {fmt(overdueBy)} days
+                        {/* The multiple only once it says something the day
+                            count does not: under 2x it rounds to "1.0x" and
+                            reads as "exactly at target", which is the opposite
+                            of what the words beside it mean. */}
+                        {waitRatio != null && waitSev >= 2 && <> · {waitRatio.toFixed(1)}&times; the target</>}
+                      </SevChip>
+                    )
                     : `${fmt(Math.abs(overdueBy ?? 0))} days of target left`}
                 </div>
               </>
@@ -223,8 +248,8 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
 
       {/* Eight of the 308 are fixtures the dataset track plants at fixed pathway
           numbers because the demo depends on them existing. Saying what each one
-          is for turns the most obvious challenge — "why is there test data in
-          your clinical list?" — into the answer: each is a claim the system can
+          is for turns the most obvious challenge ("why is there test data in
+          your clinical list?") into the answer: each is a claim the system can
           be tested against, and the test that plants it is named. */}
       {plantedCase(pathway) && (
         <aside className="pt-planted">
@@ -242,31 +267,24 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
 
       {ovrRec && (
         <div className="pt-ovr-note">
-          <Info size={14} aria-hidden />
+          <Info size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden />
           <span>
             A clinician moved this referral on{' '}
             <span className="num">{new Date(ovrRec.created_at).toLocaleString('en-IE')}</span>:{' '}
             <strong>{ovrRec.reason}</strong>
-            {ovrRec.rule_warning_accepted && ' — a category-boundary warning was accepted on the record.'}
-            {' '}The position below is the system's; the override is what stands.
-            {/* The other three surfaces that show a clinician_id carry this
-                caveat and this one did not -- and the default value is literally
-                "clinician-01", which reads as an identity. */}
-            <span className="pt-attr">
-              Recorded as <span className="num">{ovrRec.clinician_id}</span> — attribution,
-              not authentication: the record says who typed it, it does not verify them.
-            </span>
+            {ovrRec.rule_warning_accepted && ' (a category-boundary warning was accepted on the record)'}
+            {'. '}The position below is the system's; the override is what stands.
           </span>
         </div>
       )}
 
-      {/* 2 — why that position */}
+      {/* 2: why that position */}
       {placed && dec.data
         ? <WhyHere placed={placed} decision={dec.data} reference={reference} ages={ages} compare={cmp}
                    onCompare={setCmp} onCloseCompare={() => setCmp(null)} />
         : <NotScoredYet refused={refused} skipped={skipped} error={dec.isError} />}
 
-      {/* 3 — what reached each agent */}
+      {/* 3: what reached each agent */}
       <section className="p-sec">
         <h2 className="sec-h">What informed the agents
           <span className="sec-note">
@@ -295,17 +313,22 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
         />
       </section>
 
-      {/* 4 — the shape of the wait */}
+      {/* 4: the shape of the wait */}
       {events.length > 0 && (
         <section className="p-sec">
           <h2 className="sec-h">The journey
-            <span className="sec-note">recorded dates only — nothing here is computed</span></h2>
-          <Journey events={events} today={date} className="pt-journey"
+            <span className="sec-note">recorded dates only, nothing here is computed</span></h2>
+          {/* The axis's overdue span is the same fact as the header's bar, so
+              it reads the same scale. Journey draws the span; the step comes
+              down as a class on its root because the span's magnitude is the
+              header's ratio, not something the axis can compute for itself. */}
+          <Journey events={events} today={date}
+                   className={'pt-journey' + (waitSev ? ` is-sev-${waitSev}` : '')}
                    waitDays={wait} targetDays={target} />
         </section>
       )}
 
-      {/* 5 — the chain. Cited where a run exists; on-record everywhere else.
+      {/* 5: the chain. Cited where a run exists; on-record everywhere else.
              A view-only day used to render nothing here at all, which read as a
              missing feature rather than as the deliberate limit it is: evidence
              is date-blind, so only the newest day can honestly be ranked, but
@@ -319,12 +342,12 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
       ) : ctx.data ? (
         <section className="p-sec">
           <h2 className="sec-h">What is on record
-            <span className="sec-note">no agent has scored this day — nothing here was cited</span></h2>
+            <span className="sec-note">no agent has scored this day, so nothing here was cited</span></h2>
           <Provenance pathway={pathway} context={ctx.data} />
         </section>
       ) : null}
 
-      {/* 6 — the edge of the instrument */}
+      {/* 6: the edge of the instrument */}
       <Limits pathway={pathway} clinical={c ?? null}
               news2={ops.data?.clinical} cohort={cohort.data?.referrals} />
     </div>
@@ -504,8 +527,8 @@ function WhyHere({ placed, decision, reference, ages, compare, onCompare, onClos
       <p className="p-note">
         Waiting time is a percentile <em>within this category</em>, not a raw day count, so one
         very long waiter cannot flatten everyone else. The {Math.round(a * 100)}/{Math.round((1 - a) * 100)}{' '}
-        split is set once for the whole hospital-day from how pressured its specialties are —
-        it is the same number for all {fmt(decision.rankings.length)} people here and cannot move
+        split is set once for the whole hospital-day from how pressured its specialties are. It
+        is the same number for all {fmt(decision.rankings.length)} people here and cannot move
         anyone between categories.
       </p>
 
@@ -523,8 +546,18 @@ function WhyHere({ placed, decision, reference, ages, compare, onCompare, onClos
               <span className="pt-check-id num">{ch.rule_id}</span>
               <span className="pt-check-st">{ruleStatement(reference, ch.rule_id)}</span>
               <span className="pt-check-d num">{ch.detail ?? '—'}</span>
-              <span className={'pt-verdict ' + (ch.passed ? 'is-ok' : 'is-bad')}>
-                {ch.passed ? 'holds' : 'breached'}
+              {/* The only one of four verdict registers in the product with no
+                  icon, and a breach carried by a 1px inset hairline. Now the
+                  same word, the same icon and the severity a breach gets
+                  everywhere else. */}
+              <span className={'pt-verdict' + (ch.passed ? ' is-ok' : '')}>
+                {ch.passed
+                  ? <><Check size={V_ICON} strokeWidth={2.5} aria-hidden />holds</>
+                  : (
+                    <SevChip sev={sevBreach(false)}>
+                      <TriangleAlert size={V_ICON} strokeWidth={2.25} aria-hidden />breached
+                    </SevChip>
+                  )}
               </span>
             </div>
           ))}
@@ -536,7 +569,7 @@ function WhyHere({ placed, decision, reference, ages, compare, onCompare, onClos
           <span className="lab">Coordinator's note</span>
           <p>{placed.rationale_summary}</p>
           <span className="pt-mini">
-            Written by <code>coordinator</code> from the numbers above. Deterministic — no model
+            Written by <code>coordinator</code> from the numbers above. Deterministic: no model
             wrote this sentence.
           </span>
         </div>
@@ -545,7 +578,9 @@ function WhyHere({ placed, decision, reference, ages, compare, onCompare, onClos
       {(above || below) && (
         <div className="why-neighbours">
           {above && <NeighbourRow r={above} label="above" onCompare={() => onCompare('above')} />}
+          {above && <WhatSeparates a={above} b={placed} alpha={decision.alpha} />}
           <NeighbourRow r={placed} label="this patient" self />
+          {below && <WhatSeparates a={placed} b={below} alpha={decision.alpha} />}
           {below && <NeighbourRow r={below} label="below" onCompare={() => onCompare('below')} />}
         </div>
       )}
@@ -592,8 +627,8 @@ function NotScoredYet({ refused, skipped, error }: {
     <section className="p-sec">
       <div className="notyet">
         <strong>
-          {refused ? 'Not scored, and not placed — paediatric.'
-            : skipped ? 'Not scored — no observation to read.'
+          {refused ? 'Not scored, and not placed: paediatric.'
+            : skipped ? 'Not scored: no observation to read.'
               : error ? 'No agent has scored this hospital-day.'
                 : 'No position yet.'}
         </strong>

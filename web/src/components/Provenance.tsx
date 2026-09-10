@@ -23,27 +23,36 @@ const GraphCanvas = lazy(() =>
  *  Neither shows why one patient outranks another. That is the contribution
  *  bars' job and this must never be read as the ordering argument.
  */
-/** The graph palette, shared with CohortGraph.tsx.
+/** The graph palette. The SAME ramp CohortGraph.tsx draws, value for value, so
+ *  a reader who learns the classes on the cohort graph reads them here.
  *
- *  Deliberately OFF the triage axis. An earlier version of this file used
- *  #2F5D45 for observations and #8A5A12 for ward and clinic nodes -- which are
- *  exactly --cat-routine and --cat-semi -- so a patient's own reading was drawn
- *  in Routine green and their ward in Semi-Urgent amber, on the same page where
- *  the header chip uses those hues for the real CPC band. reagraph needs
- *  literals, which is why these are not tokens; they are still the ink/clay/
- *  taupe axis and nothing here may borrow a category hue. */
+ *  Two rounds of the same fault. First #2F5D45 for observations and #8A5A12 for
+ *  ward and clinic nodes, which are exactly --cat-routine and --cat-semi: a
+ *  patient's own reading drawn in Routine green and their ward in Semi-Urgent
+ *  amber, on the same page whose header chip uses those hues for the real CPC
+ *  band. Then #B5765F and #D2A07E, which CohortGraph's own comment records as
+ *  having been REMOVED for being red-orange and amber next to --cat-urgent, and
+ *  which this file went on shipping. #D2A07E measures 2.32:1 on white.
+ *
+ *  reagraph needs literals, which is why these are not tokens. That exception
+ *  covers where the values LIVE; it has never licensed which hues are allowed.
+ *  This is paper, taupe, two clays and three ink steps, and nothing on it can
+ *  be read as a severity:
+ *
+ *    #FAFAF8 paper   #C4B6A6 taupe   #9C7C6B clay-light   #7A5B4D clay
+ *    #8C93AD ink-3   #6E6559 stone   #5B6480 ink-2 */
 const PALETTE = {
   decision: '#FAFAF8',
   placement: '#C4B6A6',
-  score: '#6E86C4',
-  observation: '#6E86C4',
-  bed_status: '#B5765F',
-  clinic_session: '#D2A07E',
-  condition: '#8A8577',
   referral: '#C4B6A6',
-  triage_event: '#8A7FA8',
-  specialty: '#8A7FA8',
-  ward: '#B5765F',
+  score: '#8C93AD',
+  observation: '#8C93AD',
+  bed_status: '#7A5B4D',
+  ward: '#7A5B4D',
+  clinic_session: '#9C7C6B',
+  condition: '#6E6559',
+  triage_event: '#6E6559',
+  specialty: '#5B6480',
 }
 
 // three.js renders labels from a limited glyph set: U+2082 (the subscript 2 in
@@ -162,14 +171,14 @@ export function Provenance({ pathway, decision, scores, context, height = 380 }:
         {cited ? (
           <>
             The chain the coordinator recorded: <strong className="num">{count}</strong> cited
-            records behind this position. What was cited — never why one person is ahead of
+            records behind this position. What was cited, never why one person is ahead of
             another, which is the arithmetic above.
           </>
         ) : (
           <>
             <strong>On record, not cited.</strong> No agent has scored this hospital-day, so
-            nothing here was used to place anyone. This is what exists about this referral —{' '}
-            <strong className="num">{count}</strong> linked records — and it exists on every
+            nothing here was used to place anyone. This is what exists about this referral
+            (<strong className="num">{count}</strong> linked records) and it exists on every
             day, which is why an older day can be read but not ranked.
           </>
         )}
@@ -190,8 +199,18 @@ function Stage({ nodes, edges, height }: { nodes: GraphNode[]; edges: GraphEdge[
   useEffect(() => {
     const el = host.current?.querySelector('canvas')
     if (!el) return
-    const onLost = (e: Event) => { e.preventDefault(); setLost(true) }
-    const onRestored = () => { setLost(false); setGen((g) => g + 1) }
+    // Same guard as CohortGraph's stage. react-three-fiber calls
+    // forceContextLoss() on a canvas React has already discarded, 500ms after
+    // it unmounts, which dispatches webglcontextlost on a DEAD element. That
+    // loss is not this surface's loss.
+    const onLost = (e: Event) => {
+      if (!el.isConnected) return
+      e.preventDefault(); setLost(true)
+    }
+    const onRestored = () => {
+      if (!el.isConnected) return
+      setLost(false); setGen((g) => g + 1)
+    }
     el.addEventListener('webglcontextlost', onLost)
     el.addEventListener('webglcontextrestored', onRestored)
     return () => {
@@ -216,7 +235,10 @@ function Stage({ nodes, edges, height }: { nodes: GraphNode[]; edges: GraphEdge[
       {lost && (
         <div className="prov-lost">
           The graphics context dropped.{' '}
-          <button onClick={() => setGen((g) => g + 1)}>Redraw</button>
+          {/* clears the latch as well as remounting: webglcontextrestored can
+              never fire on the canvas this replaces, so without setLost(false)
+              the banner outlives every redraw */}
+          <button onClick={() => { setLost(false); setGen((g) => g + 1) }}>Redraw</button>
         </div>
       )}
     </div>

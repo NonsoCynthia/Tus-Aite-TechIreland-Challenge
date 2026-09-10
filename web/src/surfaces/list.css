@@ -8,12 +8,18 @@
    reading too old to trust, and clock suspended. Those are not the same thing
    and must not be the same colour.
 
-   Four survive, each in a different composition:
-     .wb-over    the overflow past target -- the ONLY clay whose LENGTH varies
-                 row to row, so the only one carrying information
+   Three survive, each in a different composition:
      .tier-*     the breach boundary, drawn once per table
      .ev-v.is-cited  in the expander, the vital the agent actually read
      .fig.is-accent  one figure in the headline row
+
+   .wb-over used to be the fourth. It is now driven by --sev-*, because the
+   overflow past target is a GRADED state and clay could only ever draw it at
+   one weight: a referral 1.01x past its target and one 31x past it were the
+   same colour, and the class that was supposed to separate them, .sub.is-over,
+   restated the base class verbatim and did nothing at all. The severity scale
+   (tokens.css, lib/severity.ts) is where every attention state on this surface
+   now lives, and clay is left to mean only "this is what did the work".
 */
 /* The ranked list.
  *
@@ -84,16 +90,54 @@
 }
 .lst-warn svg { flex: none; margin-top: 2px; color: var(--text-2); }
 
-/* --- before any run ------------------------------------------------------
-   A flat statement rather than a photograph: what is on screen, and what claim
-   it does not make. */
+/* --- before any run: the list, and what is in it -------------------------
+   The client asked for this state by name: "you would want to see a state
+   before running ranking, that there are these number of patients who have
+   been waiting with these issues, and then when we run you see the ranking."
+
+   It was two sentences of disclaimer, which reads as an absence. It is the
+   count, the spread and the two graded states now, so that running the agents
+   is a step the reader chooses rather than a screen they arrive at. Every
+   figure is counted from the cohort, so all of it is true of a day nothing has
+   scored. */
 .lst-pre {
   border: 1px solid var(--rule-firm); border-left: 3px solid var(--clay);
-  background: var(--surface); padding: var(--d3) var(--d4);
-  margin-bottom: var(--d5); max-width: 96ch; display: grid; gap: 4px;
+  background: var(--surface); padding: var(--d4);
+  margin-bottom: var(--d5); max-width: 108ch;
 }
-.lst-pre strong { font-size: var(--t-body); }
-.lst-pre span { font-size: var(--t-small); color: var(--text-2); line-height: 1.55; }
+.pre-h {
+  font-family: var(--font-brand); font-size: var(--t-title); font-weight: 400;
+  line-height: 1.25; margin: 0 0 var(--d3); text-wrap: balance; color: var(--text);
+}
+.pre-h strong { font-weight: 500; }
+.pre-figs {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(184px, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+}
+.pre-f { background: var(--surface-2); padding: var(--d3); min-width: 0; }
+.pre-f-v {
+  display: flex; align-items: baseline; gap: var(--d2); flex-wrap: wrap;
+  font-size: var(--t-small); color: var(--text-2); line-height: 1.3;
+}
+.pre-f-v > b {
+  font-family: var(--font-brand); font-size: 26px; font-weight: 300;
+  line-height: 1.05; color: var(--text);
+}
+/* inside a severity block the numeral keeps the data face, because the block
+   is the thing carrying the weight */
+.pre-f-v .sev b {
+  font-family: var(--font-data); font-size: var(--t-data); font-weight: 650;
+  color: inherit;
+}
+.pre-f-k {
+  font-size: var(--t-micro); color: var(--text-2); line-height: 1.45;
+  margin-top: var(--d1);
+}
+.pre-p {
+  margin: var(--d3) 0 0; font-size: var(--t-small); color: var(--text-2);
+  line-height: 1.6;
+}
+.pre-p strong, .pre-p .num { color: var(--text); }
 
 /* --- the sort key, drawn ------------------------------------------------- */
 .lst-key-sec { margin-bottom: var(--d5); }
@@ -117,6 +161,14 @@
   font-size: var(--t-micro); color: var(--text-3); letter-spacing: 0.01em;
   margin-top: 3px; overflow-wrap: anywhere;
 }
+/* A step that needs a caveat gets one under it. Step 4 is where twelve pairs
+   print the same number and are still separated by it; step 5 is where the
+   sixteen that are genuinely equal are placed. */
+.key-note {
+  font-size: var(--t-micro); color: var(--text-3); line-height: 1.45;
+  margin-top: var(--d1); padding-top: var(--d1); border-top: 1px solid var(--rule);
+}
+
 /* step 3 is the tier readers kept missing: it is the one accented element */
 .key-s.is-tier {
   border-top-color: var(--clay); background: var(--surface-2);
@@ -234,8 +286,14 @@
   max-height: min(calc(100vh - 300px), 1180px); min-height: 420px; overflow: auto;
   border: 1px solid var(--rule); background: var(--surface);
 }
+/* min-width is set inline from List.tsx, where the column widths live: it has
+   to be the sum of the specified widths PLUS Referral's reserved minimum, and
+   written down here as a constant it drifted to 1120 against a 1154 sum. Under
+   `table-layout: fixed` that gave the one elastic column a remainder of -34px
+   and its content painted over the next column, which is the "compact version
+   overlaps" report. */
 .lst-table {
-  width: 100%; min-width: 1120px;
+  width: 100%;
   table-layout: fixed; border-collapse: separate; border-spacing: 0;
 }
 
@@ -305,10 +363,22 @@
 }
 .lst-table .sub b { color: var(--text); font-weight: 600; }
 .sub-code { color: var(--text-3); }
-.sub.is-over { color: var(--text-2); }
-.sub.is-over b { color: var(--text); }
-.sub.is-stale { color: var(--text-2); }
-.sub.is-stale b { color: var(--text); border-bottom: 1px dashed var(--rule-firm); }
+
+/* A qualifier line carrying a GRADED value is a flex row, not one run of text:
+   the severity block never shrinks and the prose beside it truncates first.
+   That is what keeps a reading's age on screen at every width, and the age may
+   never be the thing that goes.
+
+   The two rules that used to live here were .sub.is-over (which restated .sub
+   verbatim, so a referral 31x past target was typeset exactly like one at
+   1.04x) and .sub.is-stale (a 1px dashed underline at 1.75:1 for a reading up
+   to 871 days old). Both are severity steps now. */
+.lst-table .sub.is-split { display: flex; align-items: baseline; gap: 5px; }
+.lst-table .sub.is-split > .sev, .lst-table .sub.is-split > .sub-age { flex: none; }
+.sub-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the block keeps its fill and loses only the vertical padding, so a graded
+   qualifier costs a 46px row no height at all */
+.lst-table .sub .sev { padding: 0 6px; }
 
 .c-pos { text-align: right; }
 .pos {
@@ -318,17 +388,27 @@
 }
 .pos.is-moved { color: var(--ink); box-shadow: inset 0 -2px 0 var(--ink); }
 .pos-was {
-  display: block; line-height: 1.2;
+  display: block; max-width: 100%; line-height: 1.2;
   /* .lab's uppercase + 0.08em tracking is wider than this column, so the word
      overflowed left and clipped to "ONFIRMED". It keeps the label register but
-     drops the tracking and is allowed to wrap. */
-  letter-spacing: 0.02em; white-space: normal; text-transform: none;
+     drops the tracking. It no longer wraps either: 76px of column is 56px of
+     content, and "system said 12" wrapped to three lines (39.6px) in a 56px
+     box. The phrase is on the tooltip and in the expander in full. */
+  letter-spacing: 0.02em; text-transform: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .lst-table .pw { font-size: var(--t-body); color: var(--text); }
 .lst-table .wait-n, .lst-table .n2 {
   font-size: var(--t-data); font-weight: 600; color: var(--text); line-height: 1.2;
 }
+/* NEWS2 carries its own magnitude. A 0 and a 7 were typeset identically here.
+   Size and weight are set inline from the value, as a continuous map with no
+   band in it: NEWS2 TOTAL is deliberately outside the severity scale
+   (lib/severity.ts -- 148 of 308 tie at exactly 0), so a graded colour would
+   claim a discrimination the number cannot make, and any threshold drawn here
+   would be an invented one. */
+.n2-v { line-height: 1.1; }
 .lst-table .of { font-weight: 400; color: var(--text-2); font-size: var(--t-micro); }
 .tri { font-size: var(--t-small); color: var(--text); }
 .susp { color: var(--text-2); font-style: italic; }
@@ -360,6 +440,20 @@
 .spn.is-tight .spn-g { height: 16px; }
 .spn.is-tight .spn-u { top: 1px; }
 .spn.is-tight .spn-w { bottom: 1px; }
+/* six decimals when two would print the same number as the row above */
+.spn.is-precise .spn-n { width: 52px; }
+
+/* --- two rows the printed priority cannot separate ------------------------
+   Twelve adjacent in-band pairs in this decision differ only from the fourth
+   decimal and both print the same three. Both halves of the pair carry this
+   line: the numerals above it are what actually differ, and this names which
+   of the two terms carried the margin. */
+.tie { display: block; max-width: 100%; margin-top: 1px; font-size: var(--t-micro); }
+.tie-w {
+  display: block; color: var(--text-2); line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tie.is-exact .tie-w { color: var(--text-3); }
 
 /* --- waiting time against target ------------------------------------------
    The target sits at a fixed mark at 62%. Everything past it is compressed, so
@@ -370,7 +464,14 @@
   background: var(--bg-sunk); margin: 3px 0 2px;
 }
 .wb-in { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text-3); }
-.wb-over { position: absolute; top: 0; bottom: 0; background: var(--clay); }
+/* The overflow past target takes the SAME severity step as the chip beside it,
+   so the bar and the numeral can never disagree. The two solid steps also grow
+   the fill area rather than only changing it: 2px of extra height, drawn
+   outside the track, so nothing reflows. */
+.wb-over { position: absolute; top: 0; bottom: 0; background: var(--sev-1-edge); }
+.wb[data-sev="2"] .wb-over { background: var(--sev-2-edge); }
+.wb[data-sev="3"] .wb-over { background: var(--sev-3-bg); top: -1px; bottom: -1px; }
+.wb[data-sev="4"] .wb-over { background: var(--sev-4-bg); top: -1px; bottom: -1px; }
 .wb-mark {
   position: absolute; left: 62%; top: -2px; bottom: -2px; width: 1px;
   background: var(--rule-firm);
@@ -383,16 +484,34 @@
 }
 
 /* --- the rule that fired. No rule ID had ever reached a screen. ------------ */
-.rulez { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.rulez {
+  display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
+  min-width: 0; max-width: 100%;
+}
+/* The chip is a wrapper now. The rule ID sits inside the severity block, which
+   at sevBreach(false) is a SOLID fill and is what carries across a room; the
+   detail stays outside it in the reading register, so the sentence is not
+   reversed out of a dark ground at 11px. */
 .rule-chip {
-  display: inline-flex; align-items: baseline; gap: 5px; flex-wrap: wrap;
-  max-width: 100%; padding: 3px var(--d2);
-  background: var(--bg-sunk); box-shadow: inset 2px 0 0 var(--rule-firm);
+  display: inline-flex; align-items: baseline; gap: 5px;
+  max-width: 100%; min-width: 0;
   color: var(--text); font-size: var(--t-micro); line-height: 1.4;
 }
+.rule-chip > .sev { flex: none; padding: 1px 6px; }
 .rule-chip svg { align-self: center; flex: none; }
 .rule-chip b { font-weight: 650; letter-spacing: 0.01em; }
-.rule-d { color: var(--text-2); }
+.rule-d {
+  color: var(--text-2); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* A rule that will not fit is COUNTED, never dropped. Compact used to clip the
+   second chip with `overflow: hidden` and no ellipsis, which contradicted the
+   compact block's own promise not to hide one of the two facts in a cell. */
+.rule-more {
+  flex: none; font-size: var(--t-micro); color: var(--text-2); line-height: 1.4;
+  padding: 1px var(--d2);
+  border: 1px solid var(--rule-firm); border-radius: var(--radius);
+}
 .rule-ok, .rule-pre {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: var(--t-micro); color: var(--text-3);
@@ -480,7 +599,7 @@
 
 .ev-rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 .ev-rules li {
-  display: grid; grid-template-columns: 78px 172px 1fr; align-items: baseline;
+  display: grid; grid-template-columns: 92px 172px 1fr; align-items: baseline;
   gap: var(--d2) var(--d3); background: var(--surface-2); padding: 6px var(--d3);
 }
 .ev-rid { font-size: var(--t-micro); color: var(--text); font-weight: 600; }
@@ -490,13 +609,33 @@
 }
 .ev-rules li.is-bad .ev-rd { color: var(--text); font-weight: 600; }
 .ev-rw { grid-column: 2 / -1; font-size: var(--t-micro); color: var(--text-3); }
+/* A pass and a breach used to share one background, separated by a single text
+   step and a 1.55:1 ring. A breach is sevBreach(false) now, which is a solid
+   block; "holds" is not an attention state, so it keeps the neutral pill it
+   always had. Colour never travels alone either way: the word is in the chip. */
 .ev-vd {
-  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
-  font-size: var(--t-micro); padding: 2px var(--d2); border-radius: var(--radius-pill);
+  display: inline-flex; align-items: center; white-space: nowrap;
+  font-size: var(--t-micro);
 }
-/* colour never travels alone: the word is in the chip */
-.ev-vd.is-ok { color: var(--text-2); background: var(--bg-sunk); }
-.ev-vd.is-bad { color: var(--text); background: var(--bg-sunk); box-shadow: inset 0 0 0 1px var(--rule-firm); }
+.ev-ok {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px var(--d2); border-radius: var(--radius-pill);
+  color: var(--text-2); background: var(--bg-sunk);
+}
+.ev-vd .sev { border-radius: var(--radius-pill); }
+.ev-vd svg { align-self: center; flex: none; }
+
+/* --- the pair the printed priority cannot separate, said in full ---------- */
+.ev-tie {
+  margin: var(--d2) 0 0; padding: var(--d2) var(--d3);
+  background: var(--surface-2); box-shadow: inset 3px 0 0 var(--sev-2-edge);
+  font-size: var(--t-micro); color: var(--text-2); line-height: 1.6;
+}
+.ev-tie strong, .ev-tie b { color: var(--text); }
+.ev-tie .num { color: var(--text); font-weight: 600; }
+/* an exact tie is not a severity: nothing is wrong, priority simply cannot
+   separate them and step 5 places them */
+.ev-tie.is-exact { box-shadow: inset 3px 0 0 var(--rule-firm); }
 
 .ev-vitals {
   display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -560,8 +699,18 @@
 .lst-vp.is-tight .cell.is-r { flex-direction: row-reverse; }
 .lst-vp.is-tight .pos { font-size: 16px; }
 .lst-vp.is-tight .wb { width: 56px; flex: none; margin: 0; align-self: center; }
-.lst-vp.is-tight .rulez { flex-direction: row; flex-wrap: nowrap; overflow: hidden; }
-.lst-vp.is-tight .rule-chip { flex-wrap: nowrap; white-space: nowrap; }
+/* One line, and a count of whatever did not fit. NEVER `overflow: hidden` with
+   no ellipsis: a row can fire a CRT rule AND RULE-TRIAGE-TURNAROUND, and the
+   second chip was being cut off silently. */
+.lst-vp.is-tight .rulez {
+  flex-direction: row; flex-wrap: nowrap; align-items: center; gap: var(--d2);
+}
+.lst-vp.is-tight .rule-chip { min-width: 0; white-space: nowrap; }
+/* The pathway number and the planted chip came to 47px wrapped inside a 36px
+   row. They sit on one line, and the chip truncates before the number does. */
+.lst-vp.is-tight .pw-line { flex-wrap: nowrap; gap: 5px; }
+.lst-vp.is-tight .pw-open { flex: none; }
+.lst-vp.is-tight .planted { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* the override badge sits BESIDE the referral in compact, not under it, so a
    moved row stays one line high like every other row */
 .lst-vp.is-tight .c-ref .cell {
@@ -634,14 +783,11 @@
 .n2.is-na { font-weight: 500; }
 .n2-na { color: var(--text-2); font-size: var(--t-small); }
 
-/* --- below 1440 the table has to lose a column, and CONTEXT is the one -------
-   MTS and pain are recorded-but-not-scored, they are in the expander in full,
-   and the column returned an identical subline on every row. TRIAGE reads
-   "triaged" on 307 of 308, so it goes too and the status is carried as a chip
-   only when it is NOT triaged. */
-@media (max-width: 1439px) {
-  .lst-table .c-ctx, .lst-table th.c-ctx { display: none; }
-}
+/* Which columns the table carries is decided in List.tsx and NOT here. Under
+   `table-layout: fixed` with a <colgroup>, hiding a <td> in CSS while its <col>
+   and its <th> remain misaligns every row below it, so the cells and their cols
+   have to appear and disappear together. useNarrow(NINE_COL_PX) does that, and
+   the media query that used to hide .c-ctx alone has been removed. */
 
 /* The row is not a button. ARIA's "children presentational" on role=button was
    stripping every cell from the accessibility tree, so a screen-reader user got
@@ -671,6 +817,20 @@
   font-size: var(--t-micro); color: var(--text-3); white-space: nowrap;
   padding: 1px var(--d2); border: 1px dashed var(--rule-firm); border-radius: var(--radius);
 }
+
+/* --- icons, by role -------------------------------------------------------
+   tokens.css declares --icon and --icon-sm and nothing was spending them. The
+   same glyph appeared here at 11px/2.25, 12px/2.25, 14px/2 and 11px/2.5, and
+   at 12px and 13px on other surfaces. Three roles, two token sizes, one stroke:
+
+     .ico-sig  a signal: TriangleAlert, Check
+     .ico-chr  inline chrome: the sort arrows, the search glass, the pen
+     .ico-ctl  a control's own glyph on a 26px target: the expander chevron
+
+   Sized here rather than through lucide's `size` prop so the value comes from
+   the token; stroke is passed explicitly at every call site. */
+.lst .ico-sig, .lst .ico-chr { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
+.lst .ico-ctl { width: var(--icon); height: var(--icon); flex: none; }
 
 /* A filter that matches only in another category used to dead-end here. */
 .lst-jump {

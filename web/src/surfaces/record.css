@@ -51,6 +51,13 @@
 .c-st { color: var(--text-2); }
 .rules tr.is-breached .c-rid { color: var(--text); font-weight: 700; }
 
+/* Three verdicts, three glyphs, three registers. "holds" and "not tested" are
+   quiet because neither is an alarm; the breach is a SevChip, so its fill comes
+   from the severity scale and not from here.
+
+   .verdict.is-bad is gone. It was --bg-sunk with a --rule-firm inset ring, which
+   is the same weight as "holds": the row that mattered looked exactly like the
+   row that did not. */
 .verdict {
   display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
   font-size: var(--t-micro); padding: 3px var(--d2);
@@ -58,10 +65,25 @@
 }
 /* colour is never the only channel: the word travels with it, always */
 .verdict.is-ok  { color: var(--text-3); background: var(--surface-2); }
-.verdict.is-bad { color: var(--text); background: var(--bg-sunk); box-shadow: inset 0 0 0 1px var(--rule-firm); }
+/* an untested rule is an ABSENCE of a verdict, not a pass. It is drawn quieter
+   than "holds", never as a check. */
+.verdict.is-none {
+  color: var(--text-3); background: transparent;
+  box-shadow: inset 0 0 0 1px var(--rule); font-style: italic;
+}
+.verdict svg { flex: 0 0 auto; }
+
+/* the breach verdict renders through <SevChip>, which brings its own fill from
+   the severity tokens. This only lends it the pill's geometry. */
+.c-v .sev {
+  align-items: center; gap: 5px;
+  padding: 3px var(--d2); border-radius: var(--radius-pill);
+  font-size: var(--t-micro);
+}
+.c-v .sev svg { flex: 0 0 auto; }
 
 /* --- the reconciliation ledger ------------------------------------------
-   Four buckets, separately labelled, never summed into one figure. */
+   Each bucket separately labelled, never summed into one figure. */
 .ledger { border: 1px solid var(--rule); background: var(--surface); }
 .ledger-row {
   display: grid; grid-template-columns: 84px 200px 1fr;
@@ -78,8 +100,13 @@
   font-size: var(--t-small); color: var(--text-2);
   background: var(--bg-sunk); border: 1px solid var(--rule);
 }
-.ledger-sum.is-off { border-left: 3px solid var(--rule-firm); }
+/* The gap is an integrity failure, so the edge is the top of the severity scale
+   rather than --rule-firm at 1.55:1. The edge is only the supporting cue: the
+   fill area is the SevChip carrying the count, because fill is what carries
+   across a room and a hairline never did. */
+.ledger-sum.is-off { border-left: 3px solid var(--sev-4-bg); color: var(--text); }
 .ledger-sum strong { color: var(--text); }
+.ledger-sum .sev { margin-left: var(--d1); }
 
 .warn-chip {
   display: inline-block; margin-left: var(--d2); padding: 2px var(--d2);
@@ -87,8 +114,43 @@
   background: var(--bg-sunk); border-radius: var(--radius-pill);
   box-shadow: inset 0 0 0 1px var(--rule-firm);
 }
+/* --- the override log ----------------------------------------------------
+   Bounded so the section has a height a reviewer can hold, and so the header
+   has a scroll container to stick to. Without the viewport, `position: sticky`
+   on a th is inert: .scroll-x sets overflow on both axes but no height, so the
+   container never scrolls vertically and the header never engages. Past about
+   row 20 that left six unlabelled columns of timestamps and integers. */
+.ovr-vp {
+  max-height: min(calc(100vh - 320px), 640px); overflow: auto;
+  border: 1px solid var(--rule); background: var(--surface);
+}
+/* sticky needs SEPARATE borders: a collapsed border belongs to the table rather
+   than to the cell, so it scrolls out from under a stuck header. The rule is an
+   inset shadow instead, which is what the brand allows and what the ranked
+   list's own header already does. */
+.rules.ovr-log { border-collapse: separate; border-spacing: 0; }
+.ovr-vp .ovr-log th {
+  position: sticky; top: 0; z-index: 2;
+  border-bottom: 0; box-shadow: inset 0 -1px 0 var(--rule-firm);
+}
 .ovr-log td { white-space: nowrap; }
-.ovr-log td:nth-child(5) { white-space: normal; min-width: 260px; }
+/* the Reason is the one column that must wrap, and the one that sets row
+   height. Capped so a long reason cannot make a 200px row. */
+.ovr-log td:nth-child(5) {
+  white-space: normal; min-width: 260px; max-width: 420px;
+}
+
+.ovr-foot {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--d3);
+  margin-top: var(--d2); font-size: var(--t-small); color: var(--text-3);
+}
+.ovr-more {
+  font: inherit; font-size: var(--t-small); cursor: pointer;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--rule-firm); border-radius: var(--radius);
+  padding: 5px var(--d3);
+}
+.ovr-more:hover { background: var(--bg-sunk); }
 
 .p-note {
   font-size: var(--t-small); color: var(--text-2);
@@ -100,8 +162,8 @@
   .ledger-w { grid-column: 1 / -1; }
 }
 
-.ledger-sum strong { color: var(--text); }
-.ledger-gap { color: var(--text); font-weight: 700; }
+/* .ledger-gap is gone: the unexplained count is a SevChip now, so its weight
+   comes from the scale rather than from bolding 11px of text. */
 /* the buckets overlap; saying so IS the panel */
 .ledger-overlap {
   margin-top: var(--d2); padding-top: var(--d2);

@@ -1,15 +1,20 @@
 /* The hospital overview.
 
    An instrument panel, not a document. Every rule here follows the kit: no
-   gradient, no glow, no drop shadow — depth is a hairline and a flat fill.
+   gradient, no glow, no drop shadow, and depth is a hairline and a flat fill.
    Every colour is a token; there is not one literal in this file.
 
-   Two reservations are held to strictly.
-     - --cat-* is triage and GAR only. Bars, meters, sparklines and the
-       occupancy track are all neutral (--text-3 / --rule-firm), because a
-       booked clinic is not an Urgent referral and must not borrow its red.
+   Three reservations are held to strictly.
+     - --cat-* is triage and GAR only. Bars, meters and sparklines are neutral
+       (--text-3 / --rule-firm), because a booked clinic is not an Urgent
+       referral and must not borrow its red.
      - clay marks ONE element in the composition: .is-cited, the session the
-       capacity agent actually read. Nothing else on this page is clay. */
+       capacity agent actually read. The readout band used to spend a second
+       clay edge on the past-target tile; that tile now carries severity, which
+       is what an attention state is supposed to carry, and clay is back to one.
+     - severity is never drawn here. Every attention state on this surface
+       renders through <SevChip> and <SevBar>, so the scale is learned once.
+       This file only positions them. */
 
 .ov { display: grid; gap: var(--d5); align-content: start; }
 
@@ -27,13 +32,77 @@
 .ov-head-meta span { display: inline-flex; align-items: center; gap: 6px; }
 .ov-head-meta svg { color: var(--text-3); flex: none; }
 
+/* --- the severity primitives, positioned ----------------------------------
+   Colour, weight and fill are the contract's and are not touched here. What is
+   set is layout: the chip baseline-aligns its children, which drops an icon
+   below the cap height, and the bar is a block that has to flex inside a cell. */
+.ov .sev svg { align-self: center; flex: none; }
+.ov .sev .ov-ro-u, .ov .sev .ov-mini-u { color: inherit; }
+.ov-inline .sevbar { flex: 1 1 auto; }
+
+/* --- reconciliation -------------------------------------------------------
+   Quiet while two independent counts of the same list agree. The moment they
+   do not, the block inside is sev-4: a number that does not reconcile outranks
+   any clinical state, because a clinician can act on a bad number. */
+.ov-recon {
+  display: flex; align-items: center; gap: var(--d2); flex-wrap: wrap;
+  margin: 0; font-size: var(--t-micro); color: var(--text-3);
+}
+.ov-recon svg { flex: none; }
+.ov-recon.is-broken {
+  align-items: flex-start; gap: var(--d3);
+  padding: var(--d3) var(--d4); background: var(--bg-sunk);
+  border: 1px solid var(--rule-firm);
+  box-shadow: inset 3px 0 0 var(--sev-4-bg);
+  font-size: var(--t-small); color: var(--text);
+}
+.ov-recon-b { display: grid; gap: 3px; min-width: 0; }
+.ov-recon-n { font-size: var(--t-micro); color: var(--text-2); }
+
+/* --- the day the figures were actually taken on ---------------------------
+   A ward snapshot and a clinic session carry their own date, and it is not
+   always the day selected. When it is not, the date itself is the sev-4 mark. */
+.ov-asof {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin: 0 0 var(--d3); font-size: var(--t-micro); color: var(--text-3);
+}
+.ov-asof svg { flex: none; }
+.ov-asof.is-off {
+  align-items: flex-start; gap: var(--d2);
+  padding: var(--d2) var(--d3); background: var(--bg-sunk);
+  border: 1px solid var(--rule-firm);
+  box-shadow: inset 3px 0 0 var(--sev-4-bg);
+  font-size: var(--t-small); color: var(--text);
+}
+.ov-asof.is-off > span { min-width: 0; }
+
+/* --- before anything has been ranked -------------------------------------
+   A 404 from /api/decision is the ordinary state, not a failure, so this reads
+   as a step not yet taken rather than as an alarm. */
+.ov-before {
+  padding: var(--d3) var(--d4) var(--d4);
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-firm);
+}
+.ov-before-h {
+  display: flex; align-items: center; gap: var(--d2);
+  font-size: var(--t-section); margin-bottom: var(--d2);
+}
+.ov-before-h svg { flex: none; color: var(--text-3); }
+.ov-before p { margin: 0; font-size: var(--t-small); color: var(--text-2); max-width: 88ch; }
+.ov-before p.ov-before-cta {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  margin-top: var(--d3); color: var(--text); font-weight: 550;
+}
+.ov-before-cta svg { flex: none; align-self: center; }
+
 /* --- the readout band -----------------------------------------------------
    One hairline grid, no cards. The band fills the column at any width. */
 .ov-band {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
   /* NOT the gap:1px-over-a-rule-background trick. Nine tiles into a column that
      fits seven leaves five empty cells, and those cells render as a solid grey
-     block -- the exact "doesn't fill the room" fault this page was rebuilt to
+     block: the exact "doesn't fill the room" fault this page was rebuilt to
      fix. Hairlines live on the children, so a partial last row is just quiet
      surface. */
   gap: 0; background: var(--surface); border: 1px solid var(--rule);
@@ -42,9 +111,6 @@
   background: var(--surface); padding: var(--d3) var(--d4) var(--d4); min-width: 0;
   border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
 }
-/* an inset RULE, not a drop shadow: the same idiom app.css uses for .tile
-   and .vital, and neutral rather than clay so the one accent stays spent. */
-.ov-ro.is-accent { box-shadow: inset 3px 0 0 var(--clay); }
 .ov-ro-k { display: flex; align-items: center; gap: 5px; }
 .ov-ro-k svg { flex: none; color: var(--text-3); }
 .ov-ro-v {
@@ -69,7 +135,9 @@
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   /* no align-items: start. .ov-panel is a column flex whose body grows, so the
      panels stretch to a shared bottom edge; starting them left a ~260px band of
-     empty paper under the shortest one, on the same row as the tallest. */
+     empty paper under the shortest one, on the same row as the tallest. That
+     shared edge is only affordable because every panel on the row is bounded:
+     see .ov-rules, which used to grow without limit. */
 }
 @media (max-width: 1180px) { .ov-cols { grid-template-columns: minmax(0, 1fr); } }
 
@@ -89,7 +157,13 @@
   color: var(--text-3); font-weight: 400; margin-left: auto;
 }
 .ov-panel-b { padding: var(--d4); min-width: 0; flex: 1 1 auto; }
-.ov-panel-b > .scroll-x { margin: calc(var(--d4) * -1) calc(var(--d4) * -1) 0; }
+/* A table goes full bleed sideways always, and flush to the panel head only
+   when nothing precedes it. It is preceded now: the ward and clinic panels
+   state the date their figures were taken on before the table starts. */
+.ov-panel-b > .scroll-x {
+  margin-left: calc(var(--d4) * -1); margin-right: calc(var(--d4) * -1);
+}
+.ov-panel-b > .scroll-x:first-child { margin-top: calc(var(--d4) * -1); }
 .ov-panel-b > .scroll-x:last-child { margin-bottom: calc(var(--d4) * -1); }
 
 /* A caption, not a paragraph: where a number came from and what it may not do. */
@@ -117,7 +191,7 @@
 .ov-t th:first-child, .ov-t td:first-child { padding-left: var(--d4); }
 .ov-t th:last-child, .ov-t td:last-child { padding-right: var(--d4); }
 .ov-t .c-n, .ov-t th.c-n { text-align: right; }
-/* whose number this is, under the column name — the agent's working is
+/* whose number this is, under the column name: the agent's working is
    labelled as the agent's, never left to look like a measurement */
 .ov-th-sub {
   display: block; font-weight: 400; letter-spacing: 0;
@@ -126,15 +200,22 @@
 .ov-t .c-bar { min-width: 132px; }
 .ov-t .c-name { color: var(--text); font-weight: 550; white-space: normal; }
 .ov-t .c-dim { color: var(--text-3); }
+/* A list cell. .c-dim only set a colour, so it INHERITED the nowrap above and
+   one ward backing six specialties ran ~600px on a single unbreakable line,
+   pushing the 13-column table past 2,500px. */
+.ov-t .c-wrap { white-space: normal; min-width: 140px; max-width: 240px; }
 .ov-t tfoot td {
   border-top: 1px solid var(--rule-firm); border-bottom: 0;
   background: var(--bg-sunk); color: var(--text-2); font-weight: 550;
 }
 .ov-of { color: var(--text-3); font-weight: 400; }
 .ov-none { color: var(--text-3); }
-.ov-sub { display: block; font-size: var(--t-micro); color: var(--text-3); font-weight: 400; }
+.ov-sub {
+  display: block; font-size: var(--t-micro); color: var(--text-3);
+  font-weight: 400; white-space: normal;
+}
 
-/* --- the bar. neutral by rule; the number always sits beside it. ---------- */
+/* --- the neutral bar. the number always sits beside it. ------------------- */
 .ov-bar {
   display: block; position: relative; height: 8px; min-width: 40px;
   background: var(--bg-sunk); border: 1px solid var(--rule); flex: 1 1 auto;
@@ -158,7 +239,11 @@
 .ov-nat-n { font-size: var(--t-micro); color: var(--text-2); white-space: nowrap; }
 .ov-nat-d { font-size: var(--t-micro); color: var(--text-2); }
 
-/* --- intake --------------------------------------------------------------- */
+/* --- intake ---------------------------------------------------------------
+   A column per day. At 60 days a no-wrap flex row left 3.8px per column and a
+   20px count label centred on it landed on both neighbours, so the columns now
+   hold a floor width and the series scrolls past it instead of collapsing. The
+   labels also clip rather than spill. */
 .ov-intake-lead {
   display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
   font-size: var(--t-small); color: var(--text-2); margin-bottom: var(--d4);
@@ -169,16 +254,20 @@
   font-size: var(--t-body); font-weight: 600; color: var(--text);
   padding-left: var(--d2); margin-left: var(--d1); border-left: 1px solid var(--rule-firm);
 }
-.ov-cols-chart { display: flex; align-items: flex-end; gap: 3px; }
-.ov-col { flex: 1 1 0; min-width: 0; display: grid; gap: 3px; justify-items: center; }
-.ov-col-n { font-size: var(--t-micro); color: var(--text-2); }
+.ov-chart-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
+.ov-cols-chart { display: flex; align-items: flex-end; gap: 3px; min-width: min-content; }
+.ov-col { flex: 1 1 0; min-width: 22px; display: grid; gap: 3px; justify-items: center; }
+.ov-col-n {
+  font-size: var(--t-micro); color: var(--text-2); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
 .ov-col-track {
   display: flex; align-items: flex-end; justify-content: center;
   width: 100%; height: 58px; background: var(--bg-sunk);
   border-bottom: 1px solid var(--rule-firm);
 }
 .ov-col-track i { display: block; width: 100%; background: var(--text-3); min-height: 1px; }
-.ov-col-k { font-size: var(--t-micro);
+.ov-col-k {
   font-size: 9px; color: var(--text-3); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
@@ -193,34 +282,45 @@
   gap: 0; background: var(--surface); border: 1px solid var(--rule);
   margin-bottom: var(--d4);
 }
-.ov-mini-i { background: var(--surface); padding: var(--d2) var(--d3);  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);}
+.ov-mini-i {
+  background: var(--surface); padding: var(--d2) var(--d3);
+  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+}
 .ov-mini-v {
   font-family: var(--font-brand); font-size: 19px; font-weight: 300;
   line-height: 1.15; color: var(--text);
 }
+.ov-mini-u { font-size: var(--t-small); font-family: var(--font-data); color: var(--text-3); }
 .ov-hist { display: grid; gap: 5px; }
 .ov-hist-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 38px; align-items: center; gap: var(--d2); }
 .ov-hist-k { font-size: var(--t-micro); color: var(--text-2); }
 .ov-hist-n { font-size: var(--t-small); color: var(--text); text-align: right; }
-/* the year boundary is a rule, not a hue */
+/* the year boundary is a rule as well as a step on the scale */
 .ov-hist-row.is-past-year { border-top: 1px solid var(--rule-firm); padding-top: 5px; }
 .ov-hist-row.is-past-year + .ov-hist-row.is-past-year { border-top: 0; padding-top: 0; }
 .ov-hist-mark { font-size: var(--t-micro); color: var(--text-3); margin-top: 3px; }
 
-/* --- rules ---------------------------------------------------------------- */
-.ov-rules { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+/* --- rules ----------------------------------------------------------------
+   Bounded. Five rules is ~470px and twenty was ~1,300px, and because the three
+   panels on this row share a bottom edge that handed the two beside it ~900px
+   of blank paper each. */
+.ov-rules {
+  display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+  max-height: 480px; overflow-y: auto; overscroll-behavior-y: contain;
+}
 .ov-rule { background: var(--surface); padding: var(--d2) var(--d3); display: grid; gap: 2px; }
 .ov-rule-top { display: flex; align-items: center; justify-content: space-between; gap: var(--d2); }
 .ov-rule-id { font-size: var(--t-micro); font-weight: 600; color: var(--text); }
 .ov-rule-st { font-size: var(--t-small); color: var(--text-2); line-height: 1.4; }
 .ov-rule-m { font-size: var(--t-micro); color: var(--text-3); }
-/* colour is never the only channel: the word rides with it, always */
+/* "holds" and "no verdict" are quiet pills. A breach is not drawn here at all:
+   it is a <SevChip> at sevBreach, on the one scale the whole product uses. */
 .ov-verdict {
   display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
   font-size: var(--t-micro); padding: 2px var(--d2); border-radius: var(--radius-pill);
 }
 .ov-verdict.is-ok { color: var(--text-3); background: var(--surface-2); }
-.ov-verdict.is-bad { color: var(--text); background: var(--bg-sunk); box-shadow: inset 0 0 0 1px var(--rule-firm); }
+.ov-verdict.is-none { color: var(--text-3); background: var(--surface-2); font-style: italic; }
 .ov-rule-foot {
   font-size: var(--t-micro); color: var(--text-2); margin-top: var(--d3);
   display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
@@ -232,10 +332,17 @@
 }
 .ov-link:hover { border-bottom-color: var(--text); }
 
-/* --- clinics: the sparkline, and the one row the agent read --------------- */
-.ov-spark { display: inline-flex; align-items: flex-end; gap: 2px; padding-bottom: 4px; }
+/* --- clinics: the sparkline, and the one row the agent read ---------------
+   The bars scroll inside their own box; the date range stays put beside them,
+   because a 60-session series is 660px inside a cell that does not wrap. */
+.ov-sess { display: inline-flex; align-items: flex-end; gap: 5px; max-width: 320px; }
+.ov-spark {
+  display: inline-flex; align-items: flex-end; gap: 2px; padding-bottom: 4px;
+  max-width: 220px; overflow-x: auto; overscroll-behavior-x: contain;
+}
 .ov-spark-c {
-  position: relative; display: flex; align-items: flex-end; width: 9px; height: 24px;
+  position: relative; display: flex; align-items: flex-end; flex: none;
+  width: 9px; height: 24px;
   background: var(--bg-sunk); border-bottom: 1px solid var(--rule-firm);
 }
 /* a tick under one column and none under the others: a shape channel, so the
@@ -248,22 +355,19 @@
 /* THE accent. clay, once, for the session the capacity agent actually read. */
 .ov-spark-c.is-cited { border-bottom-color: var(--accent); }
 .ov-spark-c.is-cited i { background: var(--accent); }
-.ov-spark-k { font-size: var(--t-micro); font-size: 9px; color: var(--text-3); margin-left: 5px; align-self: flex-end; }
+.ov-spark-k { font-size: 9px; color: var(--text-3); flex: none; align-self: flex-end; }
 .ov-cited-tag { color: var(--accent); font-weight: 600; }
 
-/* --- wards ---------------------------------------------------------------- */
-.ov-occ { display: grid; gap: 3px; min-width: 168px; }
-.ov-occ-track {
-  position: relative; display: block; height: 8px;
-  background: var(--bg-sunk); border: 1px solid var(--rule);
+/* --- wards ----------------------------------------------------------------
+   Occupancy is graded against the 85% safe-operating line by sevOccupancy, so
+   the bar, the mark on it and the block carrying the number are all the
+   contract's. `over` used to be computed and spent on nothing. */
+.ov-occ { display: grid; gap: 4px; min-width: 178px; }
+.ov-occ-n {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: var(--t-micro); color: var(--text);
 }
-.ov-occ-fill { position: absolute; inset: 0 auto 0 0; background: var(--text-3); }
-/* the 85% safe-operating mark: a rule, never a hue */
-.ov-occ-safe {
-  position: absolute; top: -3px; bottom: -3px; width: 1px;
-  background: var(--text); opacity: 0.55;
-}
-.ov-occ-n { font-size: var(--t-micro); color: var(--text); }
+.ov-occ-w { font-weight: 400; }
 .ov-gar { display: inline-flex; align-items: center; gap: 5px; font-size: var(--t-micro); color: var(--text-2); }
 .ov-gar i { width: 8px; height: 8px; flex: none; }
 .ov-gar.is-G i { background: var(--cat-routine); }

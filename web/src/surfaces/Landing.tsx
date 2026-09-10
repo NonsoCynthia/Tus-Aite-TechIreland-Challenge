@@ -48,14 +48,6 @@ export function Landing({ hospital, date, name, hospitals, onHospital, onEnter }
           )}
         </p>
 
-        {/* README feature 1 promises this label "in the graph AND the UI". The
-            rail carries it everywhere else, but the rail does not exist yet on
-            this screen -- and this is the screen that states a figure about
-            people waiting, over a photograph of a real waiting room. */}
-        <p className="landing-synth">
-          <span aria-hidden />Synthetic data · no real patient
-        </p>
-
         <p className="landing-thesis">
           A clinician has already decided who is urgent. This does not change that.
           It suggests an order <em>within</em> each group, and shows every piece of

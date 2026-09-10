@@ -42,7 +42,7 @@ const REASONS = [
 export function Override({ patient, decision, displayedOrder, onClose, onDone }: {
   patient: Ranking
   decision: Decision
-  /** Pathway numbers in the order actually ON SCREEN — the coordinator's, with
+  /** Pathway numbers in the order actually ON SCREEN: the coordinator's, with
    *  every live override already spliced in. The boundary check must ask about
    *  this list, not about decision.rankings: after one override, position N in
    *  what the clinician sees is a different person. */
@@ -127,7 +127,7 @@ export function Override({ patient, decision, displayedOrder, onClose, onDone }:
         <input className="ovr-in num" type="number" min={1} max={decision.rankings.length}
                value={to} onChange={(e) => setTo(e.target.value)} />
         <span className="ovr-hint">
-          {isAccept ? 'unchanged — this records that you reviewed and agreed'
+          {isAccept ? 'unchanged. this records that you reviewed and agreed'
             : `moving into ${movingTo}`}
         </span>
       </label>
@@ -163,14 +163,13 @@ export function Override({ patient, decision, displayedOrder, onClose, onDone }:
       <label className="ovr-f">
         <span className="ovr-l">Recorded as</span>
         <input className="ovr-in" value={clinician} onChange={(e) => setClinician(e.target.value)} />
-        <span className="ovr-hint">Attribution, not authentication: this says who typed it, it does not verify them.</span>
       </label>
 
       <p className="ovr-hint ovr-after">
         {isAccept
           ? <>Nothing moves. The list will show this position as confirmed by you.</>
           : <>The row moves to position {to || '—'} in the list and carries your name and reason.
-            The position the system gave it — <span className="num">{patient.position}</span> —
+            The position the system gave it (<span className="num">{patient.position}</span>)
             stays on the row, so a colleague can see both.</>}
       </p>
 
@@ -178,7 +177,7 @@ export function Override({ patient, decision, displayedOrder, onClose, onDone }:
 
       <div className="ovr-actions">
         <button className="pg" onClick={() => { ref.current?.close(); onClose() }} disabled={busy}>Cancel</button>
-        <button className="run-btn ovr-go" onClick={submit} disabled={busy || needsAttest || !reason}>
+        <button className="cta ovr-go" onClick={submit} disabled={busy || needsAttest || !reason}>
           {busy ? 'Recording…' : isAccept ? 'Confirm and record' : 'Move and record'}
         </button>
       </div>

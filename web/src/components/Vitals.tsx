@@ -1,5 +1,7 @@
 import { Activity, Brain, Droplet, HeartPulse, Thermometer, TriangleAlert, Wind } from 'lucide-react'
 import { VITALS, positionOf, scoreOf, type Band, type Vital } from '../lib/news2'
+import { sevNews2Sub, sevReadingAge, type Sev } from '../lib/severity'
+import { SevBar, SevChip } from './Severity'
 import type { Observation } from '../lib/types'
 
 /** NEWS2 as six instruments, not as a sentence.
@@ -12,15 +14,29 @@ import type { Observation } from '../lib/types'
  *  and CHECKED against the recorded total. A disagreement is printed, never
  *  hidden behind whichever number happened to be handy.
  *
- *  Sub-scores are weighted in ink, never in --cat-* : those five hues belong to
- *  CPC triage categories and a NEWS2 sub-score of 3 is not a triage category.
- *  The magnitude therefore travels three ways at once -- the numeral, three
- *  pips, and the ink weight -- so colour is never load-bearing on its own.
+ *  The sub-score ladder is the product's severity scale, through sevNews2Sub,
+ *  and never --cat-* : those five hues belong to CPC triage categories and a
+ *  NEWS2 sub-score of 3 is not a triage category. The ladder here used to be
+ *  four ink steps of its own whose contrast was NOT monotonic -- 0 at 3.56:1,
+ *  1 at 5.99:1, 2 at 15.37:1 and then 3 at 14.70:1, so the most severe step was
+ *  the LESS contrasty of the top two, which is the exact fault the severity
+ *  scale exists to end. sevNews2Sub maps 0/1/2/3 onto steps 0/1/3/4: it skips a
+ *  step so that a 3 lands on a solid block and cannot be mistaken for a 2.
+ *  The magnitude still travels three ways at once -- the numeral, three pips
+ *  and the fill -- so colour is never load-bearing on its own.
  */
 
 const ICON: Record<Vital['key'], typeof Activity> = {
   rr: Wind, spo2: Droplet, sbp: Activity, hr: HeartPulse, avpu: Brain, temp: Thermometer,
 }
+
+/** --icon and --icon-sm from tokens.css. lucide sizes in JS rather than in CSS,
+ *  so the two steps live here as numbers; STROKE is passed on every icon in
+ *  this file because lucide's default of 2 renders heavier than the 1.75
+ *  hairline chrome beside it. */
+const ICON_PX = 16
+const ICON_SM_PX = 14
+const STROKE = 1.75
 
 /** core.observations returns temp as a string and spo2 as a number. Both are
  *  readings; neither is trusted to arrive as one type. */
@@ -61,13 +77,23 @@ const bandLabel = (b: { lo: number | null; hi: number | null }, unit: string) =>
 const bandFor = (v: Vital, value: number) =>
   v.bands.find((b) => (b.lo == null || value >= b.lo) && (b.hi == null || value <= b.hi))
 
-/** Age of a reading, as a state rather than as an opinion about the patient. */
-export const ageState = (days: number | null): { key: string; word: string } => {
-  if (days == null) return { key: 'unknown', word: 'age unknown' }
-  if (days <= 30) return { key: 'fresh', word: 'fresh' }
-  if (days <= 90) return { key: 'recent', word: 'recent' }
-  if (days <= 365) return { key: 'stale', word: 'stale' }
-  return { key: 'very', word: 'over a year old' }
+/** Age of a reading, as a state rather than as an opinion about the patient.
+ *
+ *  The word and the severity step are ONE ladder. sevReadingAge owns the
+ *  boundaries (90, 365 and 730 days) and the word is read off the step it
+ *  returns, so the two can never drift apart. Below 90 days there is no mark at
+ *  all, which is what a severity of 0 means: the absence of a severity is not a
+ *  severity. This was the one existing four-step ramp in the product and it
+ *  bottomed out at 3.56:1; it is now the same four steps everything else uses.
+ */
+export const ageState = (days: number | null): { word: string; sev: Sev } => {
+  if (days == null) return { word: 'age unknown', sev: 0 }
+  const sev = sevReadingAge(days)
+  const word = sev === 0 ? (days <= 30 ? 'fresh' : 'recent')
+    : sev === 1 ? 'stale'
+      : sev === 3 ? 'over a year old'
+        : 'over two years old'
+  return { word, sev }
 }
 
 export interface AgeStats { n: number; median: number; mean: number; max: number; over_1y: number; over_2y: number }
@@ -83,7 +109,7 @@ export function Staleness({ when, ageDays, stats }: {
 }) {
   const st = ageState(ageDays)
   const max = stats?.max ?? null
-  const pct = (d: number) => (max && max > 0 ? Math.max(0, Math.min(100, (d / max) * 100)) : 0)
+  const frac = (d: number) => (max && max > 0 ? Math.max(0, Math.min(1, d / max)) : 0)
 
   return (
     <div className="pt-stale">
@@ -93,17 +119,18 @@ export function Staleness({ when, ageDays, stats }: {
         {ageDays != null && (
           <>
             <span className="pt-stale-age num">{fmtN(ageDays)} days ago</span>
-            <span className="pt-stale-state" data-age={st.key}>{st.word}</span>
+            <span className="pt-stale-state" title={`${fmtN(ageDays)} days old`}>
+              <SevChip sev={st.sev}>{st.word}</SevChip>
+            </span>
           </>
         )}
       </div>
 
       {ageDays != null && max != null && max > 0 ? (
         <>
-          <div className="pt-stale-track" role="img"
-               aria-label={`${fmtN(ageDays)} days old, against a cohort median of ${fmtN(stats!.median)} and an oldest reading of ${fmtN(max)} days`}>
-            <i className="pt-stale-fill" style={{ width: `${pct(ageDays)}%` }} />
-            <span className="pt-stale-med" style={{ left: `${pct(stats!.median)}%` }} />
+          <div className="pt-stale-track">
+            <SevBar sev={st.sev} value={frac(ageDays)} of={frac(stats!.median)} height={8}
+                    label={`${fmtN(ageDays)} days old, against a cohort median of ${fmtN(stats!.median)} and an oldest reading of ${fmtN(max)} days`} />
           </div>
           <div className="pt-stale-scale num">
             <span>today</span>
@@ -154,12 +181,12 @@ export function Vitals({ obs, recordedTotal, agentTotal, when, ageDays, stats, c
   if (!obs) {
     return (
       <div className="pt-novitals">
-        <TriangleAlert size={15} aria-hidden />
+        <TriangleAlert size={ICON_PX} strokeWidth={STROKE} aria-hidden />
         <div>
           <strong>No observation on this referral.</strong>
           <p>
             NEWS2 needs six readings and there are none, so the urgency agent had nothing to
-            score. That is a data-quality gap, not a low score — the two are different states and
+            score. That is a data-quality gap, not a low score: the two are different states and
             are never merged here.
           </p>
         </div>
@@ -195,14 +222,14 @@ export function Vitals({ obs, recordedTotal, agentTotal, when, ageDays, stats, c
         <span className="pt-of">of 17</span>
         {!complete && (
           <span className="pt-sum-note">
-            {present.length} of 6 readings present — the six do not sum to a total
+            {present.length} of 6 readings present, so the six do not sum to a total
           </span>
         )}
       </div>
 
       {disagrees && (
         <p className="pt-disc">
-          <TriangleAlert size={14} aria-hidden />
+          <TriangleAlert size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden />
           <span>
             <strong>These do not agree.</strong> The six sub-scores above add to{' '}
             <strong className="num">{computed}</strong>; the record carries{' '}
@@ -219,7 +246,7 @@ export function Vitals({ obs, recordedTotal, agentTotal, when, ageDays, stats, c
       )}
       {agentDiffers && (
         <p className="pt-disc">
-          <TriangleAlert size={14} aria-hidden />
+          <TriangleAlert size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden />
           <span>
             The urgency agent harvested <strong className="num">{agentTotal}</strong> where the
             observation record carries <strong className="num">{recordedTotal}</strong>.
@@ -244,11 +271,33 @@ function Pips({ score }: { score: number | null }) {
   )
 }
 
+/** One parameter's contribution: numeral, pips and fill, three channels of one
+ *  value.
+ *
+ *  The fill is the product's severity scale through sevNews2Sub, so a 3 lands on
+ *  a solid block two steps above a 1 rather than on an ink shade that measured
+ *  LESS contrasty than the step below it.
+ *
+ *  A refused score is not an acuity claim, so a paediatric refusal takes the
+ *  whole severity register away: sev is forced to 0 whatever the number is. That
+ *  is deliberate, and it is also how a refused 3 came to look exactly like a
+ *  refused 0. It no longer does. The chip keeps the number and the pips, so the
+ *  value is still legible, and marks it as withdrawn rather than absent: the
+ *  word "refused", a struck numeral and a dashed edge, none of which a zero has.
+ */
 function SubScore({ score, applied }: { score: number | null; applied: boolean }) {
+  const sev = applied ? sevNews2Sub(score) : 0
+  const title = score == null ? 'no reading'
+    : applied ? `scores ${score} of 3`
+      : `${score} of 3, refused: NEWS2 was not applied to this referral`
   return (
-    <span className="pt-sub" data-score={score ?? 'none'} data-applied={applied ? 'yes' : 'no'}>
-      <span className="pt-sub-n num">{score == null ? '—' : score}</span>
-      <Pips score={score} />
+    <span className="pt-sub" data-sev={sev} data-score={score ?? 'none'}
+          data-applied={applied ? 'yes' : 'no'} title={title}>
+      <SevChip sev={sev}>
+        {!applied && <span className="pt-sub-x">refused</span>}
+        <span className="pt-sub-n num">{score == null ? '—' : score}</span>
+        <Pips score={score} />
+      </SevChip>
     </span>
   )
 }
@@ -268,7 +317,7 @@ function VitalCard({ v, value, score, cited, applied }: {
   return (
     <div className="pt-card">
       <div className="pt-card-h">
-        <Icon size={14} aria-hidden />
+        <Icon size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden />
         <span className="lab">{v.short}</span>
         <SubScore score={score} applied={applied} />
       </div>
@@ -305,7 +354,7 @@ function VitalCard({ v, value, score, cited, applied }: {
           : band
             ? <>lands in <span className="num">{bandLabel(band, v.unit)}</span>, which scores{' '}
                 <span className="num">{band.score}</span></>
-            : <span className="pt-flag">off the drawn scale — the reading is printed above in full</span>}
+            : <span className="pt-flag">off the drawn scale: the reading is printed above in full</span>}
         {!cited && <span className="pt-flag pt-flag-cite">not cited</span>}
       </div>
     </div>
@@ -325,7 +374,7 @@ function AvpuCard({ v, value, score, cited, applied }: {
   return (
     <div className="pt-card is-cat">
       <div className="pt-card-h">
-        <Icon size={14} aria-hidden />
+        <Icon size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden />
         <span className="lab">{v.short}</span>
         <SubScore score={score} applied={applied} />
       </div>
@@ -343,7 +392,7 @@ function AvpuCard({ v, value, score, cited, applied }: {
       <div className="pt-caption">
         {value == null
           ? <span className="pt-flag">not recorded</span>
-          : <>categorical, not a scale — there is no 1 or 2</>}
+          : <>categorical, not a scale: there is no 1 or 2</>}
         {!cited && <span className="pt-flag pt-flag-cite">not cited</span>}
       </div>
     </div>

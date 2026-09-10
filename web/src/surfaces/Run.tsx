@@ -1,12 +1,42 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play, Waypoints, ListOrdered, X } from 'lucide-react'
 import { api } from '../lib/api'
-import type { Run as RunT } from '../lib/types'
+import { crtDays } from '../lib/ref'
+import { sevBreach, sevWaitRatio } from '../lib/severity'
+import { SevChip } from '../components/Severity'
+import type { CohortReferral, Reference, Run as RunT } from '../lib/types'
 import './run.css'
 
 const fmt = (n: number) => n.toLocaleString('en-IE')
+
+/** Stroke weight is a role: 1.75 chrome, 2.25 signal. Size comes from --icon /
+ *  --icon-sm through .ico / .ico-s in app.css. */
+const CHROME = 1.75
+const SIGNAL = 2.25
+
+/** The state the run is about to change, counted from the cohort itself.
+ *
+ *  Two things it will not do. It will not call 143 of 308 late: Routine and
+ *  Uncategorised have no target at all, so a breach count is of the 165 that
+ *  HAVE one and never of the whole cohort. And it reads no threshold from this
+ *  file: the authoritative CRT days are core.ref_codes via crtDays(reference,
+ *  cpc), with the cohort row's own copy only as a fallback for the first paint.
+ */
+function cohortBefore(rows: CohortReferral[], ref: Reference | undefined) {
+  let withTarget = 0, past = 0, worst = 0, longest = 0
+  for (const r of rows) {
+    const wait = r.adjusted_wait_days ?? 0
+    if (wait > longest) longest = wait
+    const target = crtDays(ref, r.cpc) ?? r.crt_threshold_days
+    if (target == null || target <= 0) continue
+    withTarget += 1
+    const ratio = wait / target
+    if (ratio > 1) { past += 1; if (ratio > worst) worst = ratio }
+  }
+  return { n: rows.length, withTarget, noTarget: rows.length - withTarget, past, worst, longest }
+}
 
 /** What each agent reads, stated as inputs rather than description.
  *  `reads` is the evidence it will cite; `cites` is how many rows per referral,
@@ -40,8 +70,8 @@ const AGENTS = [
  *  endpoint the coordinator reads. It cannot advance unless work happened, and
  *  it never interpolates between polls: it steps when data arrives.
  */
-export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }: {
-  hospital: string; date: string; runnable: string | null
+export function Run({ hospital, name, date, runnable, onClose, onSeeGraph, onSeeList }: {
+  hospital: string; name: string; date: string; runnable: string | null
   onClose: () => void; onSeeGraph: () => void; onSeeList: () => void
 }) {
   // Evidence is date-blind: GET /referrals/{h}/{pw}/context takes no date and
@@ -60,7 +90,10 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
     queryKey: ['cohort', hospital, date], queryFn: () => api.cohort(hospital, date),
   })
   const health = useQuery({ queryKey: ['health'], queryFn: api.health })
+  // the same key App uses, so this reads the cache rather than asking again
+  const ref = useQuery({ queryKey: ['reference'], queryFn: api.reference, staleTime: Infinity })
   const n = cohort.data?.referrals.length ?? 0
+  const before = cohortBefore(cohort.data?.referrals ?? [], ref.data)
 
   useEffect(() => () => { if (timer.current) window.clearInterval(timer.current) }, [])
   useEffect(() => {
@@ -108,17 +141,17 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
         <div className="runlay-head-in">
         <div className="runlay-t">
           <span className="lab">Agent run</span>
-          <h1>{hospital} · {new Date(date).toLocaleDateString('en-IE',
+          <h1>{name} · {new Date(date).toLocaleDateString('en-IE',
             { day: 'numeric', month: 'long', year: 'numeric' })}</h1>
         </div>
         <button className="runlay-x" onClick={onClose} disabled={busy}
                 aria-label="Close">
-          <X size={18} strokeWidth={1.75} />
+          <X className="ico" strokeWidth={CHROME} />
         </button>
         </div>
       </div>
 
-      <div className={"runlay-body" + (run ? "" : " is-idle")}>
+      <div className="runlay-body">
         {!rankable ? (
           <div className="run-locked">
             <strong>This day can be read, but not scored.</strong>
@@ -133,8 +166,93 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
           </div>
         ) : (
           <>
-            {/* Pre-run is a readout of what is about to happen on what data,
-                not a paragraph about agents. */}
+            {/* D1/D5. The overlay used to say what the run would DO. What a
+                reader needs first is what it will CHANGE, so the cohort that
+                exists right now is stated on the left and what will be true of
+                it on the right. Every figure on the left is counted from the
+                cohort payload on screen; nothing on it is written down.
+
+                It leaves when the run starts, because from that moment the
+                lanes are the answer to the same question. */}
+            <AnimatePresence initial={false}>
+              {!run && (
+                <motion.div className="run-ba" key="ba"
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: still ? 0 : 0.2 }}>
+                  <section className="run-ba-c">
+                    <span className="lab">Right now, before the run</span>
+                    {cohort.isError ? (
+                      <ul className="run-ba-l">
+                        <li>The cohort could not be read, so there is nothing to state about it.</li>
+                      </ul>
+                    ) : before.n === 0 ? (
+                      <ul className="run-ba-l">
+                        <li>{cohort.isLoading ? 'Reading the cohort…' : 'No referrals on this day.'}</li>
+                      </ul>
+                    ) : (
+                      <ul className="run-ba-l">
+                        <li>
+                          <b className="num">{fmt(before.n)}</b> people are waiting. The longest has
+                          waited <b className="num">{fmt(before.longest)}</b> days.
+                        </li>
+                        <li>
+                          <b className="num">{fmt(before.withTarget)}</b> of them have a target
+                          date. The other <b className="num">{fmt(before.noTarget)}</b> are Routine
+                          or Uncategorised and have no target at all, so nothing in those groups
+                          can be late.
+                        </li>
+                        <li>
+                          {before.past > 0 ? (
+                            <>
+                              <SevChip sev={sevBreach(false)}>
+                                <b className="num">{fmt(before.past)}</b> past target
+                              </SevChip>{' '}
+                              of that <b className="num">{fmt(before.withTarget)}</b>, and the
+                              worst is{' '}
+                              <SevChip sev={sevWaitRatio(before.worst)}>
+                                <b className="num">{before.worst.toFixed(1)}x</b> over
+                              </SevChip>.
+                            </>
+                          ) : (
+                            <>None of the <b className="num">{fmt(before.withTarget)}</b> with a
+                            target is past it.</>
+                          )}
+                        </li>
+                        <li>
+                          Nobody holds a position. No score, no citation and no rule check exists
+                          for any of them yet.
+                        </li>
+                      </ul>
+                    )}
+                  </section>
+                  <section className="run-ba-c">
+                    <span className="lab">After it</span>
+                    <ul className="run-ba-l">
+                      <li>
+                        One order, built inside each CPC category and never across one.
+                      </li>
+                      <li>
+                        Inside a category, past target comes first and priority decides the rest: a
+                        breach is a tier above a score, not a bigger number.
+                      </li>
+                      <li>
+                        Every position carries the evidence it cited, up to{' '}
+                        <b className="num">8</b> rows per referral: six vitals and two capacity.
+                      </li>
+                      <li>
+                        Two to three rules tested per referral, each with its result on the record.
+                      </li>
+                      <li>
+                        Paediatric referrals are refused rather than scored. NEWS2 is validated in
+                        adults, and a refusal is a statement about coverage.
+                      </li>
+                    </ul>
+                  </section>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* the instrument values: what is about to happen, on what data */}
             <div className="run-plan">
               <Readout k="cohort" v={fmt(n)} u="referrals" />
               <Readout k="agents" v="2" u="per referral" />
@@ -213,19 +331,28 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
                   <Readout k="alpha" v={(run.alpha ?? 0).toFixed(3)} u="weight on urgency" big />
                   <Readout k="scarcity" v={(run.scarcity ?? 0).toFixed(3)} u="mean ward+clinic pressure" />
                 </div>
+                {before.n > 0 && (
+                  <p className="run-done-p measure">
+                    Before this run, <strong className="num">{fmt(before.past)}</strong> of the{' '}
+                    <strong className="num">{fmt(before.withTarget)}</strong> referrals with a
+                    target were past it and none of them held a position.{' '}
+                    <strong className="num">{fmt(run.ranked)}</strong> hold one now, inside their
+                    own category and past target first within it, each carrying what it cited.
+                  </p>
+                )}
                 <p className="run-done-p measure">
                   The <strong className="num">{fmt(run.refused_paediatric)}</strong> outside are
                   paediatric referrals. NEWS2 is validated in adults, so the agent refuses them
-                  rather than scoring a child on an adult scale — a statement about coverage,
+                  rather than scoring a child on an adult scale: a statement about coverage,
                   not a low position.
                 </p>
                 <div className="run-go">
                   <button className="cta" onClick={onSeeGraph}>
-                    <Waypoints size={14} strokeWidth={2} aria-hidden />
+                    <Waypoints className="ico-s" strokeWidth={CHROME} aria-hidden />
                     See what it cited
                   </button>
                   <button className="cta is-ghost" onClick={onSeeList}>
-                    <ListOrdered size={14} strokeWidth={2} aria-hidden />
+                    <ListOrdered className="ico-s" strokeWidth={CHROME} aria-hidden />
                     See the order
                   </button>
                 </div>
@@ -234,7 +361,7 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
 
             {!run && (
               <button className="run-start" onClick={start} disabled={busy}>
-                <Play size={16} strokeWidth={2.25} fill="currentColor" aria-hidden />
+                <Play className="ico" strokeWidth={SIGNAL} fill="currentColor" aria-hidden />
                 {busy ? 'Starting…' : `Score ${fmt(n)} referrals`}
               </button>
             )}

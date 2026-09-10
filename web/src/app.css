@@ -17,6 +17,14 @@
   align-items: center; justify-content: center; gap: var(--d4);
   background: var(--bg); color: var(--text-2); font-size: var(--t-small);
 }
+/* the same arithmetic as the rail: cap height is 266/676 of the rendered
+   height, and the kit's floor is 13px. 40px puts it at 15.7px. */
+.boot-brand { display: grid; justify-items: center; gap: var(--d2); }
+.boot-mark { display: block; height: 40px; width: auto; }
+.boot-descriptor {
+  font-family: var(--font-brand); font-size: 10px; font-weight: 300;
+  letter-spacing: 0.1em; color: var(--text-2);
+}
 
 /* --- rail ---------------------------------------------------------------- */
 .rail {
@@ -30,7 +38,8 @@
   padding: var(--d5) var(--d5) var(--d4);
   background: none; border: 0; cursor: pointer; text-align: left; width: 100%;
 }
-.rail-brand img { height: 22px; width: auto; }
+.rail-brand picture { display: block; line-height: 0; }
+.rail-brand img { display: block; height: 40px; width: auto; }
 .rail-descriptor {
   font-family: var(--font-brand); font-size: 10px; font-weight: 300;
   letter-spacing: 0.1em; color: var(--text-2);
@@ -57,19 +66,6 @@
 .rail-item svg { flex: 0 0 auto; opacity: 0.9; }
 
 .rail-foot { padding: var(--d4) var(--d5) var(--d5); display: grid; gap: var(--d3); }
-/* README feature 1 promises this label in the graph AND the UI. It is a
-   compliance statement in front of a clinical audience, so it is permanent
-   chrome rather than a dismissible banner. */
-.synthetic {
-  display: flex; align-items: center; gap: var(--d2);
-  font-size: var(--t-micro); letter-spacing: 0.04em; color: var(--text-2);
-  padding: var(--d2) var(--d3);
-  border: 1px dashed var(--rule-firm); border-radius: var(--radius);
-}
-.synthetic-dot {
-  width: 6px; height: 6px; flex: 0 0 auto;
-  border-radius: 50%; background: var(--accent);
-}
 .sysstat { display: flex; flex-wrap: wrap; gap: var(--d3); }
 .sysstat-i {
   display: inline-flex; align-items: center; gap: 5px;
@@ -86,14 +82,38 @@
 .sysstat-i:not(.is-up) b { color: var(--text); }
 .sysstat-i.is-up { color: var(--text-2); }
 
+/* --- icon sizing, from the token rather than from a number typed at the call
+   site. lucide writes width/height as PRESENTATION attributes, so a CSS rule
+   wins and --icon stays the single source. Stroke is the other half and is a
+   ROLE, not a size: 1.75 chrome, 2.25 signal. */
+.ico   { width: var(--icon);    height: var(--icon);    flex: none; }
+.ico-s { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
+
 /* --- top bar ------------------------------------------------------------- */
 .topbar {
-  display: flex; align-items: center; gap: var(--d4);
+  display: flex; align-items: center; gap: var(--d4); flex-wrap: nowrap;
   min-height: var(--topbar-h); padding: var(--d2) var(--d6);
   border-bottom: 1px solid var(--rule); background: var(--surface);
   position: sticky; top: 0; z-index: 20;
 }
-.scope { display: flex; gap: var(--d2); min-width: 0; }
+.scope { display: flex; align-items: center; gap: var(--d2); min-width: 0; flex-wrap: nowrap; }
+
+/* --- "has anything new arrived?" -----------------------------------------
+   The days in the selector are DISCOVERED by probing a 60-day window, and the
+   answer is cached per hospital for the life of the process
+   (orchestrator/app/main.py:120-165). A batch loaded while the service is up is
+   therefore invisible until that cache is cleared, which is what
+   POST /api/hospital-days/{h}/refresh does. Nothing called it until now. */
+.probe {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  padding: 0 var(--d3); min-height: 34px;
+  background: var(--bg); border: 1px solid var(--rule-firm);
+  border-radius: var(--radius); color: var(--text-2);
+  font: inherit; font-size: var(--t-small); cursor: pointer;
+}
+.probe:hover:not(:disabled) { color: var(--text); border-color: var(--text-3); }
+.probe:disabled { opacity: 0.55; cursor: progress; }
+.probe-said { font-size: var(--t-small); color: var(--text-2); max-width: 52ch; }
 .picker-wrap {
   display: inline-flex; align-items: center; gap: var(--d2);
   padding: 0 var(--d3); min-height: 34px;
@@ -104,10 +124,26 @@
 .picker {
   font: inherit; font-size: var(--t-small); color: var(--text);
   background: none; border: 0; padding: 6px 0; max-width: 30ch;
+  text-overflow: ellipsis;
+}
+/* The bar has to hold two pickers, the refresh control, the run pill and the
+   run button on ONE row. Adding "check for new data" tipped it over at 1440:
+   scope 699 + actions 438 + gap + padding came to 1217 in a 1204px bar, so it
+   wrapped and the bar grew from 56px to 101px. The pickers are the elastic
+   part -- their labels carry a date and a count that can ellipsise -- so they
+   give up the width rather than the actions dropping to a second row. */
+@media (max-width: 1600px) {
+  .picker { max-width: 22ch; }
+}
+@media (max-width: 1400px) {
+  .picker { max-width: 16ch; }
 }
 .picker:focus { outline: none; }
 
-.topbar-right { margin-left: auto; display: flex; align-items: center; gap: var(--d3); }
+.topbar-right {
+  margin-left: auto; display: flex; align-items: center; gap: var(--d3);
+  flex: 0 0 auto;   /* the actions never shrink; the pickers give way first */
+}
 
 /* the only durable display of alpha: agent.decision_rankings stores no alpha,
    scarcity, priority or band, so the number that produced the order on screen
@@ -141,9 +177,13 @@
 .measure { max-width: 68ch; }
 .muted { color: var(--text-2); }
 .num { font-variant-numeric: tabular-nums; }
+/* An error means a number on screen cannot be trusted, which is SEV_INTEGRITY
+   (lib/severity.ts:84) and the top of the severity scale. It used to sit on a
+   3px --cat-urgent edge: a RESERVED triage hue, spent on chrome. */
 .err {
-  padding: var(--d3) var(--d4); border: 1px solid var(--rule-firm);
-  border-left: 3px solid var(--cat-urgent); background: var(--surface);
+  padding: var(--d3) var(--d4);
+  border: 1px solid var(--sev-4-edge); border-left: 3px solid var(--sev-4-bg);
+  background: var(--surface); color: var(--text);
 }
 
 /* --- lede ---------------------------------------------------------------- */
@@ -153,19 +193,14 @@
 .lede-p { margin: 0; font-size: var(--t-body); line-height: 1.6; color: var(--text-2); }
 .lede-p strong { color: var(--text); font-size: var(--t-data); }
 
-/* --- tiles. flat, hairline, no shadow. ----------------------------------- */
-.tiles {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
-  margin-bottom: 26px;
-}
-.tile { background: var(--surface); padding: var(--pad); }
-/* clay marks ONE element per composition -- here, the breach tile only. */
-.tile.is-accent { box-shadow: inset 3px 0 0 var(--clay); }
+/* Overview draws its own tiles now (.ov-ro, surfaces/overview.css). The .tiles
+   / .tile pair here had no consumer left, and .tile's padding read var(--pad),
+   which is not defined anywhere and resolved to nothing. */
 .big { font-family: var(--font-brand); font-size: 26px; font-weight: 300; }
 
-/* --- band distribution --------------------------------------------------- */
-.bands { display: grid; gap: 6px; max-width: 720px; }
+/* --- band distribution ---------------------------------------------------
+   The .bands container is gone with the surface that used it. The five triage
+   swatches below STAY. */
 /* The five triage swatches. Reserved hues, and every one of them also carries
    its name on screen, so colour is never the only channel.
 
@@ -179,25 +214,10 @@
 .cat-routine       { background: var(--cat-routine); }
 .cat-uncategorised { background: var(--cat-uncat); }
 
-/* --- the spine, derived from the mark ------------------------------------ */
-.spine { position: relative; display: inline-block; height: 18px; vertical-align: middle; }
-.spine-stem {
-  position: absolute; left: 50%; top: 0; bottom: 0; width: var(--spine-w);
-  margin-left: calc(var(--spine-w) / -2); background: var(--rule-firm);
-}
-.spine-bar {
-  position: absolute; top: 50%; height: var(--spine-bar); margin-top: calc(var(--spine-bar) / -2);
-  background: var(--text-3);
-}
-.spine-bar.is-wait    { left: 50%; }
-.spine-bar.is-urgency { right: 50%; }
-.spine-over {
-  position: absolute; top: 50%; left: 50%; height: var(--spine-bar);
-  margin-top: calc(var(--spine-bar) / -2); background: var(--clay);
-}
-.spine-tick {
-  position: absolute; top: 50%; width: 7px; height: 1px; background: var(--rule-firm);
-}
+/* The .spine-* primitive is gone with components/Spine.tsx's SpineBar, which
+   was exported and imported nowhere. The list draws its overflow through
+   .spn (surfaces/list.css), and --spine-w / --spine-bar still drive .j-steps,
+   .j-line and .j-mark below. */
 
 /* --- the mark drawing itself, once, on the landing ----------------------- */
 @keyframes markStem { from { transform: scaleY(0); } to { transform: scaleY(1); } }
@@ -213,24 +233,12 @@
   font-weight: 400; color: var(--text-2);
 }
 
-/* --- staleness: the thesis, stated once ---------------------------------- */
-.stale {
-  border: 1px solid var(--rule); border-left: 3px solid var(--clay);
-  background: var(--surface); padding: var(--pad); margin-bottom: 26px;
-}
-
-/* --- wards ---------------------------------------------------------------- */
-.wards { margin-bottom: 26px; }
-@media (max-width: 1100px) { }
-@media (max-width: 620px)  { }
-.ward { background: var(--surface); padding: 12px 12px 13px; }
-.ward-id { font-size: var(--t-small); color: var(--text-2); letter-spacing: 0.02em; }
-/* TrolleyGAR is the HSE's own Green/Amber/Red instrument, so it keeps those
-   hues legitimately. It is always named in words as well, and the swatch stays
-   small so it never competes with a triage category chip. */
-.gar { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-2); }
-.gar i { width: 8px; height: 8px; flex: none; }
-.ward-pct { font-family: var(--font-brand); font-size: 21px; font-weight: 300; line-height: 1.1; }
+/* Staleness is drawn on the reading itself now (.pt-stale, components/Vitals)
+   and the ward panel is .ov-ward / .pt-ward. The .stale, .wards, .ward-*, .gar
+   rules here had no consumer, .stale also read the undefined var(--pad), and
+   two media queries had been emptied by an earlier sweep and left behind.
+   TrolleyGAR keeps its Green/Amber/Red in surfaces/overview.css (.ov-gar),
+   where the instrument that owns those hues actually renders. */
 
 /* --- surface nav ---------------------------------------------------------- */
 .surfaces { display: flex; gap: 2px; margin-left: 8px; }
@@ -243,7 +251,7 @@
   position: sticky; top: 0; z-index: 5;
   /* glass: depth through blur, never light through glow. Chrome only --
      never behind a number, where contrast would depend on what scrolls past. */
-  background: rgba(250, 250, 248, 0.78);
+  background: color-mix(in srgb, var(--paper) 78%, transparent);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
@@ -263,26 +271,16 @@
 }
 .panel-note strong { color: var(--text); }
 
-/* --- the rows ------------------------------------------------------------- */
-.rows { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.rows thead th {
-  text-align: left; font-size: 11px; font-weight: 600; color: var(--text-2);
-  letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--rule-firm);
-  vertical-align: bottom;
-}
+/* --- the rows -------------------------------------------------------------
+   The ranked table is .lst-table / .lst-row (surfaces/list.css). What is left
+   here are the CELL classes that table still spends. The .rows / .row shell,
+   .over and .contrib-track went with the surface that used them; .over also
+   held a 3px --cat-urgent, a reserved triage hue, on a plain text run. */
 .th-sub { display: block; font-weight: 400; letter-spacing: 0; color: var(--text-3); }
-.row { border-bottom: 1px solid var(--rule); height: var(--row-h); }
-.row:hover { background: var(--surface-2); }
-.row td { padding: 6px 10px; vertical-align: middle; }
-.row .c-rank {
-  font-family: var(--font-brand); font-size: 17px; font-weight: 400; text-align: right;
-}
 .pw { font-size: var(--t-body); }
 .sub { font-size: 11px; color: var(--text-2); margin-top: 1px; }
 .wait-n, .n2 { font-size: var(--t-data); font-weight: 600; }
 .n2 .of { font-weight: 400; color: var(--text-2); font-size: 11px; }
-.over { color: var(--cat-urgent); font-weight: 600; }
-.contrib-track i.is-wait { background: var(--clay); }
 
 /* --- pagination ----------------------------------------------------------- */
 .pager {
@@ -358,55 +356,16 @@
 .p-sec { margin-bottom: 28px; }
 .p-note { font-size: var(--t-small); color: var(--text-2); max-width: 76ch; line-height: 1.55; margin: 10px 0 0; }
 .p-note strong { color: var(--text); }
-.vitals { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
-@media (max-width: 900px) { .vitals { grid-template-columns: repeat(3, 1fr); } }
-.vital { background: var(--surface); padding: 12px 14px; }
-/* a cited vital carries a clay underline: the agent actually used this one */
-.vital.is-cited { box-shadow: inset 0 -2px 0 var(--clay); }
-.warn {
-  border-left: 3px solid var(--clay); background: var(--surface-2);
-  padding: 12px 16px; max-width: 76ch; font-size: var(--t-body); line-height: 1.55;
-}
-.row.is-clickable { cursor: pointer; }
-.run-btn {
-  font-family: var(--font-brand); font-size: 15px; font-weight: 400;
-  color: var(--paper); background: var(--ink); border: 1px solid var(--ink);
-  padding: 11px 22px; cursor: pointer; letter-spacing: 0.01em;
-}
-.run-btn:hover:not(:disabled) { background: #1b2d6e; }
-.run-btn:disabled { opacity: 0.55; cursor: default; }
-.run-id { color: var(--text-3); }
+/* The vitals grid is .pt-vitals (surfaces/patient.css) and the caveat panel is
+   .pt-novitals / .lst-warn; .vital, .vitals, .warn and .row.is-clickable had no
+   consumer left.
 
-/* steps when data arrives; never interpolates between polls */
-.run-bar { height: 10px; background: var(--bg-sunk); overflow: hidden; }
-.run-bar i {
-  display: block; height: 100%; background: var(--clay);
-  transition: width var(--t-fast) linear;
-}
-.run-n { font-family: var(--font-brand); font-size: 22px; font-weight: 300; color: var(--text); }
-.run-of { color: var(--text-2); }
-
-.lanes { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
-.lane {
-  display: grid; grid-template-columns: 18px 150px 1fr auto; align-items: center;
-  gap: 12px; padding: 12px 14px; background: var(--surface); font-size: var(--t-small);
-}
-.lane.is-live .lane-dot { background: var(--clay); }
-.lane.is-done .lane-dot { background: var(--text-3); }
-.lane.is-live .lane-a, .lane.is-done .lane-a { color: var(--text); }
-.lane-r { color: var(--text-3); }
-.lane-s { color: var(--text-2); }
-.lane.is-todo { opacity: 0.55; }
-
-.run-done { margin-top: 22px; border-left: 3px solid var(--clay); background: var(--surface-2); padding: 16px 18px; }
-.run-done-h .num { font-family: var(--font-brand); font-size: 20px; font-weight: 300; }
-.run-done-p { font-size: var(--t-small); color: var(--text-2); margin: 8px 0 14px; max-width: 76ch; line-height: 1.55; }
-.run-go {
-  font: inherit; font-size: var(--t-small); color: var(--text);
-  background: var(--surface); border: 1px solid var(--rule-firm);
-  padding: 8px 16px; cursor: pointer;
-}
-.run-go:hover { border-color: var(--text-3); }
+   Everything the RUN drew when it was a full page was dead here too, and worse
+   than dead: app.css loads before run.css, so a property run.css does not
+   restate still applied. .lanes kept a 1px --rule border and a --rule
+   background around the overlay's lane list, .lane kept a 12px font, and
+   .run-go put a bordered button background behind the overlay's button ROW.
+   The overlay owns all of it now, in surfaces/run.css. */
 
 /* --- provenance graph: the one dark surface inside a light screen --------- */
 .prov { border: 1px solid var(--rule-firm); background: var(--ink-deep); }
@@ -428,7 +387,10 @@
   border: 1px solid var(--rule-firm); background: var(--surface);
   color: var(--text); padding: 24px 26px; font: inherit;
 }
-.ovr::backdrop { background: rgba(11, 20, 54, 0.55); backdrop-filter: blur(3px); }
+.ovr::backdrop {
+  background: color-mix(in srgb, var(--ink-deep) 55%, transparent);
+  backdrop-filter: blur(3px);
+}
 .ovr-h { font-family: var(--font-brand); font-size: 20px; font-weight: 500; margin: 0 0 4px; }
 .ovr-sub { font-size: var(--t-small); color: var(--text-2); margin: 0 0 18px; }
 .ovr-f { display: grid; gap: 5px; margin-bottom: 16px; }
@@ -440,19 +402,26 @@
 }
 .ovr-ta { resize: vertical; min-height: 54px; }
 .ovr-hint { font-size: 11px; color: var(--text-3); line-height: 1.4; }
-/* the boundary warning: the one place an interruption is justified */
+/* The boundary warning: the one place an interruption is justified, so it is
+   the one panel that takes a FILL rather than an edge. It sat on a 3px
+   --cat-urgent, which is a CPC band's own hue spent on chrome; it reads on the
+   severity scale now, sev-2's tint carrying a sev-3 edge. */
 .ovr-warn {
-  border-left: 3px solid var(--cat-urgent); background: var(--surface-2);
+  border: 1px solid var(--sev-2-edge); border-left: 3px solid var(--sev-3-bg);
+  background: var(--sev-2-bg); color: var(--text);
   padding: 13px 15px; margin: 0 0 16px; font-size: var(--t-small); line-height: 1.55;
 }
-.ovr-warn p { margin: 6px 0 10px; color: var(--text-2); }
+.ovr-warn p { margin: 6px 0 10px; color: var(--sev-2-fg); }
 .ovr-attest { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
 .ovr-attest input { margin-top: 2px; }
 .ovr-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-.ovr-go { padding: 9px 20px; font-size: var(--t-body); }
+.ovr-go { min-height: 40px; padding: 0 var(--d5); font-size: var(--t-body); }
 .ovr-err { margin-top: 12px; }
+/* A recorded override is a confirmation, not a severity and certainly not a
+   CPC band: it sat on 3px of --cat-routine, the Routine category's own green.
+   The ink register says "this happened" without claiming a clinical grade. */
 .flash {
-  border-left: 3px solid var(--cat-routine); background: var(--surface-2);
+  border-left: 3px solid var(--text); background: var(--surface-2);
   padding: 11px 16px; margin-bottom: 18px; font-size: var(--t-body);
 }
 
@@ -465,7 +434,11 @@
 /* the photograph's left wall is already empty; this only steadies the type */
 .landing-scrim {
   position: absolute; inset: 0;
-  background: linear-gradient(100deg, rgba(250,250,248,0.97) 0%, rgba(250,250,248,0.9) 34%, rgba(250,250,248,0.15) 62%, rgba(250,250,248,0) 100%);
+  background: linear-gradient(100deg,
+    color-mix(in srgb, var(--paper) 97%, transparent) 0%,
+    color-mix(in srgb, var(--paper) 90%, transparent) 34%,
+    color-mix(in srgb, var(--paper) 15%, transparent) 62%,
+    transparent 100%);
 }
 .landing-in {
   position: relative; max-width: 1248px; margin: 0 auto;
@@ -495,41 +468,13 @@
 }
 .landing-go:disabled { opacity: 0.45; cursor: default; }
 @media (max-width: 720px) {
-  .landing-scrim { background: rgba(250,250,248,0.94); }
+  .landing-scrim { background: color-mix(in srgb, var(--paper) 94%, transparent); }
   .landing-lead { max-width: none; }
 }
-.run-dark .pad { padding-top: 28px; }
-.run-dark .lede h1 { color: var(--text); }
-.run-dark .lede-p { color: var(--text-2); }
-.run-dark .run-btn {
-  color: var(--ink); background: var(--taupe); border-color: var(--taupe);
-}
-.run-dark .run-btn:hover:not(:disabled) { background: #d3c8ba; }
-.run-dark .run-id, .run-dark .lane-r { color: var(--text-3); }
-.run-dark .run-n { color: var(--text); }
-.run-dark .run-bar { background: rgba(196,182,166,0.14); }
-.run-dark .run-bar i { background: var(--taupe); }
-.run-dark .lanes { background: var(--rule); border-color: var(--rule); }
-.run-dark .lane { background: var(--surface); }
-.run-dark .lane.is-live .lane-dot { background: var(--taupe); }
-.run-dark .lane.is-done .lane-dot { background: rgba(196,182,166,0.55); }
-.run-dark .lane.is-live .lane-a, .run-dark .lane.is-done .lane-a { color: var(--text); }
-.run-dark .run-done {
-  background: rgba(196,182,166,0.07); border-left-color: var(--taupe);
-}
-.run-dark .run-done-p { color: var(--text-2); }
-.run-dark .run-go {
-  background: transparent; color: var(--text); border-color: var(--rule-firm);
-}
-.run-dark .run-go:hover { border-color: var(--taupe); }
-/* the live pill is the one place glass belongs here: it floats over the panel */
-.run-dark .lane.is-live {
-  position: relative;
-}
-.run-dark .lane.is-live::after {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
-  background: var(--taupe);
-}
+/* .run-dark was the dark theme for the Run PAGE. The run is an overlay now
+   and carries data-surface="dark", which swaps the tokens themselves, so the
+   whole block had no consumer and held the last two hex literals in this file
+   plus four raw alpha literals. */
 
 /* --- why this position: arithmetic, not assertion ------------------------ */
 .why-tier {
@@ -565,12 +510,7 @@
   align-items: center; justify-content: center; gap: 18px;
   color: var(--text-2); font-size: var(--t-small); background: var(--bg);
 }
-/* --- a readable but unrankable day --------------------------------------- */
-.run-locked {
-  border-left: 3px solid var(--taupe); background: rgba(196,182,166,0.07);
-  padding: 13px 16px; margin-bottom: 18px; font-size: var(--t-small); line-height: 1.55;
-}
-.run-locked p { margin: 6px 0 0; color: var(--text-2); max-width: 76ch; }
+/* .run-locked lives with the overlay that draws it, surfaces/run.css. */
 
 /* --- nothing computed yet: say so where the ranking would be ------------- */
 .notyet {
@@ -634,7 +574,8 @@
 .landing-sel { display: grid; gap: 5px; }
 .landing-sel select {
   font: inherit; font-size: var(--t-small); color: var(--text);
-  background: rgba(255, 255, 255, 0.7); border: 1px solid var(--rule-firm);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: 1px solid var(--rule-firm);
   border-radius: var(--radius); padding: 0 var(--d3); min-height: 42px; max-width: 34ch;
 }
 
@@ -642,7 +583,7 @@
    as a broken product rather than a dropped graphics context. */
 .prov-lost {
   position: absolute; inset: 0; display: grid; place-items: center;
-  gap: var(--d3); background: rgba(11, 20, 54, 0.9);
+  gap: var(--d3); background: color-mix(in srgb, var(--ink-deep) 90%, transparent);
   color: var(--taupe); font-size: var(--t-small);
 }
 .prov-lost button {
@@ -661,42 +602,36 @@
   .app { grid-template-columns: 64px minmax(0, 1fr); }
   .rail-item span:not(.lab) { display: none; }
   .rail-item { justify-content: center; padding: var(--d2); }
-  .rail-lab, .rail-descriptor, .synthetic, .sysstat-i { display: none; }
+  .rail-lab, .sysstat-i { display: none; }
   .rail-brand { padding: var(--d4) var(--d2); align-items: center; }
-  .rail-brand img { height: 18px; }
-  .rail-nav { padding: var(--d3) var(--d2) 0; }
-  /* the synthetic-data statement is a compliance claim and may not simply
-     vanish with the labels -- it moves to the top bar */
-  .topbar::after {
-    content: 'Synthetic data'; margin-left: var(--d3);
-    font-size: var(--t-micro); letter-spacing: 0.04em; color: var(--text-3);
-    padding: 3px var(--d2); border: 1px dashed var(--rule-firm);
-    border-radius: var(--radius); white-space: nowrap; order: 1;
+  /* F2. The <picture> has already swapped the source to the VECTOR mark here.
+     52x70 at height 24px is 17.8px wide, inside a 48px content box with room to
+     spare, and it resamples at no size because there is nothing to resample.
+     The lockup at height 18px was 68px wide in that same 48px box: it hung 10px
+     past each edge and lapped over the rail's own border-right. */
+  .rail-brand img { height: 24px; }
+  /* The kit: "in any clinical setting the words decision support travel with
+     the mark." They may not disappear with the nav labels, so they wrap to two
+     lines under the mark instead. Most of the tracking comes off: 0.1em over
+     "decision support" is 1.6px of the 48px the box has. */
+  .rail-descriptor {
+    text-align: center; letter-spacing: 0.02em; line-height: 1.35;
+    overflow-wrap: anywhere;
   }
+  .rail-nav { padding: var(--d3) var(--d2) 0; }
   .pad { padding: var(--d4) var(--d4) var(--d7); }
 }
-
-/* The landing states a figure about people waiting, over a photograph of a real
-   waiting room, and it is the screen the demo opens on. The synthetic marker
-   cannot wait for the rail to mount. */
-.landing-synth {
-  display: inline-flex; align-items: center; gap: var(--d2);
-  margin: 0 0 var(--d4); padding: var(--d2) var(--d3);
-  font-size: var(--t-micro); letter-spacing: 0.04em; color: var(--text-2);
-  border: 1px dashed var(--rule-firm); border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.55);
-}
-.landing-synth span { width: 6px; height: 6px; border-radius: 50%; background: var(--clay); }
 
 /* A day that can be read but not scored. Evidence is date-blind, so ranking an
    older day would cite readings taken after it -- a real limit, and one that has
    to be visible rather than hidden in a disabled control's tooltip. */
 .cta-locked {
   display: inline-flex; align-items: center; gap: var(--d2);
-  padding: 0 var(--d3); min-height: 34px;
+  padding: var(--d1) var(--d3); min-height: 34px;
   border: 1px dashed var(--rule-firm); border-radius: var(--radius);
-  font-size: var(--t-small); color: var(--text-2); white-space: nowrap;
+  font-size: var(--t-small); color: var(--text-2);
 }
+.cta-locked b { color: var(--text); font-weight: 600; }
 .cta-locked svg { color: var(--text-3); flex: none; }
 .cta-why {
   background: none; border: 0; padding: 0 0 0 var(--d1); font: inherit;

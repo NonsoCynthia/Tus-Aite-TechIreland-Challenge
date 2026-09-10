@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
 import { motion, useReducedMotion } from 'motion/react'
 import { useQuery } from '@tanstack/react-query'
@@ -9,6 +10,9 @@ import { api, bandOf, BANDS } from '../lib/api'
 import { useNarrow } from '../lib/useNarrow'
 import { crtDays, ruleStatement, specialtyName } from '../lib/ref'
 import { plantedCase } from '../lib/planted'
+import { sevBreach, sevReadingAge, sevWaitRatio } from '../lib/severity'
+import type { Sev } from '../lib/severity'
+import { SevChip } from '../components/Severity'
 import { Override } from '../components/Override'
 import type {
   CohortReferral, Citation, Decision, Observation, OverrideRecord, Overrides,
@@ -19,7 +23,7 @@ import './list.css'
 /** The ranked list.
  *
  *  The page used to open with a six-line paragraph explaining the sort order.
- *  A sort key is a structure, so it is drawn as one — six numbered steps, with
+ *  A sort key is a structure, so it is drawn as one: six numbered steps, with
  *  the hidden third tier (past target first, before any score is compared)
  *  carrying the composition's one clay accent, because that tier is the thing
  *  readers kept missing and the thing that makes adjacent rows look wrong.
@@ -33,8 +37,9 @@ import './list.css'
 const fmt = (n: number) => n.toLocaleString('en-IE')
 const pct = (n: number) => `${Math.round(n * 100)}%`
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
-/** A date that will not parse prints as an em dash, never as "Invalid Date":
- *  evidence keys are strings from another service and may not be dates at all. */
+/** A date that will not parse prints as the no-value placeholder, never as
+ *  "Invalid Date": evidence keys are strings from another service and may not
+ *  be dates at all. */
 const dmy = (s: string | null | undefined) => {
   const d = s ? new Date(s) : null
   return d && !Number.isNaN(d.getTime())
@@ -54,11 +59,61 @@ const dmyt = (s: string | null | undefined) => {
  *  these would imply 305 independent verdicts where the coordinator made one. */
 const WHOLE_LIST = new Set(['RULE-ORDER', 'RULE-TIEBREAK'])
 
-/** A reading older than this is an absence of information rather than a
- *  reassurance, so it is marked as a caveat wherever it appears. */
-const STALE_DAYS = 365
+/** How far past target, as a numeral. 31x rounds, 1.2x keeps its decimal, and
+ *  the numeral always carries the true value whatever the bar does with it. */
+const ratioText = (r: number) => (r >= 10 ? String(Math.round(r)) : r.toFixed(1))
+
+/** NEWS2 typeset so that a 7 does not look like a 0.
+ *
+ *  Weight and size, no band and no colour. NEWS2 TOTAL is deliberately outside
+ *  the severity scale (lib/severity.ts: 148 of 308 tie at exactly 0, so a
+ *  graded scale on it would be flat across half the list), and any threshold
+ *  drawn here would be an invented one. This is a continuous map from the value
+ *  to its weight: a magnitude channel, not a claim. */
+const n2Type = (n: number | null): CSSProperties => {
+  if (n == null) return {}
+  const t = clamp01(n / 17)
+  return { fontWeight: 400 + Math.round(t * 300), fontSize: `${(14 + t * 7).toFixed(1)}px` }
+}
 
 const UNPLACED = 1e9
+
+/* ------------------------------------------------------------- geometry -- */
+
+/** The table's column widths, in ONE place, because the table's own min-width
+ *  has to be derived from them.
+ *
+ *  `table-layout: fixed` gives the elastic column whatever is left after every
+ *  specified width is honoured. The specified widths summed to 1154px while the
+ *  table's min-width was 1120px, so the one auto column (Referral) was allotted
+ *  -34px, which is to say 0. td overflow is `visible`, so the pathway number,
+ *  the planted chip and the override badge painted straight over the Waited
+ *  column at every width from 1440 up. That is the "compact version overlaps"
+ *  report, and 1440x900 and 1536x864 are both inside it.
+ *
+ *  min-width is now the fixed sum PLUS a reserved minimum for Referral, so the
+ *  elastic column can never be squeezed to nothing again. The worst case is
+ *  that .lst-vp scrolls sideways, which is what .lst-vp is for. */
+const COL = {
+  pos: 76, spine: 140, wait: 200, rule: 240, news: 180,
+  triage: 144, ctx: 132, exp: 42,
+} as const
+
+/** Referral's floor. "Otolaryngology (ENT) · 0600" beside a pathway number and
+ *  a planted chip does not fit in less. */
+const COL_REF = 260
+
+/** Nine columns need 1414px of table, seven need 1138. Content width is the
+ *  viewport less the rail and the page padding: 300px at 1440 and above (rail
+ *  236 + 2x32), 96px below it (rail 64 + 2x16). So nine columns first fit at
+ *  1714px, and asking for nine at 1440 is what forced the overlap. Triage and
+ *  Context are the two that go: Triage reads "triaged" on 307 of 308, Context's
+ *  subline was identical on every row, and both are in the expander in full. */
+const NINE_COL_PX = 1714
+
+const tableMin = (narrow: boolean): number =>
+  COL.pos + COL.spine + COL.wait + COL.rule + COL.news
+  + (narrow ? 0 : COL.triage + COL.ctx) + COL.exp + COL_REF
 
 type Clin = {
   news2: number | null
@@ -124,7 +179,7 @@ function useList(hospital: string, date: string) {
 
   /** The displayed order: the coordinator's positions, then every override that
    *  belongs to THIS decision applied oldest first, so the newest one wins.
-   *  Nothing is interpolated — a row is either in a slot or it is not. */
+   *  Nothing is interpolated: a row is either in a slot or it is not. */
   const seqOf = useMemo(() => {
     const m = new Map<string, number>()
     const d = decision.data
@@ -150,9 +205,9 @@ function useList(hospital: string, date: string) {
    *  move crosses a category boundary IN THE LIST THE CLINICIAN IS LOOKING AT.
    *  Computed against decision.rankings it was answering about a different list:
    *  after one override, displayed position N is a different person, so the
-   *  warning could stay silent for a move that visibly crosses a boundary —
-   *  and rule_warning_accepted would then be stored false for a crossing that
-   *  did happen. */
+   *  warning could stay silent for a move that visibly crosses a boundary, and
+   *  rule_warning_accepted would then be stored false for a crossing that did
+   *  happen. */
   const displayedOrder = useMemo(() => {
     const arr: string[] = []
     for (const [pw, i] of seqOf) arr[i] = pw
@@ -239,6 +294,82 @@ function comparator(sort: { key: SortKey; dir: 1 | -1 }, ranked: boolean, ref: R
   }
 }
 
+/* ------------------------------------------------------------ tied priority -- */
+
+/** Two rows, adjacent in the suggested order, whose priorities print the same.
+ *
+ *  On 9001/2026-08-30 twelve adjacent in-band pairs differ only from the fourth
+ *  decimal: positions 18 and 19 are 0.282693 and 0.282539, and both print
+ *  0.283. Sixteen further pairs are equal to the last bit and correctly fall
+ *  through to referral date. At three decimals the two kinds are indis-
+ *  tinguishable, and the surface then says priority decided the order. So the
+ *  pair is named, the margin is printed at the precision that carries it, and
+ *  the term that carries it is named as well.
+ *
+ *  In every near-tie in this decision the two terms pull in OPPOSITE
+ *  directions: alpha x urgency puts one row ahead by ~0.061 while
+ *  (1 - alpha) x wait_normalised puts the other ahead by ~0.061, and the
+ *  residue is the margin. Naming the winner without naming that is a half
+ *  truth, so both differences travel. */
+type Tie = {
+  hi: string; lo: string
+  hiPos: number; loPos: number
+  hiP: number; loP: number
+  /** hiP less loP. Exactly zero when the two are equal at every decimal. */
+  delta: number
+  /** alpha x urgency, hi less lo. */
+  du: number
+  /** (1 - alpha) x wait_normalised, hi less lo. */
+  dw: number
+  exact: boolean
+  /** The term pulling in the direction the pair actually resolved. Null when
+   *  nothing resolved it and referral date had to. */
+  carries: 'urgency' | 'wait' | null
+}
+
+const term = (t: Tie['carries']) => (t === 'urgency' ? 'how unwell' : 'how long waited')
+
+/** Every such pair in a decision, keyed by both of its pathway numbers.
+ *
+ *  Computed from the coordinator's own positions rather than from what is on
+ *  screen, so the fact survives a filter, a page and a different sort: it is a
+ *  property of the decision, not of the view. Only pairs in the same breach
+ *  tier are compared, because priority is only reached once that tier has tied
+ *  (step 3 of the key), so two rows either side of the boundary were never
+ *  separated by a score at all. */
+function findTies(rankings: Ranking[]): Map<string, Tie> {
+  const m = new Map<string, Tie>()
+  const byBand: Record<string, Ranking[]> = {}
+  for (const r of [...rankings].sort((a, b) => a.position - b.position)) {
+    (byBand[bandOf(r.cpc)] ??= []).push(r)
+  }
+  for (const list of Object.values(byBand)) {
+    for (let i = 1; i < list.length; i++) {
+      const a = list[i - 1]
+      const b = list[i]
+      if ((a.crt_breached === true) !== (b.crt_breached === true)) continue
+      if (a.priority.toFixed(3) !== b.priority.toFixed(3)) continue
+      const [hi, lo] = a.priority >= b.priority ? [a, b] : [b, a]
+      const du = hi.urgency_score * hi.alpha - lo.urgency_score * lo.alpha
+      const dw = hi.wait_normalised * (1 - hi.alpha) - lo.wait_normalised * (1 - lo.alpha)
+      const delta = hi.priority - lo.priority
+      const t: Tie = {
+        hi: hi.pathway_number, lo: lo.pathway_number,
+        hiPos: hi.position, loPos: lo.position,
+        hiP: hi.priority, loP: lo.priority,
+        delta, du, dw,
+        exact: delta === 0,
+        // delta is positive by construction, so the larger of the two
+        // differences is the positive one and is the term that carried it.
+        carries: delta === 0 ? null : du > dw ? 'urgency' : 'wait',
+      }
+      if (!m.has(a.pathway_number)) m.set(a.pathway_number, t)
+      if (!m.has(b.pathway_number)) m.set(b.pathway_number, t)
+    }
+  }
+  return m
+}
+
 /** Evidence keys are slash-joined and percent-encoded:
  *  9001/PW-9001-000191/2026-03-31%2009%3A08%3A00/avpu */
 const keyParts = (k: string): string[] =>
@@ -317,6 +448,46 @@ export function List({ hospital, date, reference, onOpen }: {
     }
   }, [rows, reference])
 
+  /** The state before ranking, which the client asked for by name: how many
+   *  people are waiting, and with what, so that running the agents is a step
+   *  the reader chooses rather than a screen they arrive at. Everything here is
+   *  counted from the cohort, so it is true of a day nothing has scored. */
+  const pre = useMemo(() => {
+    if (ranked || !rows.length) return null
+    const waits = rows.map((r) => r.adjusted_wait_days ?? 0).sort((a, b) => a - b)
+    const n = waits.length
+    const median = n % 2 ? waits[(n - 1) / 2] : Math.round((waits[n / 2 - 1] + waits[n / 2]) / 2)
+    const ratios = rows.map((r) => ratioOf(r, reference)).filter((x): x is number => x != null)
+    const steps = rows.map((r) => sevReadingAge(r.clin?.reading_age_days ?? null))
+    const n2 = rows.map((r) => r.clin?.news2).filter((x): x is number => x != null)
+    return {
+      median, min: waits[0], max: waits[n - 1],
+      worst: ratios.length ? Math.max(...ratios) : null,
+      // graded by the frozen scale rather than by a threshold invented here:
+      // sevReadingAge answers what a year-old and a two-year-old reading are.
+      year: steps.filter((x) => x >= sevReadingAge(365)).length,
+      twoYear: steps.filter((x) => x >= sevReadingAge(730)).length,
+      noReading: rows.filter((r) => r.clin?.obs_datetime == null).length,
+      n2n: n2.length,
+      n2zero: n2.filter((x) => x === 0).length,
+      n2max: n2.length ? Math.max(...n2) : null,
+      awaiting: rows.filter((r) => r.triage_status === 'awaiting_triage').length,
+    }
+  }, [rows, ranked, reference])
+
+  /** Adjacent pairs the printed priority cannot separate. Computed from the
+   *  decision's own positions, so the fact holds under any filter or sort. */
+  const ties = useMemo(
+    () => (decision ? findTies(decision.rankings) : new Map<string, Tie>()),
+    [decision])
+  const tieCount = useMemo(() => {
+    const seen = new Set<Tie>(ties.values())
+    let near = 0
+    let exact = 0
+    for (const t of seen) if (t.exact) exact++; else near++
+    return { near, exact }
+  }, [ties])
+
   function toggleSort(key: SortKey) {
     setOpen(null)
     setSort((s) => (s.key === key
@@ -363,8 +534,8 @@ export function List({ hospital, date, reference, onOpen }: {
               </>
             ) : (
               <>
-                No agent has scored this hospital-day. Rows sit in referral-date order —{' '}
-                <em>a display order, not a ranking.</em>
+                No agent has scored this hospital-day. The list below is what a clinician
+                recorded, in referral-date order: <em>a display order, not a ranking.</em>
               </>
             )}
           </p>
@@ -375,26 +546,68 @@ export function List({ hospital, date, reference, onOpen }: {
           <Fig n={figures.withTarget} k="have a target"
                w="a clinical timeframe applies to these, and only these" />
           <Fig n={figures.past} k="past target" accent
-               w={`of the ${fmt(figures.withTarget)} with one — never of ${fmt(figures.onList)}`} />
+               w={`of the ${fmt(figures.withTarget)} with one, never of ${fmt(figures.onList)}`} />
           <Fig n={figures.noTarget} k="no target applies"
                w="Routine and Uncategorised. Nothing here can be late." />
         </div>
       </header>
 
-      {!ranked && (
-        <div className="lst-pre">
-          <strong>No agent has scored this hospital-day yet.</strong>
-          <span>
-            Everything below is what a clinician recorded. Rows sit in referral-date order,
-            which is a display order and carries no clinical claim. Run the agents from the
-            top bar to see a suggested one.
-          </span>
-        </div>
+      {!ranked && pre && (
+        <section className="lst-pre" aria-label="The list before any ranking">
+          <h2 className="pre-h">
+            <strong className="num">{fmt(figures.onList)}</strong> people are waiting here, and
+            nothing has scored them yet.
+          </h2>
+          <div className="pre-figs">
+            <PreFig k={`already past their target, of the ${fmt(figures.withTarget)} that have one. `
+              + `${fmt(figures.noTarget)} have no target at all and nothing in that group can be late.`}>
+              <b className="num">{fmt(figures.past)}</b>
+            </PreFig>
+            <PreFig k={`days waited, median. The spread is ${fmt(pre.min)} to ${fmt(pre.max)} days.`}>
+              <b className="num">{fmt(pre.median)}</b>
+            </PreFig>
+            <PreFig k="the furthest past target anyone here is">
+              {pre.worst != null && pre.worst > 1
+                ? (
+                  <SevChip sev={sevWaitRatio(pre.worst)}
+                           title="the largest wait-against-target on this hospital-day">
+                    <b className="num">{ratioText(pre.worst)}×</b>
+                  </SevChip>
+                )
+                : <span className="muted">nobody here is past a target</span>}
+            </PreFig>
+            <PreFig k={'readings older than a year. A stale normal reading is an absence of '
+              + 'information, not reassurance, so the age is graded on its own.'}>
+              <SevChip sev={sevReadingAge(365)} title="at least a year since the reading">
+                <b className="num">{fmt(pre.year)}</b>
+              </SevChip>
+              {pre.twoYear > 0 && (
+                <SevChip sev={sevReadingAge(730)} title="at least two years since the reading">
+                  <b className="num">{fmt(pre.twoYear)}</b> past two years
+                </SevChip>
+              )}
+            </PreFig>
+            <PreFig k={pre.n2max == null
+              ? 'carry a NEWS2. No observation has been read on this hospital-day.'
+              : `carry a NEWS2. ${fmt(pre.n2zero)} of those are 0 and the highest is `
+                + `${pre.n2max} of 17, which is why NEWS2 total is never the thing that ranks.`}>
+              <b className="num">{fmt(pre.n2n)}</b>
+            </PreFig>
+          </div>
+          <p className="pre-p">
+            Rows sit in referral-date order, which is a display order and carries no clinical
+            claim: nothing below has been scored, placed or tested against a rule yet.{' '}
+            <strong>Run the agents from the top bar</strong> and these same{' '}
+            <span className="num">{fmt(figures.onList)}</span> rows come back in a suggested
+            order, each one carrying its score, the evidence cited for it and every rule
+            tested against it.
+          </p>
+        </section>
       )}
 
       {opsFailed && (
         <div className="lst-warn">
-          <TriangleAlert size={14} strokeWidth={2} />
+          <TriangleAlert className="ico-sig" strokeWidth={1.75} />
           <span>
             Operational context could not be read, so NEWS2, the reading dates and the cited
             capacity rows are unavailable. Every other column is from the cohort itself.
@@ -414,7 +627,7 @@ export function List({ hospital, date, reference, onOpen }: {
             category → severity → past target first → priority → referral date → pathway number
           </span>
         </summary>
-        <SortKeyLadder alpha={alpha} ranked={ranked} reference={reference} />
+        <SortKeyLadder alpha={alpha} ranked={ranked} reference={reference} ties={tieCount} />
       </details>
 
       {ranked && (
@@ -425,7 +638,7 @@ export function List({ hospital, date, reference, onOpen }: {
               <span className="num">{decision!.rankings.length}</span> placed ·{' '}
               <span className="num">{decision!.refused_paediatric.length}</span> refused ·{' '}
               <span className="num">{decision!.skipped.length}</span> skipped ·{' '}
-              <span className="num">{decision!.excluded.length}</span> excluded —
+              <span className="num">{decision!.excluded.length}</span> excluded ·
               reconciled by set union, never by sum
             </span>
           </summary>
@@ -435,7 +648,7 @@ export function List({ hospital, date, reference, onOpen }: {
 
       <div className="lst-tools">
         <label className="lst-find">
-          <Search size={15} strokeWidth={2} aria-hidden="true" />
+          <Search className="ico-chr" strokeWidth={1.75} aria-hidden="true" />
           <input
             type="search" value={q} onChange={(e) => { setQ(e.target.value); setOpen(null) }}
             placeholder="Find a pathway number or a specialty"
@@ -467,7 +680,7 @@ export function List({ hospital, date, reference, onOpen }: {
 
         {sort.key !== 'order' && (
           <button type="button" className="lst-reset" onClick={() => setSort({ key: 'order', dir: 1 })}>
-            Sorted by {SORT_NAME[sort.key]} — <strong>not the suggested order</strong>. Reset
+            Sorted by {SORT_NAME[sort.key]}, <strong>not the suggested order</strong>. Reset
           </button>
         )}
       </div>
@@ -518,6 +731,7 @@ export function List({ hospital, date, reference, onOpen }: {
               onToggleOpen={(pw) => setOpen((c) => (c === pw ? null : pw))}
               onOpen={onOpen}
               onMove={setMoving}
+              ties={ties}
             />
           </Tabs.Content>
         ))}
@@ -550,15 +764,31 @@ function Fig({ n, k, w, accent }: { n: number; k: string; w: string; accent?: bo
   )
 }
 
+/** One figure in the before-ranking summary. The value is a node rather than a
+ *  number because some of these are graded and arrive as a severity chip. */
+function PreFig({ k, children }: { k: string; children: ReactNode }) {
+  return (
+    <div className="pre-f">
+      <div className="pre-f-v">{children}</div>
+      <div className="pre-f-k">{k}</div>
+    </div>
+  )
+}
+
 /* ----------------------------------------------------- the sort key, drawn -- */
 
 /** The order used to be explained in a paragraph. A sort key is a structure, so
  *  it is drawn as one: six ordered steps, each naming the rule it comes from.
- *  Step 3 is the tier readers kept missing — everyone past target ranks above
- *  everyone within it, before any score is compared — so it takes the one clay
- *  accent this composition is allowed. */
-function SortKeyLadder({ alpha, ranked, reference }: {
+ *  Step 3 is the tier readers kept missing (everyone past target ranks above
+ *  everyone within it, before any score is compared), so it takes the one clay
+ *  accent this composition is allowed.
+ *
+ *  Steps 4 and 5 carry what the printed order cannot show on its own: how many
+ *  pairs the priority column cannot separate at the precision it prints, and
+ *  how many are genuinely equal and reach step 5. */
+function SortKeyLadder({ alpha, ranked, reference, ties }: {
   alpha: number | null; ranked: boolean; reference: Reference | undefined
+  ties: { near: number; exact: number }
 }) {
   const steps = [
     {
@@ -568,7 +798,7 @@ function SortKeyLadder({ alpha, ranked, reference }: {
     },
     {
       k: 'Severity rank',
-      w: 'core.ref_codes.severity_rank, never the raw CPC code — CPC 3 outranks CPC 2.',
+      w: 'core.ref_codes.severity_rank, never the raw CPC code: CPC 3 outranks CPC 2.',
     },
     {
       k: 'Past target first',
@@ -581,11 +811,20 @@ function SortKeyLadder({ alpha, ranked, reference }: {
       w: alpha == null
         ? 'α × how unwell, plus (1 − α) × how long waited. A run sets α from capacity pressure.'
         : `${pct(alpha)} how unwell, ${pct(1 - alpha)} how long waited. Capacity sets that one α for the whole hospital-day and never moves an individual.`,
+      note: ties.near > 0
+        ? `${ties.near} adjacent pairs here print the same priority at three decimals and are `
+          + 'still separated by it. Those rows show the margin at the precision that carries '
+          + 'it, and name which of the two terms carried it.'
+        : undefined,
     },
     {
       k: 'Referral date',
       w: 'Oldest first, so two people the scores cannot separate are separated by their wait.',
       rule: 'RULE-TIEBREAK',
+      note: ties.exact > 0
+        ? `${ties.exact} pairs here are equal at every decimal place, so priority genuinely `
+          + 'cannot separate them and this step is what places them.'
+        : undefined,
     },
     {
       k: 'Pathway number',
@@ -607,6 +846,7 @@ function SortKeyLadder({ alpha, ranked, reference }: {
             <span className="key-n num">{i + 1}</span>
             <span className="key-k">{s.k}</span>
             <span className="key-w">{s.w}</span>
+            {s.note && <span className="key-note">{s.note}</span>}
             {s.rule && (
               <span className="key-r num" title={ruleStatement(reference, s.rule.split(' · ')[0])}>
                 {s.rule}
@@ -643,7 +883,7 @@ function Reconciliation({ decision, total }: { decision: Decision; total: number
   const buckets = [
     { k: 'Placed', n: placed.size, w: 'scored by both agents and given a position' },
     {
-      k: 'Refused — paediatric', n: paed.size,
+      k: 'Refused, paediatric', n: paed.size,
       w: 'NEWS2 is validated in adults, so specialty 0601 is refused rather than scored on an adult scale',
       note: 'a coverage statement, not a low position',
     },
@@ -672,7 +912,7 @@ function Reconciliation({ decision, total }: { decision: Decision; total: number
           <div className="recon-c" key={b.k}>
             <div className="recon-n num">{fmt(b.n)}</div>
             <div className="recon-k">{b.k}</div>
-            <div className="recon-w">{b.w}{b.note && <em> — {b.note}</em>}</div>
+            <div className="recon-w">{b.w}{b.note && <em> ({b.note})</em>}</div>
           </div>
         ))}
       </div>
@@ -681,7 +921,7 @@ function Reconciliation({ decision, total }: { decision: Decision; total: number
         <strong className="num">{fmt(total)}</strong> on the list.
         {overlap > 0 && (
           <> The buckets overlap by <span className="num">{overlap}</span>, which is why they are
-          never summed — added rather than unioned they read as{' '}
+          never summed: added rather than unioned they read as{' '}
           <span className="num">{fmt(naive)}</span> of <span className="num">{fmt(total)}</span>.</>
         )}
         {union.size !== total && (
@@ -715,13 +955,15 @@ type BandProps = {
   onToggleOpen: (pw: string) => void
   onOpen: (pw: string) => void
   onMove: (r: Ranking) => void
+  ties: Map<string, Tie>
 }
 
 function Band(p: BandProps) {
   const [page, setPage] = useState(0)
-  // below 1440 the table drops Triage and Context rather than growing a
-  // horizontal scrollbar that cuts 340px off the right on the rehearsal machine
-  const narrow = useNarrow()
+  // Nine columns need 1414px of table and only have it from a 1714px viewport
+  // up, so below that the table drops Triage and Context rather than paint the
+  // Referral cell over the Waited column. See COL and NINE_COL_PX above.
+  const narrow = useNarrow(NINE_COL_PX)
   // a new sort, a new filter or a new category always starts at the top of the
   // category, never mid-list
   useEffect(() => { setPage(0) }, [p.rows, p.size])
@@ -783,12 +1025,12 @@ function Band(p: BandProps) {
                 Overview's, which bands all 308 by CPC. Two correct numbers that
                 would otherwise change by 2 when you click between surfaces. */}
             {p.rows.length > 0 && (
-              <> They are counted here rather than in their clinical band —{' '}
+              <> They are counted here rather than in their clinical band ({' '}
                 <strong>{
                   Object.entries(p.rows.reduce((a: Record<string, number>, r) => {
                     const b = bandOf(r.cpc); a[b] = (a[b] ?? 0) + 1; return a
                   }, {})).map(([b, n]) => `${n} ${b}`).join(' · ')
-                }</strong> — so the tab counts above are of the ranking, while the
+                }</strong> ), so the tab counts above are of the ranking, while the
                 Overview bands all 308 by category.</>
             )}
           </>
@@ -810,23 +1052,29 @@ function Band(p: BandProps) {
       </p>
 
       <div className={'scroll-x lst-vp' + (p.tight ? ' is-tight' : '')}>
-        <table className="lst-table">
+        {/* min-width is DERIVED, never written down: the specified widths plus
+            Referral's reserved minimum. Written down it was 1120 against a
+            1154 sum, and `table-layout: fixed` handed the elastic column its
+            remainder of -34px. */}
+        <table className="lst-table" style={{ minWidth: tableMin(narrow) }}>
           {/* Referral is the one elastic column: specialty names vary, and the
-              rule chip must never wrap onto a second line inside a row. */}
+              rule chip must never wrap onto a second line inside a row. It is
+              the column with no width here, so it takes what is left, and the
+              table is never allowed to be narrower than COL_REF past the rest. */}
           <colgroup>
-            <col style={{ width: 76 }} />
-            <col style={{ width: narrow ? 156 : 140 }} />
+            <col style={{ width: COL.pos }} />
+            <col style={{ width: COL.spine }} />
             <col />
-            <col style={{ width: 200 }} />
-            <col style={{ width: 240 }} />
-            <col style={{ width: 180 }} />
+            <col style={{ width: COL.wait }} />
+            <col style={{ width: COL.rule }} />
+            <col style={{ width: COL.news }} />
             {/* Triage reads "triaged" on 307 of 308 and Context's subline was
                 identical on every row, with both facts in full in the expander.
                 They are the two columns to lose when the width will not take
-                nine — never the balance, the wait or the rule. */}
-            {!narrow && <col style={{ width: 144 }} />}
-            {!narrow && <col style={{ width: 132 }} />}
-            <col style={{ width: 42 }} />
+                nine, and never the balance, the wait or the rule. */}
+            {!narrow && <col style={{ width: COL.triage }} />}
+            {!narrow && <col style={{ width: COL.ctx }} />}
+            <col style={{ width: COL.exp }} />
           </colgroup>
           <thead>
             <tr>
@@ -851,7 +1099,7 @@ function Band(p: BandProps) {
               </th>}
               {!narrow && <th className="lst-th">
                 <span className="lst-th-l">Context</span>
-                <span className="lst-th-s">recorded, not scored — ADR-004</span>
+                <span className="lst-th-s">recorded, not scored · ADR-004</span>
               </th>}
               <th className="lst-th"><span className="vh">Evidence</span></th>
             </tr>
@@ -864,7 +1112,7 @@ function Band(p: BandProps) {
                     <td colSpan={9}>
                       <span className="tier-t">
                         <strong>Everyone above this line is already past their target.</strong>{' '}
-                        The sort places them there before any score is compared — step 3 of the
+                        The sort places them there before any score is compared: step 3 of the
                         key, above priority. Below it, everyone is still within{' '}
                         {target != null ? `their ${target}-day target` : 'target'}.
                       </span>
@@ -874,6 +1122,7 @@ function Band(p: BandProps) {
                 <PatientRow
                   r={r} i={i} ranked={p.ranked} outside={p.outside}
                   reference={p.reference} tight={p.tight} narrow={narrow}
+                  tie={p.ties.get(r.pathway_number)}
                   expanded={p.open === r.pathway_number}
                   onToggle={() => p.onToggleOpen(r.pathway_number)}
                   onOpen={p.onOpen} />
@@ -883,6 +1132,7 @@ function Band(p: BandProps) {
                       <Evidence
                         r={r} hospital={p.hospital} reference={p.reference}
                         ops={p.ops} decision={p.decision} onMove={p.onMove}
+                        tie={p.ties.get(r.pathway_number)}
                         onOpen={p.onOpen} />
                     </td>
                   </tr>
@@ -947,8 +1197,8 @@ function Th({ k, label, sub, sort, onSort, align, k2, sub2 }: {
   const on = sort.key === k
   const on2 = !!k2 && sort.key === k2
   const arrow = sort.dir === 1
-    ? <ArrowUp size={11} strokeWidth={2.5} aria-hidden="true" />
-    : <ArrowDown size={11} strokeWidth={2.5} aria-hidden="true" />
+    ? <ArrowUp className="ico-chr" strokeWidth={1.75} aria-hidden="true" />
+    : <ArrowDown className="ico-chr" strokeWidth={1.75} aria-hidden="true" />
   return (
     <th className={'lst-th' + (align === 'right' ? ' is-r' : '') + (on || on2 ? ' is-on' : '')}
         aria-sort={on || on2 ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
@@ -976,9 +1226,10 @@ function Th({ k, label, sub, sort, onSort, align, k2, sub2 }: {
 
 /* --------------------------------------------------------------- one row -- */
 
-function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded, onToggle, onOpen }: {
+function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expanded, onToggle, onOpen }: {
   r: Row; i: number; ranked: boolean; outside: boolean; narrow: boolean
   reference: Reference | undefined; tight: boolean; expanded: boolean
+  tie: Tie | undefined
   onToggle: () => void; onOpen: (pw: string) => void
 }) {
   const still = useReducedMotion()
@@ -987,7 +1238,12 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
   const ratio = ratioOf(r, reference)
   const over = ratio != null && ratio > 1
   const age = r.clin?.reading_age_days ?? null
-  const stale = age != null && age > STALE_DAYS
+
+  // Two graded states, both from lib/severity.ts and neither invented here.
+  // The wait is the one number on this row with a real spread (0.036x to
+  // 31.1x); the reading's age is the one that says a number cannot be trusted.
+  const waitSev = sevWaitRatio(ratio)
+  const ageSev = sevReadingAge(age)
 
   const moved = !!r.ovr && r.ovrLive && r.ovr.to_position !== r.ovr.from_position
   const shownPos = moved ? r.ovr!.to_position : r.rank?.position
@@ -996,6 +1252,11 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
   // reviewer looks for, and the coordinator has always computed it.
   const fired = (r.rank?.rule_checks ?? [])
     .filter((c) => !c.passed && !WHOLE_LIST.has(c.rule_id))
+  // A row can fire a CRT rule AND RULE-TRIAGE-TURNAROUND. Compact used to clip
+  // the second one with `overflow: hidden` and no ellipsis, which is silent
+  // loss; it is now counted out loud instead.
+  const shownRules = tight && fired.length > 1 ? fired.slice(0, 1) : fired
+  const hiddenRules = fired.length - shownRules.length
 
   return (
     <motion.tr
@@ -1025,19 +1286,33 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
             {outside ? '—' : shownPos != null ? shownPos : '·'}
           </span>
           {/* the clinician's position is the one shown; the system's stays beside it */}
+          {/* 76px of column is 56px of content, and "system said 12" wrapped to
+              three lines in it. The phrase moves to the tooltip, where the
+              expander repeats it in full. */}
           {moved
-            ? <span className="pos-was lab">system said {r.ovr!.from_position ?? '—'}</span>
+            ? <span className="pos-was lab"
+                    title={`the system placed this referral at ${r.ovr!.from_position ?? '—'}`}>
+                was {r.ovr!.from_position ?? '—'}
+              </span>
             : r.ovr && r.ovrLive
-              ? <span className="pos-was lab">confirmed</span>
+              ? <span className="pos-was lab" title="a clinician confirmed this position">confirmed</span>
               : null}
         </div>
       </td>
 
-      {/* the spine: both terms, α-weighted */}
+      {/* the spine: both terms, α-weighted. When the row is one half of a pair
+          the printed priority cannot separate, the numeral goes to six decimals
+          and the term that carried the margin is named underneath. */}
       <td className="c-spine">
         {r.rank
-          ? <RankSpine urgency={r.rank.urgency_score} wait={r.rank.wait_normalised}
-                       alpha={r.rank.alpha} priority={r.rank.priority} tight={tight} />
+          ? (
+            <>
+              <RankSpine urgency={r.rank.urgency_score} wait={r.rank.wait_normalised}
+                         alpha={r.rank.alpha} priority={r.rank.priority} tight={tight}
+                         precise={!!tie} />
+              {tie && <TieLine tie={tie} self={r.pathway_number} />}
+            </>
+          )
           : <span className="muted lst-dash">not scored</span>}
       </td>
 
@@ -1069,7 +1344,7 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
           // name and the reason wrapped into three stacked fragments. The reason
           // moves to the tooltip and the expander, where there is room for it.
           <span className="ovbadge" title={`${r.ovr.clinician_id}: ${r.ovr.reason}`}>
-            <PenLine size={11} strokeWidth={2} aria-hidden="true" />
+            <PenLine className="ico-chr" strokeWidth={1.75} aria-hidden="true" />
             <span className="ovbadge-t">
               {moved
                 ? <>moved to {r.ovr.to_position} by <b>{r.ovr.clinician_id}</b></>
@@ -1080,7 +1355,7 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
         {r.ovr && !r.ovrLive && (
           <span className="ovbadge is-stale"
                 title={`${r.ovr.clinician_id} edited an earlier decision (${r.ovr.decision_id}). Its positions name a list this run replaced, so it is recorded but not applied.`}>
-            <PenLine size={11} strokeWidth={2} aria-hidden="true" />
+            <PenLine className="ico-chr" strokeWidth={1.75} aria-hidden="true" />
             <span className="ovbadge-t">
               edited by <b>{r.ovr.clinician_id}</b> · not applied
             </span>
@@ -1088,40 +1363,63 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
         )}
       </td>
 
-      {/* waited, drawn against target */}
+      {/* Waited, drawn against target. The multiple past target is the graded
+          state: .sub.is-over used to restate the base class verbatim, so a
+          referral 31x past its target was typeset exactly like one at 1.04x. */}
       <td className="c-wt">
         <div className="cell">
           <span className="wait-n num">{fmt(wait)}<span className="of"> days</span></span>
-          <WaitBar ratio={ratio} />
-          <span className={'sub' + (over ? ' is-over' : '')}>
+          <WaitBar ratio={ratio} sev={waitSev} />
+          <span className="sub is-split">
             {target == null ? 'no target for this category'
-              : over ? <><b className="num">{ratio! >= 10 ? Math.round(ratio!) : ratio!.toFixed(1)}×</b>{' '}
-                over a {target}-day target</>
-                : <>within a {target}-day target</>}
+              : over ? (
+                <>
+                  <SevChip sev={waitSev}
+                           title={`${fmt(wait)} days against a ${target}-day target`}>
+                    <b className="num">{ratioText(ratio!)}×</b>
+                  </SevChip>
+                  <span className="sub-t">over a {target}-day target</span>
+                </>
+              )
+                : <span className="sub-t">within a {target}-day target</span>}
           </span>
         </div>
       </td>
 
-      {/* the rule that fired */}
+      {/* The rule that fired. Every chip here is a failed check, so every one of
+          them is sevBreach(false): a solid block, which is what carries across
+          a room. The detail stays outside the block, in the reading register. */}
       <td className="c-rule">
         {fired.length > 0 ? (
           <div className="rulez">
-            {fired.map((c) => (
-              <span className="rule-chip" key={c.rule_id} title={ruleStatement(reference, c.rule_id)}>
-                <TriangleAlert size={11} strokeWidth={2.25} aria-hidden="true" />
-                <b className="num">{c.rule_id}</b>
-                {c.detail && <span className="rule-d num">{c.detail}</span>}
+            {shownRules.map((c) => (
+              <span className="rule-chip" key={c.rule_id}>
+                <SevChip sev={sevBreach(c.passed)} title={ruleStatement(reference, c.rule_id)}>
+                  <TriangleAlert className="ico-sig" strokeWidth={1.75} aria-hidden="true" />
+                  <b className="num">{c.rule_id}</b>
+                </SevChip>
+                {/* the detail ellipsises rather than wrapping the row onto a
+                    second line, so it carries its own full text */}
+                {c.detail && <span className="rule-d num" title={c.detail}>{c.detail}</span>}
               </span>
             ))}
+            {hiddenRules > 0 && (
+              <span className="rule-more num"
+                    title={fired.slice(shownRules.length)
+                      .map((c) => `${c.rule_id}: ${ruleStatement(reference, c.rule_id)}`)
+                      .join(' · ') + ' · open the row for every rule tested'}>
+                +{hiddenRules} more
+              </span>
+            )}
           </div>
         ) : r.rank ? (
           <span className="rule-ok">
-            <Check size={11} strokeWidth={2.5} aria-hidden="true" />
+            <Check className="ico-sig" strokeWidth={1.75} aria-hidden="true" />
             every timeframe rule holds
           </span>
         ) : r.crt_breached === true ? (
           <span className="rule-pre">
-            past target — no run has tested a rule against it yet
+            past target, and no run has tested a rule against it yet
           </span>
         ) : (
           <span className="muted lst-dash">{ranked ? '—' : 'not tested yet'}</span>
@@ -1142,18 +1440,40 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
           <span className={'n2 num' + (outside ? ' is-na' : '')}>
             {outside
               ? <span className="n2-na">not applied<span className="of"> · adult scale</span></span>
-              : <>{r.clin?.news2 ?? '—'}<span className="of"> of 17</span></>}
+              : (
+                <>
+                  <span className="n2-v" style={n2Type(r.clin?.news2 ?? null)}>
+                    {r.clin?.news2 ?? '—'}
+                  </span>
+                  <span className="of"> of 17</span>
+                </>
+              )}
           </span>
-          <span className={'sub' + (stale ? ' is-stale' : '')}>
-            {r.clin?.obs_datetime == null ? 'no reading' : <>
-              {dmy(r.clin.obs_datetime)}
-              {age != null && <> · <b className="num">{fmt(age)}</b> days old</>}
-            </>}
+          {/* The age is the flex item that never shrinks: it travels with the
+              reading for every reader, and the date truncates before it does.
+              The stale marker used to be a 1px dashed underline at 1.75:1. */}
+          <span className="sub is-split">
+            {r.clin?.obs_datetime == null ? 'no reading' : (
+              <>
+                <span className="sub-t">{dmy(r.clin.obs_datetime)}</span>
+                {/* one flex item, always: at sev 0 SevChip renders its children
+                    bare, and a loose text node in a flex row becomes an
+                    anonymous item of its own that cannot truncate. */}
+                {age != null && (
+                  <span className="sub-age">
+                    <SevChip sev={ageSev}
+                             title={`the only reading on this pathway, ${fmt(age)} days old`}>
+                      <b className="num">{fmt(age)}</b> days old
+                    </SevChip>
+                  </span>
+                )}
+              </>
+            )}
           </span>
         </div>
       </td>
 
-      {/* triage status — carried by the cohort payload and never rendered before */}
+      {/* triage status: carried by the cohort payload and never rendered before */}
       {!narrow && <td className="c-triage">
         <div className="cell">
           <span className="tri">
@@ -1194,8 +1514,8 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
           onClick={(e) => { e.stopPropagation(); onToggle() }}
           onKeyDown={(e) => e.stopPropagation()}>
           {expanded
-            ? <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
-            : <ChevronRight size={15} strokeWidth={2} aria-hidden="true" />}
+            ? <ChevronDown className="ico-ctl" strokeWidth={1.75} aria-hidden="true" />
+            : <ChevronRight className="ico-ctl" strokeWidth={1.75} aria-hidden="true" />}
         </button>
       </td>
     </motion.tr>
@@ -1209,23 +1529,61 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
  *  urgency score against the raw wait percentile overstates waiting time by up
  *  to six times, because α is 0.81 here. The two lengths sum to the priority
  *  the coordinator actually used, and share one scale, so comparing them by eye
- *  is a true comparison. */
-function RankSpine({ urgency, wait, alpha, priority, tight }: {
+ *  is a true comparison.
+ *
+ *  `precise` prints six decimals instead of two. Two decimals is the right
+ *  density for a column of 305, and exactly the wrong one for the pairs it
+ *  cannot separate. */
+function RankSpine({ urgency, wait, alpha, priority, tight, precise }: {
   urgency: number; wait: number; alpha: number; priority: number; tight: boolean
+  precise?: boolean
 }) {
   const u = clamp01(urgency) * alpha
   const w = clamp01(wait) * (1 - alpha)
-  const title = `priority ${priority.toFixed(3)} = ${u.toFixed(3)} unwell `
-    + `(α ${alpha.toFixed(2)} × ${urgency.toFixed(2)}) + ${w.toFixed(3)} waited `
-    + `(1−α ${(1 - alpha).toFixed(2)} × ${wait.toFixed(2)})`
+  const title = `priority ${priority.toFixed(6)} = ${u.toFixed(6)} unwell `
+    + `(α ${alpha.toFixed(3)} × ${urgency.toFixed(3)}) + ${w.toFixed(6)} waited `
+    + `(1−α ${(1 - alpha).toFixed(3)} × ${wait.toFixed(3)})`
   return (
-    <span className={'spn' + (tight ? ' is-tight' : '')} title={title}>
+    <span className={'spn' + (tight ? ' is-tight' : '') + (precise ? ' is-precise' : '')}
+          title={title}>
       <span className="spn-g">
         <i className="spn-stem" />
         <i className="spn-u" style={{ width: `${u * 50}%` }} />
         <i className="spn-w" style={{ width: `${w * 50}%` }} />
       </span>
-      <span className="spn-n num">{priority.toFixed(2)}</span>
+      <span className="spn-n num">{precise ? priority.toFixed(6) : priority.toFixed(2)}</span>
+    </span>
+  )
+}
+
+/** What the priority column cannot say on its own: this row and one of its
+ *  neighbours print the same number, and here is what actually separates them.
+ *
+ *  Both halves of the pair carry the line, each showing its own value, so the
+ *  two six-decimal numerals sit one above the other and the difference is
+ *  visible rather than asserted. */
+function TieLine({ tie, self }: { tie: Tie; self: string }) {
+  const other = self === tie.hi ? tie.loPos : tie.hiPos
+  const word = tie.exact
+    ? 'exact tie · referral date'
+    : `${tie.carries === 'urgency' ? 'unwell' : 'waited'} decides`
+  const title = tie.exact
+    ? `Position ${tie.hiPos} and position ${tie.loPos} carry the same priority to every `
+      + `decimal place (${tie.hiP.toFixed(6)}). Priority cannot separate them, so the order `
+      + 'falls through to referral date, step 5 of the key.'
+    : `Position ${tie.hiPos} is ${tie.hiP.toFixed(6)} and position ${tie.loPos} is `
+      + `${tie.loP.toFixed(6)}, a margin of ${tie.delta.toFixed(6)}. `
+      + `α × urgency differs by ${tie.du.toFixed(6)} and (1 − α) × wait_normalised by `
+      + `${tie.dw.toFixed(6)}, so ${term(tie.carries)} carries it.`
+  return (
+    <span className={'tie' + (tie.exact ? ' is-exact' : '')} title={title}>
+      <span className="tie-w" aria-hidden="true">{word}</span>
+      <span className="vh">
+        {tie.exact
+          ? `equal at every decimal place to position ${other}, so referral date places them`
+          : `printed priority ties with position ${other}; ${term(tie.carries)} separates them `
+            + `by ${tie.delta.toFixed(6)}`}
+      </span>
     </span>
   )
 }
@@ -1233,8 +1591,11 @@ function RankSpine({ urgency, wait, alpha, priority, tight }: {
 /** Waiting time against target, drawn. The target sits at a fixed mark; the
  *  overflow past it is compressed, because a 31× overrun and a 1.2× one have to
  *  share an axis without either becoming invisible. The numeral beside the bar
- *  always carries the true value. A missing target is an open tick, not a zero. */
-function WaitBar({ ratio }: { ratio: number | null }) {
+ *  always carries the true value. A missing target is an open tick, not a zero.
+ *
+ *  The overflow segment takes its colour from the same severity step as the
+ *  chip beside it, so the bar and the numeral cannot disagree. */
+function WaitBar({ ratio, sev }: { ratio: number | null; sev: Sev }) {
   if (ratio == null) {
     return (
       <span className="wb is-none" aria-hidden="true">
@@ -1245,7 +1606,7 @@ function WaitBar({ ratio }: { ratio: number | null }) {
   const within = Math.min(1, ratio) * 62
   const overflow = ratio > 1 ? Math.sqrt(Math.min((ratio - 1) / 9, 1)) * 38 : 0
   return (
-    <span className="wb" aria-hidden="true">
+    <span className="wb" data-sev={sev} aria-hidden="true">
       <i className="wb-in" style={{ width: `${within}%` }} />
       {overflow > 0 && <i className="wb-over" style={{ left: '62%', width: `${overflow}%` }} />}
       <i className="wb-mark" />
@@ -1261,11 +1622,12 @@ function WaitBar({ ratio }: { ratio: number | null }) {
  *  above renders NEWS2 and the two weighted terms; this is where the six cited
  *  vitals, the one or two cited capacity rows, every rule the coordinator
  *  tested and its own rationale line live. The full patient page is still one
- *  click away on the row itself — this is the quick look, not a replacement. */
-function Evidence({ r, hospital, reference, ops, decision, onMove, onOpen }: {
+ *  click away on the row itself: this is the quick look, not a replacement. */
+function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }: {
   r: Row; hospital: string; reference: Reference | undefined
   ops: ReturnType<typeof useList>['ops']
   decision: Decision | undefined
+  tie: Tie | undefined
   onMove: (r: Ranking) => void
   onOpen: (pw: string) => void
 }) {
@@ -1293,7 +1655,7 @@ function Evidence({ r, hospital, reference, ops, decision, onMove, onOpen }: {
 
   const checks: RuleCheck[] = r.rank?.rule_checks ?? []
   const age = r.clin?.reading_age_days ?? null
-  const stale = age != null && age > STALE_DAYS
+  const ageSev = sevReadingAge(age)
 
   return (
     <div className="ev">
@@ -1316,20 +1678,49 @@ function Evidence({ r, hospital, reference, ops, decision, onMove, onOpen }: {
                   opinion. Both said here, next to it. */}
               <p className="ev-p ev-p-meta">
                 Deterministic template text, written by the coordinator from the
-                numbers above — no model wrote this sentence. The capacity score
+                numbers above. No model wrote this sentence. The capacity score
                 it names belongs to the whole specialty and set{' '}
                 <span className="num">α</span>; it did not move this referral.
               </p>
+              {/* Six decimals, not three. Three is where twelve adjacent pairs
+                  in this decision become indistinguishable, and it is also
+                  where the two terms stop reconciling with their own sum. */}
               <dl className="ev-terms">
                 <div><dt>how unwell</dt>
                   <dd className="num">{r.rank.urgency_score.toFixed(3)} × α {r.rank.alpha.toFixed(3)}
-                    {' = '}<b>{(r.rank.urgency_score * r.rank.alpha).toFixed(3)}</b></dd></div>
+                    {' = '}<b>{(r.rank.urgency_score * r.rank.alpha).toFixed(6)}</b></dd></div>
                 <div><dt>how long waited</dt>
                   <dd className="num">{r.rank.wait_normalised.toFixed(3)} × {(1 - r.rank.alpha).toFixed(3)}
-                    {' = '}<b>{(r.rank.wait_normalised * (1 - r.rank.alpha)).toFixed(3)}</b></dd></div>
+                    {' = '}<b>{(r.rank.wait_normalised * (1 - r.rank.alpha)).toFixed(6)}</b></dd></div>
                 <div className="ev-tsum"><dt>priority</dt>
-                  <dd className="num"><b>{r.rank.priority.toFixed(3)}</b></dd></div>
+                  <dd className="num"><b>{r.rank.priority.toFixed(6)}</b></dd></div>
               </dl>
+              {tie && (
+                <p className={'ev-tie' + (tie.exact ? ' is-exact' : '')}>
+                  <strong>
+                    Position <span className="num">{tie.hiPos}</span> and position{' '}
+                    <span className="num">{tie.loPos}</span> print the same priority at three
+                    decimals.
+                  </strong>{' '}
+                  {tie.exact ? (
+                    <>They are equal at every decimal place, so priority genuinely cannot
+                    separate them and the order falls through to referral date, step 5 of the
+                    key. Nothing about this pair was decided by a score.</>
+                  ) : (
+                    <>
+                      They are not equal: <span className="num">{tie.hiP.toFixed(6)}</span>{' '}
+                      against <span className="num">{tie.loP.toFixed(6)}</span>, a margin of{' '}
+                      <span className="num">{tie.delta.toFixed(6)}</span>. The two terms pull
+                      opposite ways, so the margin is what is left of them:{' '}
+                      <span className="num">α × urgency</span> differs by{' '}
+                      <span className="num">{tie.du.toFixed(6)}</span> and{' '}
+                      <span className="num">(1 − α) × wait_normalised</span> by{' '}
+                      <span className="num">{tie.dw.toFixed(6)}</span>, so{' '}
+                      <b>{term(tie.carries)}</b> is what carries it.
+                    </>
+                  )}
+                </p>
+              )}
               <p className="ev-cav">
                 Priority is compared only after category, severity and the past-target tier have
                 tied. It cannot move anyone between categories.
@@ -1356,11 +1747,22 @@ function Evidence({ r, hospital, reference, ops, decision, onMove, onOpen }: {
             <ul className="ev-rules">
               {checks.map((c) => (
                 <li key={c.rule_id} className={c.passed ? '' : 'is-bad'}>
-                  <span className={'ev-vd ' + (c.passed ? 'is-ok' : 'is-bad')}>
-                    {c.passed
-                      ? <Check size={12} strokeWidth={2.5} aria-hidden="true" />
-                      : <TriangleAlert size={12} strokeWidth={2.25} aria-hidden="true" />}
-                    {c.passed ? 'holds' : 'breached'}
+                  {/* A pass and a breach used to share one background, separated
+                      by a text step and a 1.55:1 ring. A breach is a solid
+                      block now; "holds" is not an attention state and keeps the
+                      neutral pill it always had. */}
+                  <span className="ev-vd">
+                    {c.passed ? (
+                      <span className="ev-ok">
+                        <Check className="ico-sig" strokeWidth={1.75} aria-hidden="true" />
+                        holds
+                      </span>
+                    ) : (
+                      <SevChip sev={sevBreach(c.passed)}>
+                        <TriangleAlert className="ico-sig" strokeWidth={1.75} aria-hidden="true" />
+                        breached
+                      </SevChip>
+                    )}
                   </span>
                   <span className="ev-rid num">{c.rule_id}</span>
                   <span className="ev-rst">{ruleStatement(reference, c.rule_id)}</span>
@@ -1386,14 +1788,22 @@ function Evidence({ r, hospital, reference, ops, decision, onMove, onOpen }: {
             <span className="ev-hn">
               {obsCites.length
                 ? `${obsCites.length} citations from one reading`
-                : 'no citations — nothing has scored this referral'}
-              {citedAt && <> · {dmyt(citedAt)}{age != null && <> · <b className="num">{fmt(age)}</b> days old</>}</>}
+                : 'no citations · nothing has scored this referral'}
+              {citedAt && <> · {dmyt(citedAt)}</>}
             </span>
+            {age != null && (
+              <span className="ev-age">
+                <SevChip sev={ageSev} title={`the reading is ${fmt(age)} days old`}>
+                  <b className="num">{fmt(age)}</b> days old
+                </SevChip>
+              </span>
+            )}
           </h3>
-          {stale && (
+          {ageSev > 0 && (
             <p className="ev-stale">
               This reading has never been repeated. Its date is also how long this person has
-              gone unmeasured.
+              gone unmeasured, so a normal number here is an absence of information rather
+              than a reassurance.
             </p>
           )}
           {ctx.isPending && <p className="ev-p muted">Reading the observation…</p>}
@@ -1517,7 +1927,7 @@ function Evidence({ r, hospital, reference, ops, decision, onMove, onOpen }: {
           <p className="ev-cav">
             MTS carries its own red/orange/yellow/green/blue vocabulary, which would collide with
             the triage categories, so it is shown as a word in a neutral register and is not
-            scored — ADR-004. The condition code is a weighted random draw over the specialty's
+            scored (ADR-004). The condition code is a weighted random draw over the specialty's
             mix, independent of acuity: a record field, never a finding.
           </p>
         </section>
@@ -1562,9 +1972,6 @@ function Evidence({ r, hospital, reference, ops, decision, onMove, onOpen }: {
               Open the full record
             </button>
           </div>
-          <p className="ev-cav">
-            Attribution, not authentication: the record says who typed it, it does not verify them.
-          </p>
         </section>
       </div>
     </div>

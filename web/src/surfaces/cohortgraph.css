@@ -14,7 +14,12 @@
   position: absolute; inset: 0; display: grid; place-items: center;
   color: var(--text-3); font-size: var(--t-small); background: var(--bg-sunk);
 }
-.cg-lost { background: var(--scrim-deep); gap: var(--d3); }
+/* Above the panels and the camera controls, which are z-index 5. The scrim had
+   no z-index at all, so those painted OVER it: a reviewer could keep zooming,
+   refitting and switching layout through a veil that never lifted, which is
+   worse than the dropped context it was reporting. A scrim that does not cover
+   is not a scrim. */
+.cg-lost { background: var(--scrim-deep); gap: var(--d3); z-index: 6; }
 .cg-lost button {
   margin-left: var(--d2); background: var(--accent); color: var(--ink-deep);
   border: 0; border-radius: var(--radius); padding: 6px var(--d3);

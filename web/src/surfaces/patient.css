@@ -46,17 +46,13 @@
 .pt-wait-n { font-family: var(--font-brand); font-size: 40px; font-weight: 300; line-height: 1; }
 .pt-wait-l { font-size: var(--t-small); color: var(--text-2); margin-top: 3px; }
 .pt-wait-l .num { color: var(--text); }
-/* wait against target, drawn: the tick is the target, the fill is the wait */
-.pt-wait-bar {
-  position: relative; height: 7px; margin-top: var(--d2);
-  background: var(--bg-sunk); border: 1px solid var(--rule);
-}
-.pt-wait-fill { position: absolute; inset: 0 auto 0 0; background: var(--text-3); }
-.pt-wait-tick {
-  position: absolute; top: -3px; bottom: -3px; width: 2px;
-  background: var(--ink); transform: translateX(-1px);
-}
+/* Wait against target. The track, the fill and the target mark are all SevBar
+   now: this bar did not change colour AT ALL when the wait went past target,
+   whether by a day or by 31 times, and only the words underneath moved. The
+   wrapper is spacing and nothing else. */
+.pt-wait-bar { margin-top: var(--d2); }
 .pt-wait-x { font-size: var(--t-micro); color: var(--text-2); margin-top: 4px; }
+.pt-wait-x .sev { align-items: center; }
 .pt-act { white-space: nowrap; }
 
 .pt-ovr-note {
@@ -101,13 +97,22 @@
 .pt-check-id { color: var(--text); font-weight: 550; white-space: nowrap; }
 .pt-check-st { color: var(--text-2); line-height: 1.45; }
 .pt-check-d { color: var(--text-2); }
+/* A breached rule used to be a 1px inset hairline and a bolder id. It is a
+   breach: it takes the severity register, on the row as well as on the word. */
+.pt-check[data-passed="no"] { box-shadow: inset 3px 0 0 var(--sev-3-bg); }
 .pt-check[data-passed="no"] .pt-check-id { color: var(--text); font-weight: 700; }
+.pt-check[data-passed="no"] .pt-check-d { color: var(--text); }
 .pt-verdict {
-  justify-self: end; font-size: var(--t-micro); padding: 2px var(--d2);
-  border-radius: var(--radius-pill); white-space: nowrap;
+  justify-self: end; display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--t-micro); white-space: nowrap;
 }
-.pt-verdict.is-ok  { color: var(--text-3); background: var(--surface-2); }
-.pt-verdict.is-bad { color: var(--text); background: var(--bg-sunk); box-shadow: inset 0 0 0 1px var(--rule-firm); }
+.pt-verdict svg { flex: none; }
+.pt-verdict .sev { align-items: center; }
+/* holds is the resting state, so it keeps the quiet pill and never a fill */
+.pt-verdict.is-ok {
+  color: var(--text-3); background: var(--surface-2);
+  padding: 2px var(--d2); border-radius: var(--radius-pill);
+}
 
 .pt-rationale {
   margin-top: var(--d4); border: 1px solid var(--rule);
@@ -166,15 +171,24 @@
   display: grid; grid-template-columns: 120px 1fr; gap: var(--d4);
   align-items: center; padding: var(--d3);
 }
+.pt-ward-fig { display: grid; gap: var(--d1); justify-items: start; min-width: 0; }
 .pt-ward-pct { font-family: var(--font-brand); font-size: 30px; font-weight: 300; line-height: 1; }
-.pt-ward-meter {
-  position: relative; height: 12px; background: var(--bg-sunk); border: 1px solid var(--rule);
+.pt-ward-fig-l { font-size: var(--t-micro); color: var(--text-3); }
+/* The track, the fill and the 85% mark are SevBar. 100% is the END of this
+   scale, not a line inside it: occupancy_pct is occupied/(occupied+free) and
+   cannot pass 100, so the old span of max(100, pct) was always exactly 100 and
+   pinned that tick to the right edge on every ward, while the one line a reader
+   needs was not drawn anywhere on the page. */
+.pt-ward-meter { min-width: 0; }
+.pt-ward-scale {
+  position: relative; display: flex; justify-content: space-between; gap: var(--d2);
+  margin-top: 3px; font-size: var(--t-micro); color: var(--text-3);
 }
-.pt-ward-meter i { position: absolute; inset: 0 auto 0 0; background: var(--text-3); }
-/* 100% is a line on this meter, not the end of it: occupancy passes it */
-.pt-ward-100 {
-  position: absolute; top: -3px; bottom: -3px; left: 100%; width: 2px;
-  background: var(--ink); transform: translateX(-2px);
+/* sits at the mark itself, ending on it, so the label cannot be read as the
+   middle of the scale. `left` comes from the component, which owns the number. */
+.pt-ward-safe {
+  position: absolute; transform: translateX(-100%); padding-right: 5px;
+  color: var(--text-2); white-space: nowrap;
 }
 .pt-facts {
   /* hairlines on the children: ten facts into a fluid track count leaves a
@@ -237,23 +251,17 @@
 .pt-stale-head { display: flex; align-items: baseline; gap: var(--d3); flex-wrap: wrap; }
 .pt-stale-when { font-size: var(--t-data); color: var(--text); }
 .pt-stale-age { font-size: var(--t-data); color: var(--text); font-weight: 600; }
+/* This was the one existing four-step ramp in the product, and it bottomed out
+   at 3.56:1. It is now sevReadingAge, on the word and on the meter, and below
+   90 days it carries no mark at all: the absence of a severity is not a
+   severity. The word is read off the step in Vitals.tsx, so the two cannot
+   drift apart. */
 .pt-stale-state {
   font-size: var(--t-micro); letter-spacing: var(--track-lab); text-transform: uppercase;
-  border: 1px solid var(--rule-firm); padding: 1px var(--d2); color: var(--text-2);
+  color: var(--text-2);
 }
-.pt-stale-state[data-age="fresh"]  { color: var(--text-3); }
-.pt-stale-state[data-age="recent"] { color: var(--text-2); }
-.pt-stale-state[data-age="stale"]  { color: var(--text); border-color: var(--text-3); }
-.pt-stale-state[data-age="very"]   { color: var(--paper); background: var(--ink); border-color: var(--ink); }
-.pt-stale-track {
-  position: relative; height: 8px; margin-top: var(--d3);
-  background: var(--surface); border: 1px solid var(--rule);
-}
-.pt-stale-fill { position: absolute; inset: 0 auto 0 0; background: var(--text-3); }
-.pt-stale-med {
-  position: absolute; top: -3px; bottom: -3px; width: 2px;
-  background: var(--ink); transform: translateX(-1px);
-}
+.pt-stale-state .sev { letter-spacing: inherit; }
+.pt-stale-track { margin-top: var(--d3); }
 .pt-stale-scale {
   display: flex; justify-content: space-between; gap: var(--d2);
   margin-top: 3px; font-size: var(--t-micro); color: var(--text-3);
@@ -281,24 +289,38 @@
 }
 .pt-unit { font-size: var(--t-small); color: var(--text-2); margin-left: 2px; }
 
-/* the sub-score: numeral, pips and ink weight — three channels, one value */
-.pt-sub {
-  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
-  padding: 1px 5px 1px 6px; border: 1px solid var(--rule); border-radius: var(--radius);
-}
+/* The sub-score: numeral, pips and fill, three channels of one value.
+   The four ink steps that used to live here measured 3.56 / 5.99 / 15.37 /
+   14.70:1, so the most severe step was the LESS contrasty of the top two. The
+   fill is sevNews2Sub now, which puts a 3 two steps above a 1. */
+.pt-sub { margin-left: auto; display: inline-flex; align-items: center; border-radius: var(--radius); }
+.pt-sub .sev { align-items: center; gap: 5px; padding: 1px 5px 1px 6px; }
 .pt-sub-n { font-size: var(--t-body); font-weight: 600; line-height: 1.3; }
-.pt-sub[data-score="0"] { background: var(--surface-2); color: var(--text-3); border-color: var(--rule); }
-.pt-sub[data-score="1"] { background: var(--bg-sunk);   color: var(--text-2); border-color: var(--rule-firm); }
-.pt-sub[data-score="2"] { background: var(--surface);   color: var(--text);   border-color: var(--text-3); }
-.pt-sub[data-score="3"] { background: var(--ink);       color: var(--paper);  border-color: var(--ink); }
-.pt-sub[data-score="none"] { color: var(--text-3); border-style: dashed; }
-/* a band that was drawn but never applied — the paediatric refusal */
-.pt-sub[data-applied="no"] {
-  background: none; color: var(--text-3); border-color: var(--rule-firm); border-style: dashed;
+/* step 0 is not a severity, so the resting box is the sub-score's own */
+.pt-sub[data-sev="0"] {
+  gap: 5px; padding: 1px 5px 1px 6px;
+  border: 1px solid var(--rule); background: var(--surface-2); color: var(--text-3);
 }
+.pt-sub[data-score="none"] { border-style: dashed; }
+/* A paediatric refusal. The severity register is withheld entirely, because a
+   refused score is not an acuity claim -- which is also how a refused 3 came to
+   look exactly like a refused 0. The number and the pips stay, so the value is
+   still legible, and three channels say it was withdrawn rather than absent. */
+.pt-sub[data-applied="no"] {
+  gap: 5px; padding: 1px 5px 1px 6px; background: none; color: var(--text-3);
+  border: 1px dashed var(--rule-firm);
+}
+.pt-sub[data-applied="no"] .pt-sub-n { text-decoration: line-through; }
+.pt-sub-x { font-size: var(--t-micro); letter-spacing: var(--track-lab); text-transform: uppercase; }
 .pt-pips { display: inline-flex; gap: 2px; align-items: center; }
 .pt-pips i { display: block; width: 3px; height: 9px; background: var(--rule-firm); }
 .pt-pips i.is-on { background: currentColor; }
+/* Inside a solid step the page's own hairline colour reads as ON against the
+   fill, so an unlit pip goes hollow instead. */
+.pt-sub[data-sev="3"] .pt-pips i,
+.pt-sub[data-sev="4"] .pt-pips i { background: none; box-shadow: inset 0 0 0 1px currentColor; }
+.pt-sub[data-sev="3"] .pt-pips i.is-on,
+.pt-sub[data-sev="4"] .pt-pips i.is-on { background: currentColor; box-shadow: none; }
 
 /* the meter: the band table drawn, not described */
 .pt-meter { position: relative; height: 17px; margin-top: var(--d3); }
@@ -371,13 +393,19 @@
 
 /* --- 4 the journey ------------------------------------------------------- */
 .pt-journey { margin: 0; }
-/* past target, recoloured on the axis itself. --cat-urgent is the triage
-   category's own target being missed, which is the one thing outside the
-   category chips that is allowed to wear it. */
+/* Past target, recoloured on the axis itself. It is the same fact as the
+   header's wait bar, so it climbs the same four steps rather than sitting flat
+   whatever the overrun. The step arrives as a class on the Journey root because
+   the ratio is the header's to compute, not the axis's. That also frees clay
+   for the silence hatch below, which is then the one clay mark here. */
 .j-overdue {
   position: absolute; top: 12px; height: var(--spine-w);
-  background: var(--clay);
+  background: var(--rule-firm);
 }
+.pt-journey.is-sev-1 .j-overdue, .pt-journey.is-sev-1 .j-leg.is-overdue i { background: var(--sev-1-edge); }
+.pt-journey.is-sev-2 .j-overdue, .pt-journey.is-sev-2 .j-leg.is-overdue i { background: var(--sev-2-edge); }
+.pt-journey.is-sev-3 .j-overdue, .pt-journey.is-sev-3 .j-leg.is-overdue i { background: var(--sev-3-bg); }
+.pt-journey.is-sev-4 .j-overdue, .pt-journey.is-sev-4 .j-leg.is-overdue i { background: var(--sev-4-bg); }
 .j-legend {
   list-style: none; display: flex; flex-wrap: wrap; gap: var(--d2) var(--d4);
   margin: var(--d2) 0 0; padding: 0;
@@ -387,8 +415,8 @@
   font-size: var(--t-micro); color: var(--text-2);
 }
 .j-leg i { width: 14px; height: 5px; flex: none; background: var(--rule-firm); }
-.j-leg.is-overdue i { background: var(--clay); }
-.j-leg.is-overdue strong { color: var(--clay); }
+.j-leg.is-overdue i { background: var(--rule-firm); }
+.j-leg.is-overdue strong { color: var(--text); }
 .j-leg.is-silent i { background: var(--clay); }
 .j-leg.is-silent strong { color: var(--clay); }
 
@@ -448,6 +476,7 @@
   .pt-session-x { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
+  .nb-sep { grid-template-columns: 1fr; gap: var(--d1); }
   .pt-head-r { width: 100%; }
   .pt-wait { text-align: left; min-width: 0; flex: 1 1 220px; }
   .pt-ward-main { grid-template-columns: 1fr; }
@@ -458,13 +487,13 @@
 
 /* --- motion: there is none to remove, and it stays that way --------------- */
 @media (prefers-reduced-motion: reduce) {
-  .pt-wait-fill, .pt-stale-fill, .pt-track i, .pt-bar i, .pt-session-f, .pt-ward-meter i {
+  .sevbar-f, .pt-track i, .pt-bar i, .pt-session-f {
     transition: none;
   }
 }
 
-/* A planted fixture, named. These eight are deliberate — the dataset track keeps
-   them at fixed pathway numbers because the demo depends on them — and saying so
+/* A planted fixture, named. These eight are deliberate (the dataset track keeps
+   them at fixed pathway numbers because the demo depends on them), and saying so
    is the difference between a demonstration asset and apparent test debris. */
 .pt-planted {
   display: grid; gap: var(--d2); margin: var(--d4) 0;
@@ -481,6 +510,37 @@
 .cmp-age { display: block; font-size: var(--t-micro); color: var(--text-3); }
 
 /* Shown only on the rows where the two rounded terms do not visibly add to the
-   exact priority — 38 of 305. Better than leaving a reader to hunt for an
+   exact priority: 38 of 305. Better than leaving a reader to hunt for an
    arithmetic error that is not there. */
 .why-round { display: block; font-size: var(--t-micro); color: var(--text-3); font-weight: 400; }
+
+/* --- what separates two adjacent people, on the page ----------------------
+   The client's point 12: the why "just doesn't carry any explanation. It just
+   says both are the same, but why is the other top then or below?" The answer
+   existed but was behind a click on a neighbour row, so the page as read said
+   nothing. It is a row of its own now, between the two rows it is about, and
+   the full ladder stays behind the click. */
+.nb-sep {
+  display: grid; grid-template-columns: 78px 1fr; gap: var(--d3);
+  padding: 7px var(--d4) 9px; border-top: 1px solid var(--rule);
+  background: var(--bg-sunk); font-size: var(--t-small);
+  color: var(--text-2); line-height: 1.55;
+}
+.nb-sep-k {
+  font-size: var(--t-micro); letter-spacing: var(--track-lab);
+  text-transform: uppercase; color: var(--text-3);
+}
+.nb-sep-v strong { color: var(--text); font-weight: 600; }
+.nb-sep-v .num { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* Two of the seven cells in a neighbour row had no rule at all, so the pathway
+   number and the wait sat at the row's default weight while every cell around
+   them was graded. */
+.nb-id { color: var(--text); }
+.nb-w  { color: var(--text-2); font-size: var(--t-micro); }
+
+/* The net of the two terms, at the precision the net needs. Without it the two
+   rows above can each read "0.061 apart" and leave no way to tell which way the
+   sum went. */
+.cmp-trow.is-net { border-top: 1px solid var(--rule); margin-top: 3px; padding-top: 7px; }
+.cmp-trow.is-net .cmp-tk, .cmp-trow.is-net .cmp-tv { color: var(--text); font-weight: 600; }

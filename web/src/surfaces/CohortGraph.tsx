@@ -58,11 +58,18 @@ const LAYOUTS = [
   { key: 'treeLr2d', label: 'Tree' },
 ] as const
 
-const SIZES = [
-  { n: 60, label: 'Top 60' },
-  { n: 150, label: 'Top 150' },
-  { n: 0, label: 'All 305' },
-] as const
+/** How many placements to draw. `n: 0` is no limit.
+ *
+ *  The label for that last one used to be the literal string "All 305", which
+ *  is a claim about the data written into the chrome: it read "All 305" on
+ *  every hospital-day, including the ones that hold 62. It is derived from the
+ *  decision now, and says only "All" until the decision has arrived. The Top-N
+ *  labels stay literal because they are a REQUEST, not a claim: asking for the
+ *  top 150 of a 62-row day is not wrong, it just returns 62. */
+const SIZES = [{ n: 60 }, { n: 150 }, { n: 0 }] as const
+
+const sizeLabel = (n: number, placements: number | undefined): string =>
+  n ? `Top ${n}` : placements != null ? `All ${placements}` : 'All'
 
 /** The whole decision, drawn from the graph store.
  *
@@ -174,7 +181,7 @@ export function CohortGraphSurface({ hospital, date, onOpenPatient }: {
           <p className="cg-note">
             <strong className="num">{g.data.placements}</strong> placements and{' '}
             <strong className="num">{shares.find(([k]) => k === 'score')?.[1] ?? 0}</strong>{' '}
-            urgency scores — converging on{' '}
+            urgency scores, converging on{' '}
             <strong className="num">{shares.find(([k]) => k === 'bed_status')?.[1] ?? 0}</strong>{' '}
             ward snapshots. Capacity is scored per specialty, so it sets one weight
             for the whole hospital-day and can move nobody.
@@ -192,7 +199,9 @@ export function CohortGraphSurface({ hospital, date, onOpenPatient }: {
         <div className="cg-seg" role="group" aria-label="How many placements">
           {SIZES.map((s) => (
             <button key={s.n} className={limit === s.n ? 'is-on' : ''}
-                    onClick={() => setLimit(s.n)}>{s.label}</button>
+                    onClick={() => setLimit(s.n)}>
+              {sizeLabel(s.n, dec.data?.rankings.length)}
+            </button>
           ))}
         </div>
       </div>
@@ -213,8 +222,8 @@ export function CohortGraphSurface({ hospital, date, onOpenPatient }: {
           )}
           {chosen.kind !== 'placement' && !g.data?.inputs_graph_loaded && (
             <p className="cg-caveat">
-              <TriangleAlert size={13} strokeWidth={2} aria-hidden />
-              This node is cited, and its values are not in the graph store — the
+              <TriangleAlert size={14} strokeWidth={2} aria-hidden />
+              This node is cited, and its values are not in the graph store: the
               batch input layer is not loaded here. Its identity and its role are
               real; its readings live in the records, not in these triples.
             </p>
@@ -228,7 +237,34 @@ export function CohortGraphSurface({ hospital, date, onOpenPatient }: {
 
 /** The canvas, isolated so a lost WebGL context remounts it rather than leaving
  *  a black rectangle. It was observed being lost in this session simply by
- *  navigating away and back, which mid-demo would look like a broken product. */
+ *  navigating away and back, which mid-demo would look like a broken product.
+ *
+ *  The reported "switching between options dropped the graphics context" was
+ *  four faults compounding, none of them an actual context loss:
+ *
+ *    1. `key` carried `layout`, so every layout click unmounted the canvas and
+ *       mounted a new one. `layout` was missing from the listener effect's
+ *       deps, so the effect never re-ran and the listener stayed bound to the
+ *       DETACHED element.
+ *    2. react-three-fiber calls gl.forceContextLoss() on that dead canvas in a
+ *       setTimeout(500) on unmount. That dispatches webglcontextlost on it, the
+ *       stale listener fired, and the banner appeared over a perfectly healthy
+ *       graph half a second after the click. That delay is why it read as a
+ *       spontaneous crash rather than as a consequence of the click.
+ *    3. Redraw bumped `gen` but never cleared `lost`, and webglcontextrestored
+ *       can never fire on a detached canvas, so the banner was a ONE-WAY LATCH
+ *       for the rest of the session.
+ *    4. The scrim had no z-index while the panels and camera controls have 5,
+ *       so the controls painted ABOVE it and the user kept clicking through a
+ *       permanent veil (fixed in cohortgraph.css).
+ *
+ *  The remount is gone as well: reagraph takes `layoutType` as a live prop and
+ *  re-runs the layout on it (useGraph's own effect keyed on layoutType), so
+ *  switching layout no longer creates a WebGL context. It used to leave the old
+ *  one alive for those 500ms, and browsers cap live contexts around 16, so
+ *  clicking through four layouts and three sizes quickly could force a GENUINE
+ *  loss. `gen` is now the only thing that remounts, and it is only ever bumped
+ *  by a real loss or by Redraw. */
 function GraphStage({ nodes, edges, layout, selected, onSelect }: {
   nodes: RGNode[]; edges: RGEdge[]; layout: string
   selected: string | null
@@ -250,24 +286,50 @@ function GraphStage({ nodes, edges, layout, selected, onSelect }: {
   const [gen, setGen] = useState(0)
   const [lost, setLost] = useState(false)
 
+  // These deps must name EVERYTHING that can swap the canvas element, or the
+  // listener is left on the old one. `layout` is here even though it no longer
+  // remounts the canvas, so that putting it back into `key` cannot silently
+  // unbind this again.
   useEffect(() => {
     const el = host.current?.querySelector('canvas')
     if (!el) return
-    const onLost = (e: Event) => { e.preventDefault(); setLost(true) }
-    const onRestored = () => { setLost(false); setGen((g) => g + 1) }
+    // A canvas React has already discarded still gets forceContextLoss() called
+    // on it. Its loss is not this surface's loss: ignore anything dispatched on
+    // an element that is no longer in the document.
+    const onLost = (e: Event) => {
+      if (!el.isConnected) return
+      e.preventDefault(); setLost(true)
+    }
+    const onRestored = () => {
+      if (!el.isConnected) return
+      setLost(false); setGen((g) => g + 1)
+    }
     el.addEventListener('webglcontextlost', onLost)
     el.addEventListener('webglcontextrestored', onRestored)
     return () => {
       el.removeEventListener('webglcontextlost', onLost)
       el.removeEventListener('webglcontextrestored', onRestored)
     }
-  }, [gen, nodes.length])
+  }, [gen, layout, nodes.length])
+
+  // reagraph fits the camera once, on mount, behind a `mounted` ref. The canvas
+  // used to be remounted on every layout change so that fit came free; it is
+  // not remounted now, and a tree layout drawn under a force-directed camera
+  // lands mostly off-screen. Re-fit once the new layout has settled.
+  const settled = useRef(false)
+  useEffect(() => {
+    if (!settled.current) { settled.current = true; return }
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const t = window.setTimeout(
+      () => ref.current?.fitNodesInView([], { animated: !still }), 600)
+    return () => window.clearTimeout(t)
+  }, [layout])
 
   return (
     <div className="cg-stage" ref={host}>
       <Suspense fallback={<div className="cg-boot">drawing {nodes.length} nodes…</div>}>
         <GraphCanvas
-          key={`${layout}-${gen}`}
+          key={gen}
           ref={ref as never}
           nodes={nodes} edges={edges}
           layoutType={layout as never}
@@ -301,15 +363,22 @@ function GraphStage({ nodes, edges, layout, selected, onSelect }: {
 
       {lost && (
         <div className="cg-lost">
-          The graphics context dropped. <button onClick={() => setGen((g) => g + 1)}>Redraw</button>
+          The graphics context dropped.{' '}
+          {/* clears the latch as well as remounting: without setLost(false) the
+              banner outlived every redraw for the rest of the session */}
+          <button onClick={() => { setLost(false); setGen((g) => g + 1) }}>Redraw</button>
         </div>
       )}
 
       <div className="cg-ctrl glass">
-        <button onClick={() => ref.current?.zoomIn()} aria-label="Zoom in"><ZoomIn size={15} /></button>
-        <button onClick={() => ref.current?.zoomOut()} aria-label="Zoom out"><ZoomOut size={15} /></button>
-        <button onClick={() => ref.current?.fitNodesInView()} aria-label="Fit to view"><Maximize2 size={15} /></button>
-        <button onClick={() => ref.current?.resetControls(true)} aria-label="Reset"><RotateCcw size={15} /></button>
+        <button onClick={() => ref.current?.zoomIn()} aria-label="Zoom in">
+          <ZoomIn size={16} strokeWidth={1.75} aria-hidden /></button>
+        <button onClick={() => ref.current?.zoomOut()} aria-label="Zoom out">
+          <ZoomOut size={16} strokeWidth={1.75} aria-hidden /></button>
+        <button onClick={() => ref.current?.fitNodesInView()} aria-label="Fit to view">
+          <Maximize2 size={16} strokeWidth={1.75} aria-hidden /></button>
+        <button onClick={() => ref.current?.resetControls(true)} aria-label="Reset">
+          <RotateCcw size={16} strokeWidth={1.75} aria-hidden /></button>
       </div>
     </div>
   )
@@ -323,7 +392,7 @@ function NoRun({ graph }: { graph?: boolean }) {
         <p className="lede-p measure">
           {graph
             ? 'A decision exists but its run graph holds no triples. That happens when the decision was restored from a snapshot written by a run whose graph has since been cleared.'
-            : 'No agent has scored this day, so there is no chain to draw. Run the agents from the top bar — evidence is date-blind, so only the newest day holding data can be scored.'}
+            : 'No agent has scored this day, so there is no chain to draw. Run the agents from the top bar. Evidence is date-blind, so only the newest day holding data can be scored.'}
         </p>
       </div>
     </div>

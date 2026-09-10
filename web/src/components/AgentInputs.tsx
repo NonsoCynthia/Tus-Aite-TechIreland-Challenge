@@ -1,8 +1,10 @@
 import { BedDouble, CalendarDays, Stethoscope, TriangleAlert } from 'lucide-react'
 import { Vitals, type AgeStats } from './Vitals'
+import { sevOccupancy } from '../lib/severity'
+import { SevBar, SevChip } from './Severity'
 import type { Observation } from '../lib/types'
 
-/** What actually reached each agent, and — for capacity — what it could not do
+/** What actually reached each agent, and (for capacity) what it could not do
  *  with it.
  *
  *  Two lanes, because two agents ran and they read different worlds. The
@@ -55,6 +57,19 @@ export interface CapacityContext {
 
 const GAR_WORD = { G: 'Green', A: 'Amber', R: 'Red' } as const
 const GAR_WEIGHT = { G: 1, A: 2, R: 3 } as const
+
+/** --icon and --icon-sm from tokens.css. lucide sizes in JS rather than in CSS,
+ *  so the two steps live here as numbers; STROKE is passed on every icon in this
+ *  file because lucide's default of 2 renders heavier than the 1.75 hairline
+ *  chrome beside it. */
+const ICON_PX = 16
+const ICON_SM_PX = 14
+const STROKE = 1.75
+
+/** The safe-operating line every occupancy figure in this product is read
+ *  against. sevOccupancy uses the same number; it is drawn here so the reader
+ *  can see where it falls rather than being told. */
+const SAFE_OCCUPANCY = 85
 
 const num = (v: unknown): number | null => {
   if (v == null || v === '') return null
@@ -115,7 +130,7 @@ export function AgentInputs({
     <div className="pt-lanes">
       <section className="pt-lane">
         <header className="pt-lane-h">
-          <Stethoscope size={15} aria-hidden />
+          <Stethoscope size={ICON_PX} strokeWidth={STROKE} aria-hidden />
           <span className="pt-lane-k">Urgency agent</span>
           <span className="pt-lane-s num">
             {urgencyScore == null ? 'no score' : n3(urgencyScore)}
@@ -123,7 +138,7 @@ export function AgentInputs({
           <span className="pt-lane-x">
             {applied
               ? `${cited.size} citations · one per NEWS2 parameter, zeros included`
-              : 'refused — NEWS2 is validated in adults'}
+              : 'refused: NEWS2 is validated in adults'}
           </span>
         </header>
         <div className="pt-lane-b">
@@ -134,7 +149,7 @@ export function AgentInputs({
 
       <section className="pt-lane">
         <header className="pt-lane-h">
-          <BedDouble size={15} aria-hidden />
+          <BedDouble size={ICON_PX} strokeWidth={STROKE} aria-hidden />
           <span className="pt-lane-k">Capacity agent</span>
           <span className="pt-lane-s num">
             {capacityScore == null ? 'no score' : n3(capacityScore)}
@@ -144,7 +159,7 @@ export function AgentInputs({
 
         <div className="pt-lane-b">
           <div className="pt-guard">
-            <TriangleAlert size={15} aria-hidden />
+            <TriangleAlert size={ICON_PX} strokeWidth={STROKE} aria-hidden />
             <div>
               <strong>Capacity did not move this person.</strong>
               <ul className="pt-guard-l">
@@ -153,7 +168,7 @@ export function AgentInputs({
                     <span className="num">{n3(capacityScore)}</span> is carried by{' '}
                     <span className="num">{fmt(peers.same)}</span> of the{' '}
                     <span className="num">{fmt(peers.inSpecialty)}</span> placed referrals in this
-                    specialty — it is a property of the specialty, not of anyone in it.
+                    specialty. It is a property of the specialty, not of anyone in it.
                   </li>
                 )}
                 {alpha != null && (
@@ -164,7 +179,7 @@ export function AgentInputs({
                 )}
                 <li>
                   <code>priority</code> never reads a referral's own capacity score
-                  — <code>coordinator/app/priority.py:158–162</code> — so it cannot reorder two
+                  (<code>coordinator/app/priority.py:158–162</code>), so it cannot reorder two
                   people inside a band. Everything below is context for the reader.
                 </li>
               </ul>
@@ -194,7 +209,7 @@ export function AgentInputs({
           {sessions.length > 0 && (
             <div className="pt-clinic">
               <div className="pt-clinic-h">
-                <CalendarDays size={14} aria-hidden />
+                <CalendarDays size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden />
                 <span className="lab">
                   {sessions[0].clinic_name ?? 'Outpatient clinic'}
                   {sessions[0].clinic_code ? ` · ${sessions[0].clinic_code}` : ''}
@@ -204,8 +219,7 @@ export function AgentInputs({
               <ClinicSeries sessions={sessions} readDate={readDate} />
               <p className="pt-mini">
                 One session was read. The other{' '}
-                <span className="num">{sessions.length - 1}</span> are the surrounding series,
-                shown so the read row can be seen in context — they were not scored.
+                <span className="num">{sessions.length - 1}</span> were not scored.
               </p>
             </div>
           )}
@@ -224,7 +238,7 @@ export function AgentInputs({
                   ward {wp == null ? '—' : n3(wp)} · clinic {cp == null ? '—' : n3(cp)}
                   {capacityScore != null && <> · recorded score {n3(capacityScore)}</>}
                   <span className="pt-flag">
-                    the two components do not reproduce the recorded score — weights not shown
+                    the two components do not reproduce the recorded score: weights not shown
                   </span>
                 </span>
               )}
@@ -240,18 +254,29 @@ export function AgentInputs({
  *
  *  GAR is an escalation status whose own vocabulary is green/amber/red. Those
  *  hues belong to CPC triage categories on this product and are not lent out,
- *  so the status is drawn in ink weight with the word beside it — the same
- *  neutral register MTS gets. */
+ *  so the status is drawn in ink weight with the word beside it: the same
+ *  neutral register MTS gets.
+ *
+ *  The meter used to span `Math.max(100, pct)` on the theory that occupancy
+ *  passes 100 when surge beds are open. It cannot. occupancy_pct is
+ *  occupied/(occupied+free), which is bounded at 100 by construction, so the
+ *  span was always exactly 100, the 100% tick was pinned to the right edge on
+ *  every ward, and the only line a reader actually needs -- 85%, the
+ *  safe-operating line -- was absent from this page altogether. 100% is now the
+ *  end of the scale, because that is what it is, and 85% is the mark. */
 function WardPanel({ w, cited, pressure }: {
   w: CapacityWard; cited: boolean; pressure: number | null
 }) {
   const b = w.latest_bed_status
   const pct = num(b?.occupancy_pct)
   const gar = b?.gar_status ?? null
-  // Occupancy passes 100 when surge beds are open, so the meter's span grows to
-  // hold it and 100% stays a marked line rather than becoming the end of the
-  // scale. Clamping instead would hide the overrun, which is the finding.
-  const span = Math.max(100, pct ?? 0)
+  const sev = sevOccupancy(pct)
+  // The word beside the figure names the line the number has crossed, so the
+  // fill is never the only channel and the threshold is never implied.
+  const state = sev === 0 ? null
+    : sev === 1 ? `past the ${SAFE_OCCUPANCY}% safe line`
+      : sev === 3 ? 'past 95%'
+        : 'no free bed'
 
   return (
     <div className="pt-ward">
@@ -267,12 +292,31 @@ function WardPanel({ w, cited, pressure }: {
       <div className="pt-ward-main">
         <div className="pt-ward-fig">
           <div className="pt-ward-pct num">{pct == null ? '—' : `${pct.toFixed(1)}%`}</div>
-          <div className="pt-mini">occupied</div>
+          <div className="pt-ward-fig-l">occupied</div>
+          {state && <SevChip sev={sev}>{state}</SevChip>}
         </div>
-        <div className="pt-ward-meter" role="img"
-             aria-label={`${pct == null ? 'unknown' : pct.toFixed(1)} per cent occupied`}>
-          <i style={{ width: `${Math.max(0, ((pct ?? 0) / span) * 100)}%` }} />
-          <span className="pt-ward-100" style={{ left: `${(100 / span) * 100}%` }} />
+        <div className="pt-ward-meter">
+          {/* No snapshot is not 0% occupied. An empty track with the safe line
+              drawn across it would say the ward is empty, which is a claim. */}
+          {pct == null ? (
+            <p className="pt-mini">No bed-status snapshot on this ward, so there is nothing to draw.</p>
+          ) : (
+            <>
+              <SevBar sev={sev} value={pct / 100} of={SAFE_OCCUPANCY / 100} height={12}
+                      label={`${pct.toFixed(1)} per cent occupied, against a ${SAFE_OCCUPANCY} per cent safe-operating line`} />
+              <div className="pt-ward-scale num">
+                <span>0</span>
+                <span className="pt-ward-safe" style={{ left: `${SAFE_OCCUPANCY}%` }}>
+                  {SAFE_OCCUPANCY}% safe line
+                </span>
+                <span>100%</span>
+              </div>
+              <p className="pt-mini">
+                Above <span className="num">{SAFE_OCCUPANCY}%</span> a hospital loses the slack it
+                needs to admit safely (Bagust, Place &amp; Posnett, BMJ 1999;319:155-8).
+              </p>
+            </>
+          )}
         </div>
       </div>
 

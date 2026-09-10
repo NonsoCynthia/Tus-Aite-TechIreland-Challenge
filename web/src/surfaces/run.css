@@ -1,4 +1,4 @@
-/* The run overlay. Dark, because there is no clinical number on it to misread —
+/* The run overlay. Dark, because there is no clinical number on it to misread:
    the data surfaces stay light. */
 
 .runlay {
@@ -35,6 +35,32 @@
   display: grid; gap: var(--d6); align-content: start;
   max-width: 1100px; width: 100%; margin: 0 auto;
 }
+
+/* --- before / after -------------------------------------------------------
+   Two columns of the same width, so neither state is the bigger claim. The
+   hairline runs BETWEEN them rather than around each, which is what makes them
+   read as one sentence with a hinge instead of two panels. */
+.run-ba {
+  display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--surface); border: 1px solid var(--rule);
+}
+.run-ba-c { padding: var(--d4) var(--d5); }
+.run-ba-c + .run-ba-c { border-left: 1px solid var(--rule); }
+.run-ba-l { list-style: none; margin: var(--d3) 0 0; padding: 0; display: grid; gap: var(--d3); }
+.run-ba-l li {
+  position: relative; padding-left: var(--d4);
+  font-size: var(--t-small); line-height: 1.6; color: var(--text-2);
+}
+/* the mark's own bar, at rest: a 8px rule rather than a bullet glyph */
+.run-ba-l li::before {
+  content: ''; position: absolute; left: 0; top: 9px;
+  width: var(--d2); height: 1px; background: var(--rule-firm);
+}
+.run-ba-l b { color: var(--text); font-weight: 600; }
+/* a severity chip inside a sentence keeps the line's rhythm */
+.run-ba-l .sev { margin: 0 1px; }
+
+
 
 /* --- readouts: what is about to happen, as instrument values -------------- */
 .run-plan {
@@ -123,12 +149,15 @@
 .run-locked p { margin: var(--d2) 0 0; color: var(--text-2); max-width: 76ch; }
 
 @media (max-width: 860px) {
+  .run-ba { grid-template-columns: 1fr; }
+  .run-ba-c + .run-ba-c { border-left: 0; border-top: 1px solid var(--rule); }
   .lane { grid-template-columns: 1fr; gap: var(--d2); }
   .lane-count { text-align: left; }
   .runlay-body, .runlay-head { padding-left: var(--d4); padding-right: var(--d4); }
 }
 
-/* Before a run there are three blocks and a button; top-aligning them left two
-   thirds of the overlay empty. Once a run starts the content grows into the
-   space, so the centring is dropped rather than fought. */
-.runlay-body.is-idle { align-content: center; }
+/* There used to be `.runlay-body.is-idle { align-content: center }` here,
+   because before a run there were three blocks and a button and top-aligning
+   them left two thirds of the overlay empty. The before/after panel fills that
+   space now, and centring content taller than a scroll container clips its top
+   beyond reach, so the rule is gone rather than made conditional. */
