@@ -5,6 +5,11 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+# Any venv, however it is named. `.venv/` and `**/.venv/` did NOT match
+# `.venv-orch/`, so a 1,513-file, 52MB virtualenv was tracked from the
+# commit that added the orchestrator until it was found before the first push.
+.venv*/
+**/.venv*/
 kg/.env
 kg/out/
 kg/mappings/*.ini
