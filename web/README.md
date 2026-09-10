@@ -8,14 +8,17 @@ files by the orchestrator in [`../orchestrator/`](../orchestrator/).
 [`../coordinator/`](../coordinator/README.md), the scores from [`../urgency-agent/`](../urgency-agent/README.md)
 and [`../capacity-agent/`](../capacity-agent/README.md). This track owns how those numbers are shown, and
 refusing to show one without the caveat that belongs to it. Three decisions taken elsewhere bind these screens,
-all recorded in `conductor/tracks/<track>/decisions.md`, where the numbering restarts per track:
+all recorded in `conductor/tracks/<track>/decisions.md`, where they are written as `ADR-00N` and each track
+numbers its own, so the same number means different things on different tracks and the track name is part of
+the citation:
 
-- Capacity measures **pressure**, not spare capacity: one weight for a whole hospital-day, never moving one
-  person past another. (`coordinating-agent_20260906`, decision 7)
+- Capacity measures **pressure**, not spare capacity (`coordinating-agent_20260906` ADR-007), and it modulates
+  the weights for a whole hospital-day rather than any one referral's score, so it can never move one person
+  past another (same track, ADR-005).
 - Paediatric referrals are **refused, not scored**, so such a row must never show an adult NEWS2 as that child's
-  acuity, and must never be sorted on one. (`explainable-agent-based-triage_20260828`, decision 7)
-- The urgency score uses NEWS2 only and is knowingly incomplete: 31% of Urgent referrals score zero.
-  (`explainable-agent-based-triage_20260828`, decision 4)
+  acuity, and must never be sorted on one (`explainable-agent-based-triage_20260828` ADR-007).
+- The urgency score uses NEWS2 only and is knowingly incomplete: 31% of Urgent referrals score zero
+  (`explainable-agent-based-triage_20260828` ADR-004).
 
 ## Get it running
 
@@ -48,9 +51,18 @@ cd web && npm install && npm run dev     # serves :5173
 that come from a different address, and the access token must never reach the browser, so the browser has to see
 the API on the same address as the page. In the container that is literally true: one process serves both.
 
-There are no unit tests, no linter and no formatter here. Standing in for them is
-`orchestrator/tests/demo_path.py`, 81 checks against the running system rather than against mocks. It starts a
-real run, so do not use it during a demo.
+## How it is checked
+
+There are no unit tests, no linter and no formatter in this folder. Standing in for them is
+`orchestrator/tests/demo_path.py`: 83 checks walked against the running system rather than against mocks, from
+the page being served through a real ranking run to the evidence behind one position. It starts that run itself,
+so do not use it during a demo.
+
+83 is what runs, not what is written: there are 82 call sites, one of which sits in a loop over two categories.
+
+Two habits matter more than the count. Every claim on screen names the file and line it came from, so a reader
+can check it. And the checks are pinned to this dataset's exact numbers on purpose, so a silent change in the
+data fails them rather than passing quietly.
 
 ## How it is put together
 
@@ -60,7 +72,8 @@ src/
   App.tsx        the shell: side rail, top bar, hospital and day pickers, Run
   tokens.css     every colour, spacing, type and motion value. Nothing else declares one
   app.css        the shell, and every shared piece with no stylesheet of its own
-  surfaces/      one screen per file, each with its own stylesheet
+  surfaces/      one screen per file. Six of the seven have their own stylesheet;
+                 Landing has none, its rules sit in app.css
   components/    severity marks, disclosures, vitals, agent inputs, journey, compare,
                  override, provenance, the mark
   lib/           api calls, types, target days, the NEWS2 tables, the severity scale
@@ -69,11 +82,15 @@ src/
 There is no router: `App.tsx:73` holds which screen is showing as ordinary state, and the rail sets it.
 
 **A stylesheet is imported by the one module that owns it.** The rationale lives in that module's opening
-comment; the stylesheet only spends tokens. A screen takes one name prefix and one file, so `overview.css` owns
-`.ov-` and nothing else. A shared component gets its own file only when it is a primitive used on many screens,
-today `Severity` and `Aside`; the rest live in `app.css`, being composed into the shell. Load order is
-`tokens.css`, then `app.css`, then each screen's sheet as that screen is imported, which is what lets
-`patient.css` retune a shared piece in place.
+comment; the stylesheet only spends tokens. All ten sheets have exactly one importer.
+
+Name prefixes are looser than that. `overview.css` really does own `.ov-` and nothing else, but most sheets
+carry several families: `list.css` holds `.lst .ev .key .recon .tb .spn`, `patient.css` holds `.pt .nb .j .cmp
+.why`. Treat a sheet as belonging to its screen, not as owning one prefix. A shared component gets its own file
+only when it is used on many screens, today `Severity` and `Aside`; the rest live in `app.css`. Load order is
+`tokens.css`, then `app.css`, then each screen's sheet as that screen is imported, which is what lets three
+sheets retune a piece `app.css` owns: `patient.css` restyles `.cmp-trow`, `record.css` restyles `.p-note` and
+the section headings, `list.css` restyles `.n2`.
 
 ## The screens
 
@@ -101,9 +118,9 @@ carries two because it draws a shape.
 **Five colours are reserved for the clinical categories** and mean only a category: urgent, semi-urgent,
 routine, uncategorised, outside the ranking. Red, amber and green appear nowhere else, not even for Manchester
 triage, which has its own colour vocabulary and is shown in a neutral register instead. The class names are
-assembled by joining strings in two places, `List.tsx:196` and `Patient.tsx:45`, so a plain text search for
-`cat-semiurgent` finds nothing: a tidy-up once deleted the rules on that reasoning and two categories lost
-their colour.
+assembled by joining strings in two places, `List.tsx:785` and `Patient.tsx:45`. Searching the TypeScript for
+`cat-semiurgent` therefore finds no place it is built, only the rule itself in `app.css` and two comments: a
+tidy-up once read that as dead CSS, deleted the rules, and two categories lost their colour.
 
 **The severity scale is the main visual language.** One scale, four steps, every attention state rendered
 through it, so a reader learns it once.
@@ -127,30 +144,32 @@ as a word plus its place in the scale (`Severity.tsx:49` gives "marked severe (4
 the step; and the legend names the steps in words on the same screen, painted from the same code the marks use.
 
 Before changing a value: the smallest type is 11px (`tokens.css:188`) and **must not be raised**, since the
-ranked table is measured to the pixel, 1716 for nine columns (`List.tsx:153`), and one step up reflows it. There
+ranked table is measured to the pixel: 1,414 of columns, and 1,716 of viewport once the rail and padding are
+counted, which is where the ninth column switches on (`List.tsx:110-153`). One step up reflows it. There
 are no drop shadows, gradients or glows either; depth comes from four grounds and two weights of rule.
 
 ## How a screen gets its data
 
 One trace: a clinician opens the ranked list, and one wait figure with its mark appears.
 
-1. `main.tsx:4-5` loads the tokens and shell styles and sets the fetch defaults: no refetch on window focus,
-   30 seconds before a value is stale, one retry.
+1. `main.tsx:4-5` loads the tokens and shell styles, and `main.tsx:8-10` sets the fetch defaults: no refetch
+   on window focus, 30 seconds before a value is stale, one retry.
 2. `App.tsx` holds the hospital and the day. The day is not hardcoded: it asks `/api/hospital-days/{hospital}`
    which days hold a list, and defaults to the newest one that can be scored.
-3. `List.tsx:204-217` fires four calls, for the cohort, the operations snapshot, the decision and the overrides,
+3. `List.tsx:204-219` fires four calls, for the cohort, the operations snapshot, the decision and the overrides,
    merging them into one row per referral with any live override spliced in. A 404 on the decision is the normal
    "nothing has run yet" and is not retried.
 4. The row carries a wait of 871 days and category code 1. The target comes from `crtDays()` in `lib/ref.ts:33`,
    which reads `/api/reference` and returns 28; the cohort row's own copy is a first-paint fallback only. The
-   ratio is 31.1, which `sevWaitRatio()` at `lib/severity.ts:57` turns into step 4.
-5. `List.tsx:1566` draws the cell: the number, a bar at step 4, then "31.1 times over a 28-day target" below. No
-   chip here, deliberately: the bar already carries the graded channel for that exact fact. `list.css` resolves
-   step 4 to a token and `tokens.css` resolves the token.
+   ratio is 31.107, which `sevWaitRatio()` at `lib/severity.ts:57` turns into step 4.
+5. `List.tsx:1580` draws the cell: the number, a bar at step 4, then `31× over a 28-day target` below. The
+   multiple is rounded once it passes ten (`List.tsx:68`), so the screen says 31 and the full figure stays in
+   the tooltip. No chip here, deliberately: the bar already carries the graded channel for that exact fact.
+   `list.css` resolves step 4 to a token and `tokens.css` resolves the token.
 
 The legend above the table paints its steps from the same code the marks use, so key and mark cannot drift.
 
-### The endpoints these screens use
+## The endpoints these screens use
 
 | path | what it carries |
 |---|---|
@@ -164,28 +183,28 @@ The legend above the table paints its steps from the same code the marks use, so
 | `/api/hospitals` | hospital codes and names. An empty list means the read failed, not that there are no hospitals |
 | `/api/overrides/{hospital}/{date}` | what a clinician did, read back with their name and reason |
 | `/api/graph/cohort/{run_id}` | the whole decision as nodes and links |
-| `/api/runs` | starts a run, then reports its progress |
+| `POST /api/runs` | starts a ranking run |
+| `/api/runs/{run_id}` | that run's live progress while it works |
 | `/api/scores/{run_id}/{hospital}` | each agent's score with the evidence it cited |
-| `/api/overrides` | records what a clinician did |
-| `/api/hospital-days/{hospital}/refresh` | looks again for days that hold a list |
+| `POST /api/overrides` | records what a clinician did |
+| `POST /api/hospital-days/{hospital}/refresh` | looks again for days that hold a list |
 
-Defined in `orchestrator/app/main.py`, typed in `src/lib/api.ts`. A path matching none of them returns a page,
-not a 404, so a 200 does not prove an endpoint exists.
+Unmarked rows are GET. Defined in `orchestrator/app/main.py`, typed in `src/lib/api.ts`. An unknown GET path
+returns the page rather than a 404, so a 200 does not prove an endpoint exists.
 
-## Things to be aware of
+## Numbers that are typed in rather than fetched
 
-**Some numbers are typed into this code rather than fetched.** They fall into two kinds, and the difference
-matters. **No clinical figure is one of them:** every wait, breach, score, ward figure, rule verdict and position
-on screen is fetched at runtime.
+They fall into two kinds, and the difference matters. **No clinical figure is one of them:** every wait, breach,
+score, ward figure, rule verdict and position on screen is fetched at runtime.
 
 The first kind describes the outside world, and each would go out of date quietly: nothing breaks, no test
 fails, the figure on screen is simply wrong. There are two.
 
 - **The national waiting-list figures** at `src/surfaces/Overview.tsx:82`: snapshot date, totals, four band
-  counts. The source is republished monthly. An earlier hand-typed total had drifted by 1,278 people, which is
-  why the total on screen is now derived from the four counts rather than typed beside them.
-- **The category-code to name map** at `src/lib/api.ts:171`. Code 3 ranks above code 2, so sorting on the raw
-  number puts Routine above Semi-Urgent: always go through `bandOf()` at `src/lib/api.ts:178`. It also has no
+  counts. The source is republished monthly. The file's own total and the sum of its four bands disagree by 4,
+  which the screen states rather than hides, and the shares are taken from the band sum they are counted from.
+- **The category-code to name map** at `src/lib/api.ts:180`. Code 3 ranks above code 2, so sorting on the raw
+  number puts Routine above Semi-Urgent: always go through `bandOf()` at `src/lib/api.ts:187`. It also has no
   entry for code 4, "Excluded", which `/api/reference` publishes, so an excluded referral would show as
   "Uncategorised". No code 4 exists in the data today, so that one is latent rather than live.
 
@@ -195,6 +214,8 @@ occupancy line is a published figure (Bagust, Place and Posnett, British Medical
 clinic weights of 0.7 and 0.3 mirror the capacity agent's own settings file. These are checked rather than
 trusted: the patient page recomputes the NEWS2 total and the capacity blend from the parts, compares them with
 what the agent returned, and shows a visible warning when the two disagree.
+
+## Behaviour that surprises people
 
 **An override belongs to one ranking, not to a date.** Run the agents again and you get a new ranking, so
 earlier placements show as "not applied" rather than being quietly moved onto a list they were never made against.
@@ -211,9 +232,9 @@ referrals, about 1.3 MB. The full set is 6 hospitals and 5,200 referrals, about 
 the sample holds only the two largest hospitals and loses the contrast between a 640-bed teaching hospital and a
 110-bed district one. Two things before you switch:
 
-- **The 81 checks in `orchestrator/tests/demo_path.py` are pinned to the sample's exact numbers**: 308
-  referrals, 165 with a target, 305 ranked, 7 wards. On the full set they fail on the counts. That is the
-  tripwire working, but the numbers must be updated before the checks mean anything again.
+- **The 83 checks in `orchestrator/tests/demo_path.py` are pinned to the sample's exact numbers**: 308
+  referrals, 165 with a target, 305 ranked, 7 wards. On the full set they fail on the counts, and say so before
+  they do. That is the tripwire working, but the numbers must be updated before the checks mean anything again.
 - **Targets apply to 165 of the sample's 308 referrals.** The other 143 have no target and can never be late, so
   a count of breaches is always out of 165.
 
