@@ -25,7 +25,7 @@ const AGENTS = [
   {
     key: 'ranking', name: 'Coordinator', method: 'α·urgency + (1−α)·wait',
     reads: 'both scores · CPC band · target breach · referral date',
-    cites: 'one ordered list, 5 rules tested per referral',
+    cites: 'one ordered list, 2-3 rules tested per referral',
   },
 ] as const
 
@@ -59,6 +59,7 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
   const cohort = useQuery({
     queryKey: ['cohort', hospital, date], queryFn: () => api.cohort(hospital, date),
   })
+  const health = useQuery({ queryKey: ['health'], queryFn: api.health })
   const n = cohort.data?.referrals.length ?? 0
 
   useEffect(() => () => { if (timer.current) window.clearInterval(timer.current) }, [])
@@ -135,17 +136,24 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
             <div className="run-plan">
               <Readout k="cohort" v={fmt(n)} u="referrals" />
               <Readout k="agents" v="2" u="per referral" />
-              <Readout k="scores" v={fmt(n * 2)} u="to commit" />
-              <Readout k="citations" v={fmt(n * 8)} u="at 8 per referral" />
+              <Readout k="scores" v={fmt(n * 2)} u="at most, 2 per referral" />
+              <Readout k="citations" v={fmt(n * 8)} u="at most, 8 per referral" />
               <Readout k="alpha range" v="0.50–0.90" u="set by scarcity" />
-              <Readout k="direction" v="pressure" u="ADR-007" />
+              <Readout k="direction" v={health.data?.capacity_direction ?? "…"} u="ADR-007" />
             </div>
 
             <ol className="lanes">
               {AGENTS.map((p, i) => {
                 const state = done || phaseIdx > i ? 'done' : phaseIdx === i ? 'live' : 'todo'
                 const c = committed(p.key)
-                const denom = p.key === 'ranking' ? n : n
+                // Capacity scores everyone. Urgency refuses paediatric
+                // specialties, and the coordinator can only place what urgency
+                // scored -- so those two lanes can never reach the cohort size,
+                // and a bar that stops at 99% with no explanation reads as a
+                // stall. The refusal count is only known once the run reports
+                // it, so until then the denominator is the cohort.
+                const refused = run?.refused_paediatric ?? 0
+                const denom = p.key === 'scoring_capacity' ? n : Math.max(1, n - refused)
                 return (
                   <li key={p.key} className={'lane is-' + state}>
                     <div className="lane-bar">
@@ -164,7 +172,9 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
                     <div className="lane-count num">
                       {state === 'todo' ? <span className="lane-idle">queued</span>
                         : <><strong>{fmt(c)}</strong><span className="lane-of">
-                          /{fmt(denom)} {p.key === 'ranking' ? 'placed' : 'committed'}</span></>}
+                          /{fmt(denom)} {p.key === 'ranking' ? 'placed' : 'committed'}
+                          {refused > 0 && p.key !== 'scoring_capacity' &&
+                            <> · {fmt(refused)} refused</>}</span></>}
                     </div>
                   </li>
                 )

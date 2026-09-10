@@ -162,9 +162,18 @@
 
 /* --- band distribution --------------------------------------------------- */
 .bands { display: grid; gap: 6px; max-width: 720px; }
-/* triage hues, reserved. every band also carries its name, so colour is never alone. */
-.cat-urgent      { background: var(--cat-urgent); }
-.cat-routine     { background: var(--cat-routine); }
+/* The five triage swatches. Reserved hues, and every one of them also carries
+   its name on screen, so colour is never the only channel.
+
+   These class names are BUILT BY CONCATENATION -- List.tsx's TAB_TOKEN and
+   Patient.tsx's chipClass produce `cat-semiurgent` and `cat-uncategorised`,
+   which no static search of the source will ever find. A dead-CSS sweep removed
+   both and the Semi-Urgent and Uncategorised swatches rendered with no colour
+   at all. Do not delete anything here on the evidence of a grep. */
+.cat-urgent        { background: var(--cat-urgent); }
+.cat-semiurgent    { background: var(--cat-semi); }
+.cat-routine       { background: var(--cat-routine); }
+.cat-uncategorised { background: var(--cat-uncat); }
 
 /* --- the spine, derived from the mark ------------------------------------ */
 .spine { position: relative; display: inline-block; height: 18px; vertical-align: middle; }
@@ -636,4 +645,29 @@
   margin-left: var(--d2); background: var(--taupe); color: var(--ink-deep);
   border: 0; border-radius: var(--radius); padding: 6px var(--d3);
   font: inherit; font-size: var(--t-small); cursor: pointer;
+}
+
+/* --- narrow screens: the rehearsal machine is 1280x800 ---------------------
+   --rail-w was a hard 236px with no breakpoint anywhere, so at 1280 the content
+   column was 1044px and the ranked table (min-width 1320) was cut by ~340px
+   with a horizontal scrollbar. The rail collapses to icons instead: the labels
+   are the first thing to go, because the icons plus the active marker still say
+   where you are, and 172px is the single biggest reclaim available. */
+@media (max-width: 1439px) {
+  .app { grid-template-columns: 64px minmax(0, 1fr); }
+  .rail-item span:not(.lab) { display: none; }
+  .rail-item { justify-content: center; padding: var(--d2); }
+  .rail-lab, .rail-descriptor, .synthetic, .sysstat-i { display: none; }
+  .rail-brand { padding: var(--d4) var(--d2); align-items: center; }
+  .rail-brand img { height: 18px; }
+  .rail-nav { padding: var(--d3) var(--d2) 0; }
+  /* the synthetic-data statement is a compliance claim and may not simply
+     vanish with the labels -- it moves to the top bar */
+  .topbar::after {
+    content: 'Synthetic data'; margin-left: var(--d3);
+    font-size: var(--t-micro); letter-spacing: 0.04em; color: var(--text-3);
+    padding: 3px var(--d2); border: 1px dashed var(--rule-firm);
+    border-radius: var(--radius); white-space: nowrap; order: 1;
+  }
+  .pad { padding: var(--d4) var(--d4) var(--d7); }
 }

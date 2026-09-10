@@ -262,8 +262,8 @@ function VitalCard({ v, value, score, cited, applied }: {
   const pos = value == null ? null : positionOf(v, value) * 100
   const offAxis = value != null && (value < v.axis[0] || value > v.axis[1])
   const u = unitOf(v.unit)
-  const nLo = positionOf(v, v.normal[0]) * 100
-  const nHi = positionOf(v, v.normal[1]) * 100
+  const nLo = positionOf(v, v.zeroBand[0]) * 100
+  const nHi = positionOf(v, v.zeroBand[1]) * 100
 
   return (
     <div className="pt-card">
@@ -287,7 +287,7 @@ function VitalCard({ v, value, score, cited, applied }: {
                title={`${bandLabel(s, v.unit)} scores ${s.score}`} />
           ))}
         </div>
-        <span className="pt-normal" style={{ left: `${nLo}%`, width: `${nHi - nLo}%` }} aria-hidden />
+        <span className="pt-zero" style={{ left: `${nLo}%`, width: `${nHi - nLo}%` }} aria-hidden />
         {pos != null && (
           <span className={'pt-pin' + (offAxis ? ' is-off' : '')} style={{ left: `${pos}%` }} aria-hidden />
         )}
@@ -295,7 +295,7 @@ function VitalCard({ v, value, score, cited, applied }: {
 
       <div className="pt-axis num">
         <span>{v.axis[0]}</span>
-        <span className="pt-normal-l">normal {v.normal[0]}–{v.normal[1]}{u}</span>
+        <span className="pt-zero-l">{v.zeroBand[0]}–{v.zeroBand[1]}{u} scores 0</span>
         <span>{v.axis[1]}</span>
       </div>
 

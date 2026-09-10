@@ -832,7 +832,11 @@ function WardPanel({ ops, reference, d }: {
 }
 
 function WardRow({ w, reference }: { w: Ward; reference: Reference | undefined }) {
-  const gar = (w.gar_status ?? 'G') as keyof typeof GAR_WORD
+  // Absence of information is not Green. A ward that did not report an
+  // escalation status used to be drawn with the routine swatch and the word
+  // "Green", which is the same class of error as calling a 200-day-old normal
+  // reading reassuring.
+  const gar = w.gar_status as keyof typeof GAR_WORD | null
   const over = w.occupancy_pct >= SAFE_OCCUPANCY
   const also = w.specialties.filter((c) => !w.primary_for.includes(c))
   return (
@@ -869,7 +873,9 @@ function WardRow({ w, reference }: { w: Ward; reference: Reference | undefined }
       <td className="c-n num">{fmt(w.over_9h)}</td>
       <td className="c-n num">{fmt(w.over_24h)}</td>
       <td>
-        <span className={'ov-gar is-' + gar}><i aria-hidden />{GAR_WORD[gar]}</span>
+        {gar
+          ? <span className={'ov-gar is-' + gar}><i aria-hidden />{GAR_WORD[gar]}</span>
+          : <span className="ov-none">not reported</span>}
       </td>
       <td className="c-n num c-dim">{shortDate(w.snapshot)} {clockTime(w.snapshot)}</td>
     </tr>

@@ -4,9 +4,10 @@
     <meta charset="utf-8" />
     <link rel="icon" href="/brand/tus-aite-favicon-512.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@200;300;400;500;600&display=swap" rel="stylesheet" />
+    <!-- Self-hosted. Loaded from fonts.googleapis.com, a venue with no internet
+         drops the entire brand register mid-presentation. See public/fonts/. -->
+    <link rel="preload" href="/fonts/jost-235d8f8964.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/fonts/jost.css" />
     <title>Tús Áite — decision support</title>
   </head>
   <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>

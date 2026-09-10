@@ -26,7 +26,7 @@ const KIND = {
   obs:            { fill: '#6E86C4', label: 'Observation',        size: 5 },
   condition:      { fill: '#8A8577', label: 'Condition',          size: 5 },
   triage_event:   { fill: '#8A8577', label: 'Triage event',       size: 5 },
-  evidence:       { fill: '#5A6172', label: 'Evidence',           size: 5 },
+  evidence:       { fill: '#4A5470', label: 'Evidence',           size: 5 },
 } as const
 
 const ROLE = {
@@ -34,7 +34,7 @@ const ROLE = {
   urgency:      '#5D74AE',
   capacity:     '#9A6552',
   timeframe:    '#776D92',
-  multi_list:   '#5A6172',
+  multi_list:   '#4A5470',
 } as const
 
 const LAYOUTS = [
@@ -261,7 +261,7 @@ function GraphStage({ nodes, edges, layout, selected, onSelect }: {
           theme={{
             canvas: { background: '#070F2A' },
             node: {
-              fill: '#5A6172', activeFill: '#FAFAF8', opacity: 1,
+              fill: '#4A5470', activeFill: '#FAFAF8', opacity: 1,
               selectedOpacity: 1, inactiveOpacity: 0.22,
               label: { color: '#C9CEE0', stroke: '#070F2A', activeColor: '#FAFAF8' },
             },

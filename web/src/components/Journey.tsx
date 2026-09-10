@@ -27,8 +27,23 @@ const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })
 const fmtN = (n: number) => n.toLocaleString('en-IE')
 
-export function Journey({ events, today, className = '' }: {
-  events: Event[]; today: string; className?: string
+export function Journey({ events, today, waitDays: waitProp, targetDays, className = '' }: {
+  events: Event[]
+  today: string
+  /** `adjusted_wait_days` — the SAME number the header, the rule chip and the
+   *  breach tier use. The axis used to recompute the wait from the last intake
+   *  event, which is the triage date, while every other figure on the page is
+   *  measured from the date the referral was RECEIVED. On this cohort that made
+   *  the axis disagree with the header on 259 of 308 referrals, by up to 57
+   *  days — and on five of them the header said "past target" while the axis
+   *  drew no overdue span at all. It is also not simply a different anchor:
+   *  adjusted wait excludes suspended time, so it cannot be derived from dates
+   *  here at all. The number is passed in rather than recomputed. */
+  waitDays?: number
+  /** The CRT threshold in days, from core.ref_codes. The target sits this far
+   *  into the wait, not this far past the triage date. */
+  targetDays?: number | null
+  className?: string
 }) {
   const ev = events.filter((e) => e.date).sort((a, b) => a.date.localeCompare(b.date))
   if (!ev.length) return null
@@ -37,16 +52,23 @@ export function Journey({ events, today, className = '' }: {
   const last = intake[intake.length - 1] ?? ev[0]
   const target = ev.find((e) => e.target)
   const intakeDays = days(ev[0].date, last.date)
-  const waitDays = Math.max(days(last.date, today), 1)
+  // fall back to the old derivation only when the caller supplies nothing
+  const waitDays = Math.max(waitProp ?? days(last.date, today), 1)
   const clinical = [...intake].reverse().find((e) => e.clinical)
   const silentDays = clinical ? days(clinical.date, today) : 0
-  const pct = (d: string) => Math.max(0, Math.min(100, (days(last.date, d) / waitDays) * 100))
+  /** Distance along the axis, measured BACK from today so the end of the axis
+   *  is always "now" and the wait length is the authoritative one. */
+  const pctBack = (daysAgo: number) =>
+    Math.max(0, Math.min(100, ((waitDays - daysAgo) / waitDays) * 100))
+  const pct = (d: string) => pctBack(days(d, today))
 
-  // The span past the target, drawn rather than described. A target still in the
-  // future shades nothing: there is no overdue length to draw.
-  const overdueDays = target ? days(target.date, today) : 0
-  const overdue = !!target && overdueDays > 0
-  const overdueFrom = target ? pct(target.date) : 0
+  // The span past the target, drawn rather than described, and derived from the
+  // same threshold the rule chip cites.
+  const overdueDays = targetDays != null ? waitDays - targetDays : (target ? days(target.date, today) : 0)
+  const overdue = overdueDays > 0 && (targetDays != null || !!target)
+  const overdueFrom = targetDays != null ? pctBack(overdueDays) : (target ? pct(target.date) : 0)
+  // the marker and the overdue span are the same point, so they cannot drift
+  const targetPct = targetDays != null ? pctBack(Math.max(overdueDays, 0)) : (target ? pct(target.date) : 0)
   const silent = !!clinical && silentDays > 30
   const silentFrom = clinical ? pct(clinical.date) : 0
 
@@ -80,8 +102,8 @@ export function Journey({ events, today, className = '' }: {
                    role="img" aria-label={`past target by ${fmtN(overdueDays)} days`} />
             )}
             {target && (
-              <div className={'j-mark is-target' + (pct(target.date) < 12 ? ' is-early' : '')}
-                   style={{ left: `${pct(target.date)}%` }}>
+              <div className={'j-mark is-target' + (targetPct < 12 ? ' is-early' : '')}
+                   style={{ left: `${targetPct}%` }}>
                 <i />
                 <span className="j-mt">{target.label}</span>
                 <span className="j-md num">{fmtDate(target.date)}</span>

@@ -6,6 +6,7 @@ import {
   ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, PenLine, Search, TriangleAlert,
 } from 'lucide-react'
 import { api, bandOf, BANDS } from '../lib/api'
+import { useNarrow } from '../lib/useNarrow'
 import { crtDays, ruleStatement, specialtyName } from '../lib/ref'
 import { Override } from '../components/Override'
 import type {
@@ -696,6 +697,9 @@ type BandProps = {
 
 function Band(p: BandProps) {
   const [page, setPage] = useState(0)
+  // below 1440 the table drops Triage and Context rather than growing a
+  // horizontal scrollbar that cuts 340px off the right on the rehearsal machine
+  const narrow = useNarrow()
   // a new sort, a new filter or a new category always starts at the top of the
   // category, never mid-list
   useEffect(() => { setPage(0) }, [p.rows, p.size])
@@ -757,13 +761,17 @@ function Band(p: BandProps) {
               rule chip must never wrap onto a second line inside a row. */}
           <colgroup>
             <col style={{ width: 76 }} />
-            <col style={{ width: 140 }} />
+            <col style={{ width: narrow ? 156 : 140 }} />
             <col />
             <col style={{ width: 200 }} />
             <col style={{ width: 240 }} />
             <col style={{ width: 180 }} />
-            <col style={{ width: 144 }} />
-            <col style={{ width: 132 }} />
+            {/* Triage reads "triaged" on 307 of 308 and Context's subline was
+                identical on every row, with both facts in full in the expander.
+                They are the two columns to lose when the width will not take
+                nine — never the balance, the wait or the rule. */}
+            {!narrow && <col style={{ width: 144 }} />}
+            {!narrow && <col style={{ width: 132 }} />}
             <col style={{ width: 42 }} />
           </colgroup>
           <thead>
@@ -783,14 +791,14 @@ function Band(p: BandProps) {
               </th>
               <Th k="news2" sort={p.sort} onSort={p.onSort}
                   label="How unwell" sub="NEWS2" k2="age" sub2="reading age" />
-              <th className="lst-th">
+              {!narrow && <th className="lst-th">
                 <span className="lst-th-l">Triage</span>
                 <span className="lst-th-s">status on this pathway</span>
-              </th>
-              <th className="lst-th">
+              </th>}
+              {!narrow && <th className="lst-th">
                 <span className="lst-th-l">Context</span>
                 <span className="lst-th-s">recorded, not scored — ADR-004</span>
-              </th>
+              </th>}
               <th className="lst-th"><span className="vh">Evidence</span></th>
             </tr>
           </thead>
@@ -811,7 +819,7 @@ function Band(p: BandProps) {
                 )}
                 <PatientRow
                   r={r} i={i} ranked={p.ranked} outside={p.outside}
-                  reference={p.reference} tight={p.tight}
+                  reference={p.reference} tight={p.tight} narrow={narrow}
                   expanded={p.open === r.pathway_number}
                   onToggle={() => p.onToggleOpen(r.pathway_number)}
                   onOpen={p.onOpen} />
@@ -914,8 +922,8 @@ function Th({ k, label, sub, sort, onSort, align, k2, sub2 }: {
 
 /* --------------------------------------------------------------- one row -- */
 
-function PatientRow({ r, i, ranked, outside, reference, tight, expanded, onToggle, onOpen }: {
-  r: Row; i: number; ranked: boolean; outside: boolean
+function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded, onToggle, onOpen }: {
+  r: Row; i: number; ranked: boolean; outside: boolean; narrow: boolean
   reference: Reference | undefined; tight: boolean; expanded: boolean
   onToggle: () => void; onOpen: (pw: string) => void
 }) {
@@ -1051,11 +1059,21 @@ function PatientRow({ r, i, ranked, outside, reference, tight, expanded, onToggl
         )}
       </td>
 
-      {/* NEWS2, and the reading's age, always together */}
+      {/* NEWS2, and the reading's age, always together.
+
+          On a refused row the number is NOT shown as acuity. NEWS2 is validated
+          in adults; the urgency agent refuses specialty 0601 rather than score a
+          child on an adult scale, and printing the observation's stored total
+          under a column headed "how unwell" would contradict that two inches
+          below the panel note that states it. The reading and its age still
+          travel, because a clinician recorded those. This mirrors what the
+          patient page already does (Vitals.tsx, applied={false}). */}
       <td className="c-news">
         <div className="cell">
-          <span className="n2 num">
-            {r.clin?.news2 ?? '—'}<span className="of"> of 17</span>
+          <span className={'n2 num' + (outside ? ' is-na' : '')}>
+            {outside
+              ? <span className="n2-na">not applied<span className="of"> · adult scale</span></span>
+              : <>{r.clin?.news2 ?? '—'}<span className="of"> of 17</span></>}
           </span>
           <span className={'sub' + (stale ? ' is-stale' : '')}>
             {r.clin?.obs_datetime == null ? 'no reading' : <>
@@ -1067,7 +1085,7 @@ function PatientRow({ r, i, ranked, outside, reference, tight, expanded, onToggl
       </td>
 
       {/* triage status — carried by the cohort payload and never rendered before */}
-      <td className="c-triage">
+      {!narrow && <td className="c-triage">
         <div className="cell">
           <span className="tri">
             {r.triage_status === 'awaiting_triage' ? 'awaiting triage' : r.triage_status}
@@ -1079,23 +1097,25 @@ function PatientRow({ r, i, ranked, outside, reference, tight, expanded, onToggl
             {r.currently_suspended && <span className="susp"> · suspended</span>}
           </span>
         </div>
-      </td>
+      </td>}
 
       {/* recorded but not scored. MTS keeps its own colour vocabulary, which is
           why it is shown here in a neutral register and never in triage hues. */}
-      <td className="c-ctx">
+      {!narrow && <td className="c-ctx">
         <div className="cell">
           <span className="ctx-v">
             {r.clin?.mts_category
               ? <>MTS <b>{r.clin.mts_category}</b></>
               : <span className="muted">no MTS</span>}
           </span>
-          <span className="sub">
-            not scored
-            {r.clin?.pain != null && <> · pain <span className="num">{r.clin.pain}</span></>}
-          </span>
+          {/* "not scored" was on every one of 305 rows AND in the column
+              header directly above, so the subline said nothing and truncated
+              while doing it. Only pain varies. */}
+          {r.clin?.pain != null && (
+            <span className="sub">pain <span className="num">{r.clin.pain}</span>/10</span>
+          )}
         </div>
-      </td>
+      </td>}
 
       <td className="c-exp">
         <button

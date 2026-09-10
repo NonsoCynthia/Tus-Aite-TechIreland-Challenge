@@ -44,7 +44,7 @@
 }
 /* an inset RULE, not a drop shadow: the same idiom app.css uses for .tile
    and .vital, and neutral rather than clay so the one accent stays spent. */
-.ov-ro.is-accent { box-shadow: inset 3px 0 0 var(--rule-firm); }
+.ov-ro.is-accent { box-shadow: inset 3px 0 0 var(--clay); }
 .ov-ro-k { display: flex; align-items: center; gap: 5px; }
 .ov-ro-k svg { flex: none; color: var(--text-3); }
 .ov-ro-v {
@@ -185,11 +185,13 @@
 
 /* --- staleness ------------------------------------------------------------ */
 .ov-mini {
+  /* hairlines on the children, not gap-over-a-rule-background: a partial
+     last row must be quiet surface, never a painted grey cell. */
   display: grid; grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
-  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+  gap: 0; background: var(--surface); border: 1px solid var(--rule);
   margin-bottom: var(--d4);
 }
-.ov-mini-i { background: var(--surface); padding: var(--d2) var(--d3); }
+.ov-mini-i { background: var(--surface); padding: var(--d2) var(--d3);  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);}
 .ov-mini-v {
   font-family: var(--font-brand); font-size: 19px; font-weight: 300;
   line-height: 1.15; color: var(--text);
@@ -215,8 +217,8 @@
   display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
   font-size: var(--t-micro); padding: 2px var(--d2); border-radius: var(--radius-pill);
 }
-.ov-verdict.is-ok { color: var(--cat-routine); background: var(--cat-routine-wash); }
-.ov-verdict.is-bad { color: var(--cat-urgent); background: var(--cat-urgent-wash); }
+.ov-verdict.is-ok { color: var(--text-3); background: var(--surface-2); }
+.ov-verdict.is-bad { color: var(--text); background: var(--bg-sunk); box-shadow: inset 0 0 0 1px var(--rule-firm); }
 .ov-rule-foot {
   font-size: var(--t-micro); color: var(--text-2); margin-top: var(--d3);
   display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;

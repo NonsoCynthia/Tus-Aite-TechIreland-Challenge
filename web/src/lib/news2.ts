@@ -18,14 +18,20 @@ export interface Vital {
    *  little air, so the scale is honest rather than cropped to the reading. */
   axis: [number, number]
   bands: Band[]
-  /** Where a well person sits. Drawn as the calm region on the meter. */
-  normal: [number, number]
+  /** The span that scores ZERO on NEWS2 -- nothing more.
+   *
+   *  This is NOT a clinical reference range and must never be labelled one.
+   *  NEWS2 awards no points for a systolic between 111 and 219, which includes
+   *  stage-2 hypertension; calling that "normal" would be a diagnostic claim
+   *  this system has no source for. urgency-agent/urgency_agent/news2.py carries
+   *  no concept of normal at all, and neither does this. */
+  zeroBand: [number, number]
 }
 
 export const VITALS: Vital[] = [
   {
     key: 'rr', label: 'Respiratory rate', short: 'Resp', unit: '/min', axis: [4, 32],
-    normal: [12, 20],
+    zeroBand: [12, 20],
     bands: [
       { lo: null, hi: 8, score: 3 }, { lo: 9, hi: 11, score: 1 },
       { lo: 12, hi: 20, score: 0 }, { lo: 21, hi: 24, score: 2 },
@@ -34,7 +40,7 @@ export const VITALS: Vital[] = [
   },
   {
     key: 'spo2', label: 'Oxygen saturation', short: 'SpO₂', unit: '%', axis: [88, 100],
-    normal: [96, 100],
+    zeroBand: [96, 100],
     bands: [
       { lo: null, hi: 91, score: 3 }, { lo: 92, hi: 93, score: 2 },
       { lo: 94, hi: 95, score: 1 }, { lo: 96, hi: null, score: 0 },
@@ -42,7 +48,7 @@ export const VITALS: Vital[] = [
   },
   {
     key: 'sbp', label: 'Systolic blood pressure', short: 'Systolic', unit: 'mmHg',
-    axis: [80, 230], normal: [111, 219],
+    axis: [80, 230], zeroBand: [111, 219],
     bands: [
       { lo: null, hi: 90, score: 3 }, { lo: 91, hi: 100, score: 2 },
       { lo: 101, hi: 110, score: 1 }, { lo: 111, hi: 219, score: 0 },
@@ -51,7 +57,7 @@ export const VITALS: Vital[] = [
   },
   {
     key: 'hr', label: 'Heart rate', short: 'Pulse', unit: 'bpm', axis: [35, 140],
-    normal: [51, 90],
+    zeroBand: [51, 90],
     bands: [
       { lo: null, hi: 40, score: 3 }, { lo: 41, hi: 50, score: 1 },
       { lo: 51, hi: 90, score: 0 }, { lo: 91, hi: 110, score: 1 },
@@ -60,11 +66,11 @@ export const VITALS: Vital[] = [
   },
   {
     key: 'avpu', label: 'Consciousness', short: 'AVPU', unit: '', axis: [0, 1],
-    normal: [0, 0], bands: [],
+    zeroBand: [0, 0], bands: [],
   },
   {
     key: 'temp', label: 'Temperature', short: 'Temp', unit: '°C', axis: [34, 40],
-    normal: [36.1, 38.0],
+    zeroBand: [36.1, 38.0],
     bands: [
       { lo: null, hi: 35.0, score: 3 }, { lo: 35.1, hi: 36.0, score: 1 },
       { lo: 36.1, hi: 38.0, score: 0 }, { lo: 38.1, hi: 39.0, score: 1 },

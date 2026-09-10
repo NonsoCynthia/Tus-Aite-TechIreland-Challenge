@@ -1,3 +1,20 @@
+/* Where clay is spent on this surface, and why it is spent so rarely.
+
+   The kit: "Clay marks ONE element per composition. Used everywhere it stops
+   meaning anything." An earlier version of this file used it 26 times -- about
+   five marks on every row, and since 75 of 84 Urgent rows are breached, clay was
+   true of nine rows in ten. A property shared by nine rows in ten is a field,
+   not an accent. It also carried three different claims at once: past target,
+   reading too old to trust, and clock suspended. Those are not the same thing
+   and must not be the same colour.
+
+   Four survive, each in a different composition:
+     .wb-over    the overflow past target -- the ONLY clay whose LENGTH varies
+                 row to row, so the only one carrying information
+     .tier-*     the breach boundary, drawn once per table
+     .ev-v.is-cited  in the expander, the vital the agent actually read
+     .fig.is-accent  one figure in the headline row
+*/
 /* The ranked list.
  *
  * Every colour is a token; there is not one literal in this file.
@@ -65,7 +82,7 @@
   font-size: var(--t-small); color: var(--text-2); line-height: 1.5;
   margin-bottom: var(--d5); max-width: 96ch;
 }
-.lst-warn svg { flex: none; margin-top: 2px; color: var(--clay); }
+.lst-warn svg { flex: none; margin-top: 2px; color: var(--text-2); }
 
 /* --- before any run ------------------------------------------------------
    A flat statement rather than a photograph: what is on screen, and what claim
@@ -131,8 +148,8 @@
   font-size: var(--t-small); color: var(--text-2); line-height: 1.6;
 }
 .recon-sum strong { color: var(--text); }
-.recon-sum.is-off { border-left: 3px solid var(--clay); }
-.recon-gap { color: var(--clay); }
+.recon-sum.is-off { border-left: 3px solid var(--rule-firm); }
+.recon-gap { color: var(--text); font-weight: 600; }
 
 /* --- toolbar -------------------------------------------------------------- */
 .lst-tools {
@@ -171,11 +188,11 @@
 .lst-reset {
   font: inherit; font-size: var(--t-small); color: var(--text-2);
   background: var(--surface-2); border: 1px solid var(--rule-firm);
-  border-left: 3px solid var(--clay);
+  border-left: 3px solid var(--rule-firm);
   padding: 0 var(--d3); height: 32px; cursor: pointer; margin-left: auto;
 }
 .lst-reset strong { color: var(--text); }
-.lst-reset:hover { border-color: var(--text-3); border-left-color: var(--clay); }
+.lst-reset:hover { border-color: var(--text-3); border-left-color: var(--text-3); }
 
 /* --- category tabs. the only place --cat-* appears on this surface. --------
    Sticky BELOW the top bar, which is itself sticky at 0. Opaque, not glass:
@@ -214,11 +231,11 @@
    The viewport is bounded so the header can stick to it. .scroll-x keeps wide
    content inside this box; the page body never scrolls sideways. */
 .lst-vp {
-  max-height: min(calc(100vh - 230px), 1180px); overflow: auto;
+  max-height: min(calc(100vh - 300px), 1180px); min-height: 420px; overflow: auto;
   border: 1px solid var(--rule); background: var(--surface);
 }
 .lst-table {
-  width: 100%; min-width: 1320px;
+  width: 100%; min-width: 1120px;
   table-layout: fixed; border-collapse: separate; border-spacing: 0;
 }
 
@@ -288,10 +305,10 @@
 }
 .lst-table .sub b { color: var(--text); font-weight: 600; }
 .sub-code { color: var(--text-3); }
-.sub.is-over { color: var(--clay); }
-.sub.is-over b { color: var(--clay); }
-.sub.is-stale { color: var(--clay); }
-.sub.is-stale b { color: var(--clay); }
+.sub.is-over { color: var(--text-2); }
+.sub.is-over b { color: var(--text); }
+.sub.is-stale { color: var(--text-2); }
+.sub.is-stale b { color: var(--text); border-bottom: 1px dashed var(--rule-firm); }
 
 .c-pos { text-align: right; }
 .pos {
@@ -314,7 +331,7 @@
 }
 .lst-table .of { font-weight: 400; color: var(--text-2); font-size: var(--t-micro); }
 .tri { font-size: var(--t-small); color: var(--text); }
-.susp { color: var(--clay); }
+.susp { color: var(--text-2); font-style: italic; }
 .ctx-v { font-size: var(--t-small); color: var(--text-2); }
 .ctx-v b { color: var(--text); font-weight: 550; }
 
@@ -370,8 +387,8 @@
 .rule-chip {
   display: inline-flex; align-items: baseline; gap: 5px; flex-wrap: wrap;
   max-width: 100%; padding: 3px var(--d2);
-  background: var(--surface-2); box-shadow: inset 2px 0 0 var(--clay);
-  color: var(--clay); font-size: var(--t-micro); line-height: 1.4;
+  background: var(--bg-sunk); box-shadow: inset 2px 0 0 var(--rule-firm);
+  color: var(--text); font-size: var(--t-micro); line-height: 1.4;
 }
 .rule-chip svg { align-self: center; flex: none; }
 .rule-chip b { font-weight: 650; letter-spacing: 0.01em; }
@@ -447,7 +464,7 @@
 .ev-cav .num { color: var(--text-2); }
 .ev-stale {
   margin: 0 0 var(--d2); padding: var(--d2) var(--d3);
-  border-left: 3px solid var(--clay); background: var(--surface-2);
+  border-left: 3px solid var(--rule-firm); background: var(--surface-2);
   font-size: var(--t-micro); color: var(--text-2); line-height: 1.5;
 }
 
@@ -471,7 +488,7 @@
 .ev-rd {
   grid-column: 2 / -1; font-size: var(--t-micro); color: var(--text-2);
 }
-.ev-rules li.is-bad .ev-rd { color: var(--clay); }
+.ev-rules li.is-bad .ev-rd { color: var(--text); font-weight: 600; }
 .ev-rw { grid-column: 2 / -1; font-size: var(--t-micro); color: var(--text-3); }
 .ev-vd {
   display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
@@ -479,7 +496,7 @@
 }
 /* colour never travels alone: the word is in the chip */
 .ev-vd.is-ok { color: var(--text-2); background: var(--bg-sunk); }
-.ev-vd.is-bad { color: var(--clay); background: var(--surface); box-shadow: inset 0 0 0 1px var(--clay); }
+.ev-vd.is-bad { color: var(--text); background: var(--bg-sunk); box-shadow: inset 0 0 0 1px var(--rule-firm); }
 
 .ev-vitals {
   display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -519,8 +536,8 @@
 .ev-ovr-n { font-size: var(--t-micro); color: var(--text-3); line-height: 1.5; }
 .ev-warn {
   justify-self: start; padding: 2px var(--d2);
-  font-size: var(--t-micro); color: var(--clay);
-  background: var(--surface); box-shadow: inset 0 0 0 1px var(--clay);
+  font-size: var(--t-micro); color: var(--text-2);
+  background: var(--bg-sunk); box-shadow: inset 0 0 0 1px var(--rule-firm);
   border-radius: var(--radius-pill);
 }
 .ev-acts { display: flex; gap: var(--d2); flex-wrap: wrap; margin-top: var(--d3); }
@@ -558,7 +575,12 @@
 /* --- narrower screens ----------------------------------------------------- */
 @media (max-width: 1400px) {
   .key { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .lst-figs { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(2, 1fr); }
+  /* Four figures wrapping to 2x2 costs ~90px of height, and on an 800-tall
+     screen that is two ranked rows. They stay in one row and lose the note
+     line (.fig-w) instead -- the figure and its label are what is scanned. */
+  .lst-figs { grid-auto-columns: minmax(0, 1fr); }
+  .fig { padding: var(--d2) var(--d3); }
+  .fig-w { display: none; }
 }
 @media (max-width: 1100px) {
   .recon { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -605,3 +627,18 @@
 .lst-fold-s { font-size: var(--t-small); color: var(--text-2); min-width: 0; }
 .lst-fold-s .num { color: var(--text); }
 .lst-fold > *:not(summary) { padding: 0 var(--d4) var(--d4); }
+
+/* A refused row carries a recorded observation but no acuity claim: NEWS2 is
+   validated in adults, so the score is never rendered as "how unwell" for a
+   paediatric referral. The reading and its age still show. */
+.n2.is-na { font-weight: 500; }
+.n2-na { color: var(--text-2); font-size: var(--t-small); }
+
+/* --- below 1440 the table has to lose a column, and CONTEXT is the one -------
+   MTS and pain are recorded-but-not-scored, they are in the expander in full,
+   and the column returned an identical subline on every row. TRIAGE reads
+   "triaged" on 307 of 308, so it goes too and the status is carried as a chip
+   only when it is NOT triaged. */
+@media (max-width: 1439px) {
+  .lst-table .c-ctx, .lst-table th.c-ctx { display: none; }
+}

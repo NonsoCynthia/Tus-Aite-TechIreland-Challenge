@@ -23,16 +23,25 @@ const GraphCanvas = lazy(() =>
  *  Neither shows why one patient outranks another. That is the contribution
  *  bars' job and this must never be read as the ordering argument.
  */
+/** The graph palette, shared with CohortGraph.tsx.
+ *
+ *  Deliberately OFF the triage axis. An earlier version of this file used
+ *  #2F5D45 for observations and #8A5A12 for ward and clinic nodes -- which are
+ *  exactly --cat-routine and --cat-semi -- so a patient's own reading was drawn
+ *  in Routine green and their ward in Semi-Urgent amber, on the same page where
+ *  the header chip uses those hues for the real CPC band. reagraph needs
+ *  literals, which is why these are not tokens; they are still the ink/clay/
+ *  taupe axis and nothing here may borrow a category hue. */
 const PALETTE = {
-  decision: '#122056',
-  placement: '#7A5B4D',
-  score: '#5A6172',
-  observation: '#2F5D45',
-  bed_status: '#8A5A12',
-  clinic_session: '#8A5A12',
-  condition: '#6B6257',
-  referral: '#122056',
-  triage_event: '#6E86C4',
+  decision: '#FAFAF8',
+  placement: '#C4B6A6',
+  score: '#6E86C4',
+  observation: '#6E86C4',
+  bed_status: '#B5765F',
+  clinic_session: '#D2A07E',
+  condition: '#8A8577',
+  referral: '#C4B6A6',
+  triage_event: '#8A7FA8',
   specialty: '#8A7FA8',
   ward: '#B5765F',
 }
@@ -47,7 +56,7 @@ const VITALS: Record<string, string> = {
 const THEME = {
   canvas: { background: '#0B1436' },
   node: {
-    fill: '#5A6172', activeFill: '#C4B6A6', opacity: 1,
+    fill: '#4A5470', activeFill: '#C4B6A6', opacity: 1,
     selectedOpacity: 1, inactiveOpacity: 0.35,
     label: { color: '#FAFAF8', stroke: '#0B1436', activeColor: '#C4B6A6' },
   },

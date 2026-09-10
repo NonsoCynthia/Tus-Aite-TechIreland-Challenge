@@ -14,8 +14,8 @@
      as pips as well, so colour is never the only channel.
 
      The one exception is a CRT breach. "Past target" IS a property of the
-     triage category's own target and the product already spends --cat-urgent
-     on it in the list and in the decision record, so the axis does the same.
+     triage category's own target, and the ranked list spends CLAY on it, so
+     the axis spends clay too -- one fact, one colour, across the product.
 
    clay marks one element per composition: the guard panel in the capacity
    lane, the reader's own row in the neighbours table, the silence hatch on the
@@ -101,13 +101,13 @@
 .pt-check-id { color: var(--text); font-weight: 550; white-space: nowrap; }
 .pt-check-st { color: var(--text-2); line-height: 1.45; }
 .pt-check-d { color: var(--text-2); }
-.pt-check[data-passed="no"] .pt-check-id { color: var(--cat-urgent); }
+.pt-check[data-passed="no"] .pt-check-id { color: var(--text); font-weight: 700; }
 .pt-verdict {
   justify-self: end; font-size: var(--t-micro); padding: 2px var(--d2);
   border-radius: var(--radius-pill); white-space: nowrap;
 }
-.pt-verdict.is-ok  { color: var(--cat-routine); background: var(--cat-routine-wash); }
-.pt-verdict.is-bad { color: var(--cat-urgent);  background: var(--cat-urgent-wash); }
+.pt-verdict.is-ok  { color: var(--text-3); background: var(--surface-2); }
+.pt-verdict.is-bad { color: var(--text); background: var(--bg-sunk); box-shadow: inset 0 0 0 1px var(--rule-firm); }
 
 .pt-rationale {
   margin-top: var(--d4); border: 1px solid var(--rule);
@@ -177,10 +177,12 @@
   background: var(--ink); transform: translateX(-2px);
 }
 .pt-facts {
+  /* hairlines on the children: ten facts into a fluid track count leaves a
+     partial last row, and that row must be quiet surface, not painted grey. */
   display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 1px; margin: 0; background: var(--rule); border-top: 1px solid var(--rule);
+  gap: 0; margin: 0; background: var(--surface); border-top: 1px solid var(--rule);
 }
-.pt-fact { background: var(--surface); padding: var(--d2) var(--d3); min-width: 0; }
+.pt-fact { background: var(--surface); padding: var(--d2) var(--d3); min-width: 0;  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);}
 .pt-fact dt { margin: 0; }
 .pt-fact-v {
   margin: 2px 0 0; font-size: var(--t-data); color: var(--text);
@@ -261,10 +263,15 @@
 /* --- the six instruments -------------------------------------------------- */
 .pt-vitals { display: grid; gap: var(--d3); }
 .pt-cards {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
-  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+  /* NEWS2 has exactly SIX parameters, so this is a fixed count. auto-fill gave
+     five tracks and painted the four empty cells as a solid grey block across
+     the clinical readings -- the same fault overview.css:32 already fixed on
+     the readout band. Two rows of three, and each instrument gets more width
+     for its band axis. */
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0; background: var(--surface); border: 1px solid var(--rule);
 }
-.pt-card { background: var(--surface); padding: var(--d3); min-width: 0; }
+.pt-card { background: var(--surface); padding: var(--d3); min-width: 0;  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);}
 .pt-card-h { display: flex; align-items: center; gap: 6px; }
 .pt-card-h svg { color: var(--text-3); flex: none; }
 .pt-card-h .lab { min-width: 0; overflow-wrap: anywhere; }
@@ -302,7 +309,7 @@
 .pt-track i[data-score="2"] { background: var(--rule-firm); }
 .pt-track i[data-score="3"] { background: var(--text-3); }
 /* where a well person sits, marked as the calm region */
-.pt-normal { position: absolute; top: 11px; height: 2px; background: var(--text-3); }
+.pt-zero { position: absolute; top: 11px; height: 2px; background: var(--text-3); }
 .pt-pin {
   position: absolute; top: -3px; width: 2px; height: 14px;
   background: var(--ink); transform: translateX(-1px);
@@ -312,7 +319,7 @@
   display: flex; justify-content: space-between; gap: var(--d2);
   margin-top: 3px; font-size: var(--t-micro); color: var(--text-3);
 }
-.pt-normal-l { color: var(--text-2); }
+.pt-zero-l { color: var(--text-2); }
 .pt-caption {
   margin-top: var(--d2); font-size: var(--t-micro); color: var(--text-2); line-height: 1.5;
   display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline;
@@ -369,7 +376,7 @@
    category chips that is allowed to wear it. */
 .j-overdue {
   position: absolute; top: 12px; height: var(--spine-w);
-  background: var(--cat-urgent);
+  background: var(--clay);
 }
 .j-legend {
   list-style: none; display: flex; flex-wrap: wrap; gap: var(--d2) var(--d4);
@@ -380,17 +387,19 @@
   font-size: var(--t-micro); color: var(--text-2);
 }
 .j-leg i { width: 14px; height: 5px; flex: none; background: var(--rule-firm); }
-.j-leg.is-overdue i { background: var(--cat-urgent); }
-.j-leg.is-overdue strong { color: var(--cat-urgent); }
+.j-leg.is-overdue i { background: var(--clay); }
+.j-leg.is-overdue strong { color: var(--clay); }
 .j-leg.is-silent i { background: var(--clay); }
 .j-leg.is-silent strong { color: var(--clay); }
 
 /* --- 6 what the instrument could not see --------------------------------- */
 .pt-chips {
+  /* hairlines on the children: a fluid track count leaves a partial last
+     row, and gap-over-a-rule-background paints those empty cells solid grey. */
   display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+  gap: 0; background: var(--surface); border: 1px solid var(--rule);
 }
-.pt-chip { background: var(--surface); padding: var(--d3) var(--d4); min-width: 0; }
+.pt-chip { background: var(--surface); padding: var(--d3) var(--d4); min-width: 0;  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);}
 .pt-chip-h { display: flex; align-items: baseline; gap: var(--d2); flex-wrap: wrap; }
 .pt-chip-tag {
   font-size: var(--t-micro); color: var(--text-3);

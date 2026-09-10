@@ -142,9 +142,15 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
       key: 'tri', date: c.triage_date, label: `triaged ${band}`,
       detail: c.turnaround_days != null ? `${c.turnaround_days}-day turnaround` : undefined,
     } : null,
-    c?.triage_date && target ? {
+    // The target falls `target` days into the WAIT, and the wait is measured
+    // from the date the referral was received -- not from the triage date. Built
+    // from triage_date it landed days later than the header and the rule chip
+    // said, and on five referrals it put the target in the future while the
+    // header said the referral was already past it.
+    c?.referral_received_date && target ? {
       key: 'tgt',
-      date: new Date(new Date(c.triage_date).getTime() + target * 86_400_000).toISOString().slice(0, 10),
+      date: new Date(new Date(c.referral_received_date).getTime() + target * 86_400_000)
+        .toISOString().slice(0, 10),
       label: `${target}-day target`, target: true,
     } : null,
   ].filter(Boolean) as Event[]
@@ -268,7 +274,8 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
         <section className="p-sec">
           <h2 className="sec-h">The journey
             <span className="sec-note">recorded dates only — nothing here is computed</span></h2>
-          <Journey events={events} today={date} className="pt-journey" />
+          <Journey events={events} today={date} className="pt-journey"
+                   waitDays={wait} targetDays={target} />
         </section>
       )}
 
