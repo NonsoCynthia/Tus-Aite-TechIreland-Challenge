@@ -53,13 +53,20 @@
   --accent:     #7A5B4D;   /* clay. ONE element per composition.        */
   --focus:      #122056;
 
+  /* alpha steps the graph surface needs by name rather than as literals */
+  --taupe-10:   rgba(196, 182, 166, 0.10);
+  --taupe-14:   rgba(196, 182, 166, 0.14);
+  --scrim-deep: rgba(7, 15, 42, 0.90);
+
   /* --- elevation, spent BY ROLE ------------------------------------------
-     A border, a fill and a lift each say "separate object". Stamping one card
-     treatment on every block flattens the hierarchy, so there are three levels
-     and most things use level 0. */
-  --lift-0: none;                                   /* hairline only        */
-  --lift-1: 0 1px 2px rgba(18, 32, 86, 0.06);       /* a panel that matters */
-  --lift-2: 0 8px 24px rgba(18, 32, 86, 0.12);      /* floats: popover, dialog */
+     The kit forbids drop shadows by name, so hierarchy comes from GROUND, of
+     which the palette gives four steps -- --bg-sunk / --bg / --surface /
+     --surface-2 -- plus --rule against --rule-firm for edge weight.
+
+     There were --lift-1 and --lift-2 tokens here defined as literal drop
+     shadows. Nothing ever used them (grep for var(--lift) returned nothing),
+     so they were a rule breach sitting in the token file waiting for someone
+     to reach for it. Removed rather than left. */
 
   /* --- 3. type ------------------------------------------------------------ */
   --font-brand: 'Jost', ui-sans-serif, system-ui, sans-serif;
@@ -116,8 +123,6 @@
   --rule-firm:  rgba(196, 182, 166, 0.32);
   --accent:     #C4B6A6;    /* taupe is the accent on dark, per the kit */
   --focus:      #C4B6A6;
-  --lift-1:     none;
-  --lift-2:     0 12px 32px rgba(0, 0, 0, 0.4);
   --cat-urgent-wash:  rgba(163, 42, 30, 0.18);
   --cat-semi-wash:    rgba(138, 90, 18, 0.20);
   --cat-routine-wash: rgba(47, 93, 69, 0.20);

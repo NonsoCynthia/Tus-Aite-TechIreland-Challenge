@@ -9,10 +9,16 @@
 }
 @keyframes runlay-in { from { opacity: 0 } to { opacity: 1 } }
 
+/* The border stays full-bleed; the CONTENTS share the body's measure. The title
+   started at x=49 while the readouts, the lanes and the button all started at
+   x=362 -- a 313px offset between a heading and everything it introduces. */
 .runlay-head {
-  display: flex; align-items: flex-start; gap: var(--d4);
-  padding: var(--d6) var(--d7) var(--d4);
   border-bottom: 1px solid var(--rule);
+  padding: var(--d6) var(--d7) var(--d4);
+}
+.runlay-head-in {
+  display: flex; align-items: flex-start; gap: var(--d4);
+  max-width: 1100px; margin: 0 auto; width: 100%;
 }
 .runlay-t h1 { font-size: var(--t-hero); margin-top: var(--d1); }
 .runlay-x {
@@ -37,7 +43,7 @@
   display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 0; background: var(--surface); border: 1px solid var(--rule);
 }
-.readout { background: var(--bg); padding: var(--d3) var(--d4);  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);}
+.readout { background: var(--surface); padding: var(--d3) var(--d4);  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);}
 .readout-v {
   font-size: 21px; line-height: 1.15; margin-top: var(--d1); color: var(--text);
 }
@@ -67,7 +73,7 @@
 .lane-n { font-family: var(--font-brand); font-size: var(--t-section); }
 .lane-m { font-size: var(--t-micro); color: var(--text-3); }
 .lane-reads { display: grid; gap: 2px; min-width: 0; }
-.lane-r { font-size: var(--t-small); color: var(--text-2); }
+.lane-r { font-size: var(--t-body); color: var(--text); }
 .lane-c { font-size: var(--t-micro); color: var(--text-3); }
 .lane-count { text-align: right; white-space: nowrap; }
 .lane-count strong { font-size: 20px; }

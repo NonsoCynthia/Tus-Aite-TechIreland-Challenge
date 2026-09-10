@@ -105,6 +105,7 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
     <div className="runlay" data-surface="dark" role="dialog" aria-modal="true"
          aria-label="Run the agents">
       <div className="runlay-head">
+        <div className="runlay-head-in">
         <div className="runlay-t">
           <span className="lab">Agent run</span>
           <h1>{hospital} · {new Date(date).toLocaleDateString('en-IE',
@@ -114,6 +115,7 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
                 aria-label="Close">
           <X size={18} strokeWidth={1.75} />
         </button>
+        </div>
       </div>
 
       <div className={"runlay-body" + (run ? "" : " is-idle")}>

@@ -101,6 +101,11 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
   const obs = ctx.data?.observations?.[0]
   const capacity = ctx.data?.capacity as CapacityContext | undefined
   const band = bandOf(row.cpc)
+  // Reading age per pathway, for the neighbour comparison. Ages in this cohort
+  // run from days to 871 days, so two equal-looking NEWS2 scores are routinely
+  // not equal evidence.
+  const ages: Record<string, number | null> = Object.fromEntries(
+    Object.entries(ops.data?.clinical ?? {}).map(([pw, c]) => [pw, c.reading_age_days]))
   const wait = row.adjusted_wait_days ?? 0
   // Never 28 or 91 by hand: core.ref_codes is authoritative and the cohort's own
   // copy is only the fallback if the reference has not loaded yet.
@@ -244,13 +249,20 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
             <strong>{ovrRec.reason}</strong>
             {ovrRec.rule_warning_accepted && ' — a category-boundary warning was accepted on the record.'}
             {' '}The position below is the system's; the override is what stands.
+            {/* The other three surfaces that show a clinician_id carry this
+                caveat and this one did not -- and the default value is literally
+                "clinician-01", which reads as an identity. */}
+            <span className="pt-attr">
+              Recorded as <span className="num">{ovrRec.clinician_id}</span> — attribution,
+              not authentication: the record says who typed it, it does not verify them.
+            </span>
           </span>
         </div>
       )}
 
       {/* 2 — why that position */}
       {placed && dec.data
-        ? <WhyHere placed={placed} decision={dec.data} reference={reference} compare={cmp}
+        ? <WhyHere placed={placed} decision={dec.data} reference={reference} ages={ages} compare={cmp}
                    onCompare={setCmp} onCloseCompare={() => setCmp(null)} />
         : <NotScoredYet refused={refused} skipped={skipped} error={dec.isError} />}
 
@@ -427,8 +439,11 @@ function LimitChip({ k, v, tag, note }: { k: string; v: string | null; tag: stri
  *  its ID so it can be found in core.ref_rules, and its statement comes from the
  *  reference layer rather than from a string in this file.
  */
-function WhyHere({ placed, decision, reference, compare, onCompare, onCloseCompare }: {
+function WhyHere({ placed, decision, reference, ages, compare, onCompare, onCloseCompare }: {
   placed: Ranking; decision: Decision; reference: Reference | undefined
+  /** Reading age per pathway, so a neighbour comparison cannot present two
+   *  single readings of very different ages as equivalent evidence. */
+  ages?: Record<string, number | null>
   compare: 'above' | 'below' | null
   onCompare: (w: 'above' | 'below') => void
   onCloseCompare: () => void
@@ -473,7 +488,16 @@ function WhyHere({ placed, decision, reference, compare, onCompare, onCloseCompa
         <div className="why-row is-total">
           <span className="why-k">priority</span>
           <span className="why-b" />
-          <span className="why-v num">{n3(placed.priority)}</span>
+          <span className="why-v num">{n3(placed.priority)}
+            {/* The two terms above are each rounded to 3 d.p., so on 38 of 305
+                rows they do not visibly add to this figure -- always by 0.001.
+                Priority is the ranking key and is shown exactly; the note says
+                which of the three is the rounded one rather than leaving a
+                reader to find an arithmetic error that is not there. */}
+            {Math.abs(Math.round(uTerm * 1000) / 1000 + Math.round(wTerm * 1000) / 1000
+                      - Math.round(placed.priority * 1000) / 1000) > 1e-9 && (
+              <span className="why-round">the two terms are rounded; this is exact</span>
+            )}</span>
         </div>
       </div>
 
@@ -527,10 +551,10 @@ function WhyHere({ placed, decision, reference, compare, onCompare, onCloseCompa
       )}
 
       {compare === 'above' && above && (
-        <Compare a={above} b={placed} decision={decision} onClose={onCloseCompare} />
+        <Compare a={above} b={placed} decision={decision} ages={ages} onClose={onCloseCompare} />
       )}
       {compare === 'below' && below && (
-        <Compare a={placed} b={below} decision={decision} onClose={onCloseCompare} />
+        <Compare a={placed} b={below} decision={decision} ages={ages} onClose={onCloseCompare} />
       )}
     </section>
   )

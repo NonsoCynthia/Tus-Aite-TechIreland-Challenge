@@ -473,3 +473,14 @@
 }
 .pt-planted p { margin: 0; font-size: var(--t-small); color: var(--text-2); line-height: 1.55; max-width: 88ch; }
 .pt-planted code { font-size: var(--t-micro); color: var(--text-3); word-break: break-all; }
+
+/* Reading age beside each side of a neighbour comparison. Two single readings of
+   very different ages are not equivalent evidence, and this panel used to
+   present them in the present tense. */
+.cmp-tk-s { display: block; font-size: var(--t-micro); color: var(--text-3); font-weight: 400; }
+.cmp-age { display: block; font-size: var(--t-micro); color: var(--text-3); }
+
+/* Shown only on the rows where the two rounded terms do not visibly add to the
+   exact priority — 38 of 305. Better than leaving a reader to hunt for an
+   arithmetic error that is not there. */
+.why-round { display: block; font-size: var(--t-micro); color: var(--text-3); font-weight: 400; }

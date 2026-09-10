@@ -67,7 +67,9 @@
 .ov-thirds {
   display: grid; gap: var(--d4);
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  align-items: start;
+  /* no align-items: start. .ov-panel is a column flex whose body grows, so the
+     panels stretch to a shared bottom edge; starting them left a ~260px band of
+     empty paper under the shortest one, on the same row as the tallest. */
 }
 @media (max-width: 1180px) { .ov-cols { grid-template-columns: minmax(0, 1fr); } }
 
@@ -176,7 +178,7 @@
   border-bottom: 1px solid var(--rule-firm);
 }
 .ov-col-track i { display: block; width: 100%; background: var(--text-3); min-height: 1px; }
-.ov-col-k {
+.ov-col-k { font-size: var(--t-micro);
   font-size: 9px; color: var(--text-3); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
@@ -246,7 +248,7 @@
 /* THE accent. clay, once, for the session the capacity agent actually read. */
 .ov-spark-c.is-cited { border-bottom-color: var(--accent); }
 .ov-spark-c.is-cited i { background: var(--accent); }
-.ov-spark-k { font-size: 9px; color: var(--text-3); margin-left: 5px; align-self: flex-end; }
+.ov-spark-k { font-size: var(--t-micro); font-size: 9px; color: var(--text-3); margin-left: 5px; align-self: flex-end; }
 .ov-cited-tag { color: var(--accent); font-weight: 600; }
 
 /* --- wards ---------------------------------------------------------------- */

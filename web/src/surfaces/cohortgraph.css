@@ -14,7 +14,7 @@
   position: absolute; inset: 0; display: grid; place-items: center;
   color: var(--text-3); font-size: var(--t-small); background: var(--bg-sunk);
 }
-.cg-lost { background: rgba(7, 15, 42, 0.9); gap: var(--d3); }
+.cg-lost { background: var(--scrim-deep); gap: var(--d3); }
 .cg-lost button {
   margin-left: var(--d2); background: var(--accent); color: var(--ink-deep);
   border: 0; border-radius: var(--radius); padding: 6px var(--d3);
@@ -45,12 +45,12 @@
 /* --- legend: classes with their share, the analysis-panel pattern --------- */
 .cg-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
 .cg-legend li {
-  display: grid; grid-template-columns: 9px 1fr 52px 30px;
+  display: grid; grid-template-columns: 9px 1fr 34px;
   align-items: center; gap: var(--d2); font-size: var(--t-small);
 }
 .cg-legend i { width: 9px; height: 9px; border-radius: 2px; }
 .cg-lg-n { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cg-lg-bar { height: 3px; background: rgba(196, 182, 166, 0.14); }
+.cg-lg-bar { height: 3px; background: var(--taupe-14); }
 .cg-lg-bar b { display: block; height: 100%; }
 .cg-lg-c { text-align: right; color: var(--text-3); font-size: var(--t-micro); }
 .cg-note {
@@ -98,7 +98,7 @@
   display: grid; place-items: center; cursor: pointer;
 }
 .cg-ctrl button:last-child { border-right: 0; }
-.cg-ctrl button:hover { color: var(--text); background: rgba(196, 182, 166, 0.10); }
+.cg-ctrl button:hover { color: var(--text); background: var(--taupe-10); }
 
 @media (max-width: 1180px) {
   .cg-tr, .cg-br { display: none; }

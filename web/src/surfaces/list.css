@@ -671,3 +671,11 @@
   font-size: var(--t-micro); color: var(--text-3); white-space: nowrap;
   padding: 1px var(--d2); border: 1px dashed var(--rule-firm); border-radius: var(--radius);
 }
+
+/* A filter that matches only in another category used to dead-end here. */
+.lst-jump {
+  background: none; border: 0; padding: 0; font: inherit; font-size: inherit;
+  color: var(--text); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.lst-jump:hover { color: var(--clay); }

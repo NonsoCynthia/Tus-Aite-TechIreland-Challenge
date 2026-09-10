@@ -277,8 +277,13 @@ function ReadoutBand({ s, d, noRun, ops, reference }: {
                n="Routine and Uncategorised carry no timeframe — nothing here can be late" />
       <Readout icon={Clock} k="median wait" v={fmt(s.median)} unit="days"
                n={`longest ${fmt(s.longest)} days`} />
+      {/* The guarantee this carries -- one number for the whole hospital-day,
+          which therefore cannot reorder anyone -- was stated in four separate
+          paragraphs across this file, the graph legend and the patient page. It
+          belongs on the number, once. */}
       <Readout icon={Gauge} k="α · weight on urgency" v={d ? d.alpha.toFixed(3) : '—'}
-               n={d ? 'one number for the whole hospital-day' : 'no run for this day yet'} />
+               n={d ? 'hospital-day scope · cannot reorder anyone'
+                    : 'no run for this day yet'} />
       <Readout icon={Activity} k="scarcity" v={d ? d.scarcity.toFixed(3) : '—'}
                n={d ? `read as ${d.capacity_direction} · ADR-007` : noRun ? 'not scored' : 'reading…'} />
       <Readout icon={Stethoscope} k="awaiting triage" v={fmt(s.awaitingTriage)}
@@ -354,8 +359,7 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun }: {
   return (
     <Panel icon={Stethoscope} title="By specialty"
            note={`${specs.length} specialties · core.ref_specialties`}
-           cite={`Ward pressure and capacity score are the agent's own working and are SPECIALTY-level: every referral inside a specialty carries the identical figure, which is why capacity can set α for the hospital-day and still never reorder two people. Clinic pressure is booked ÷ total on the one session the agent read, and matches what it scored wherever a specialty was scored at all.${
-             noRun ? ' No run for this day yet, so the agent columns are empty.' : ''}`}>
+           cite={noRun ? 'No run for this day yet, so the agent columns are empty.' : undefined}>
       <div className="scroll-x">
         <table className="ov-t">
           <thead>
@@ -367,16 +371,17 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun }: {
               <th className="c-n">Past target</th>
               <th className="c-n">Median wait</th>
               <th className="c-n">Longest</th>
-              <th className="c-bar">Ward pressure<span className="ov-th-sub">agent</span></th>
-              <th className="c-bar">Clinic pressure<span className="ov-th-sub">cited session</span></th>
-              <th className="c-n">Capacity score<span className="ov-th-sub">agent</span></th>
+              <th className="c-bar">Ward pressure<span className="ov-th-sub">agent · per specialty</span></th>
+              <th className="c-bar">Clinic pressure<span className="ov-th-sub">booked ÷ total, cited session</span></th>
+              <th className="c-n">Capacity score<span className="ov-th-sub">agent · identical within a specialty</span></th>
             </tr>
           </thead>
           <tbody>
             {specs.map((x) => {
               const a = cap.get(x.code)
               const clinicP = a?.clinic ?? x.clinic?.cited_pressure ?? null
-              // 0601 is refused rather than scored: NEWS2 is validated in
+              // 0601 is refused by the URGENCY agent, so it is never PLACED.
+              // Capacity still scored it. NEWS2 is validated in
               // adults. A coverage statement, not a missing number.
               const isRefused = !a && rowsRefused(refused, x.code, d)
               return (
@@ -392,10 +397,14 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun }: {
                   </td>
                   <td className="c-n num">{fmt(x.median)}<span className="ov-of">d</span></td>
                   <td className="c-n num">{fmt(x.longest)}<span className="ov-of">d</span></td>
-                  <td className="c-bar"><Meter v={a?.ward ?? null} empty={isRefused ? 'refused' : noRun ? 'no run' : '—'} /></td>
+                  <td className="c-bar"><Meter v={a?.ward ?? null} empty={isRefused ? 'not ranked' : noRun ? 'no run' : '—'} /></td>
                   <td className="c-bar"><Meter v={clinicP} empty="—" /></td>
                   <td className="c-n num">
-                    {a ? a.score.toFixed(3) : <span className="ov-none">{isRefused ? 'refused' : noRun ? 'no run' : '—'}</span>}
+                    {/* The urgency agent refused this specialty; the capacity
+                        agent did not -- it scored every referral in 0601. What is
+                        absent is a PLACEMENT, so that is what the cell says. */}
+                    {a ? a.score.toFixed(3)
+                      : <span className="ov-none">{isRefused ? 'not ranked' : noRun ? 'no run' : '—'}</span>}
                   </td>
                 </tr>
               )
@@ -628,6 +637,11 @@ function RulePanel({ d, noRun, reference, onOpenList }: {
     }
   }
   const carrying = d.rankings.filter((r) => failed(r.rule_checks).length > 0).length
+  // split out, because "past a CRT target" and "past the triage turnaround
+  // window" are different claims and only the first is what the readout band
+  // above counts as past target
+  const crtBreached = d.rankings.filter((r) =>
+    failed(r.rule_checks).some((c) => c.rule_id.startsWith('RULE-CRT-'))).length
   const ids = (reference?.rules ?? []).map((r) => r.rule_id)
     .filter((id) => tally.has(id))
   for (const id of tally.keys()) if (!ids.includes(id)) ids.push(id)
@@ -665,9 +679,18 @@ function RulePanel({ d, noRun, reference, onOpenList }: {
         })}
       </div>
       <div className="ov-rule-foot">
+        {/* This is 131 while the readout band says 130 past target, and the two
+            differ for a real reason: 130 referrals are past a CRT target, and
+            one more sat untriaged past the 21-day turnaround window with no
+            category and therefore no target at all. Said, rather than left as
+            two numbers a page apart. */}
         <span className="num">{fmt(carrying)}</span> of{' '}
         <span className="num">{fmt(d.rankings.length)}</span> placed referrals carry at least
-        one breached timeframe.
+        one breached rule — <span className="num">{fmt(crtBreached)}</span> past a CRT target
+        {carrying > crtBreached && (
+          <>, and <span className="num">{fmt(carrying - crtBreached)}</span> past the triage
+          turnaround window with no category to be late against</>
+        )}.
         <button className="ov-link" onClick={onOpenList}>
           Open the ranked order
         </button>
@@ -785,7 +808,7 @@ function WardPanel({ ops, reference, d }: {
   return (
     <Panel icon={BedDouble} title="Ward pressure"
            note={wards.length ? `${wards.length} wards · latest snapshot only` : undefined}
-           cite={`The ${SAFE_OCCUPANCY}% mark is the safe-operating threshold (Bagust, Place & Posnett, BMJ 1999;319:155-8). The agent reads this snapshot and no other — there is no bed series behind α. What it derives is one ward-pressure figure per specialty, shown in the specialty table above; it sets α for the whole hospital-day and priority.py cannot let it reorder two people.`}>
+           cite={`${SAFE_OCCUPANCY}% safe-operating threshold: Bagust, Place & Posnett, BMJ 1999;319:155-8. Latest snapshot only — there is no bed series behind α.`}>
       <PanelState q={ops}>
         <div className="scroll-x">
           <table className="ov-t">

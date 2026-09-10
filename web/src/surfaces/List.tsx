@@ -511,6 +511,9 @@ export function List({ hospital, date, reference, onOpen }: {
               tight={tight}
               size={size}
               filtered={!!needle}
+              elsewhere={TABS.filter((t) => t !== k)
+                .map((t) => [t, (groups[t] ?? []).length] as [string, number])}
+              onGoTab={setTab}
               open={open}
               onToggleOpen={(pw) => setOpen((c) => (c === pw ? null : pw))}
               onOpen={onOpen}
@@ -705,6 +708,9 @@ type BandProps = {
   tight: boolean
   size: number
   filtered: boolean
+  /** Match counts in the OTHER categories, so an empty tab is not a dead end. */
+  elsewhere?: Array<[string, number]>
+  onGoTab: (k: string) => void
   open: string | null
   onToggleOpen: (pw: string) => void
   onOpen: (pw: string) => void
@@ -726,9 +732,28 @@ function Band(p: BandProps) {
     && r.ovr.to_position !== r.ovr.from_position).length
 
   if (!p.rows.length) {
+    // A filter that matches only in another category left the reader looking at
+    // "nothing matches" while a tab two inches away showed a count. The counts
+    // were right; the dead end was the problem. Name where the matches are and
+    // offer to go there.
+    const elsewhere = (p.elsewhere ?? []).filter(([, n]) => n > 0)
     return (
       <p className="muted lst-empty">
         {p.filtered ? 'Nothing in this category matches that filter.' : 'Nobody in this group.'}
+        {p.filtered && elsewhere.length > 0 && (
+          <>
+            {' '}Matches are in{' '}
+            {elsewhere.map(([k, n], i) => (
+              <Fragment key={k}>
+                {i > 0 && (i === elsewhere.length - 1 ? ' and ' : ', ')}
+                <button className="lst-jump" onClick={() => p.onGoTab(k)}>
+                  {k === 'Outside' ? 'Outside the ranking' : k}{' '}
+                  <span className="num">{n}</span>
+                </button>
+              </Fragment>
+            ))}.
+          </>
+        )}
       </p>
     )
   }
@@ -753,6 +778,19 @@ function Band(p: BandProps) {
             validated in adults, so the urgency agent refuses paediatric specialties rather
             than scoring a child on an adult scale. Category and waiting time are shown in
             full, because a clinician recorded those.
+            {/* These rows are counted HERE and not in their clinical band, so
+                the tab counts above are the ranking's counts and differ from the
+                Overview's, which bands all 308 by CPC. Two correct numbers that
+                would otherwise change by 2 when you click between surfaces. */}
+            {p.rows.length > 0 && (
+              <> They are counted here rather than in their clinical band —{' '}
+                <strong>{
+                  Object.entries(p.rows.reduce((a: Record<string, number>, r) => {
+                    const b = bandOf(r.cpc); a[b] = (a[b] ?? 0) + 1; return a
+                  }, {})).map(([b, n]) => `${n} ${b}`).join(' · ')
+                }</strong> — so the tab counts above are of the ranking, while the
+                Overview bands all 308 by category.</>
+            )}
           </>
         ) : target == null ? (
           <>No clinical timeframe applies to this category, so nothing here can be “late”, and

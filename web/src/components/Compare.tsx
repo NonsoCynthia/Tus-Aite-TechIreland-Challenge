@@ -54,8 +54,16 @@ function ladder(a: Ranking, b: Ranking): Step[] {
   return out
 }
 
-export function Compare({ a, b, decision, onClose }: {
-  a: Ranking; b: Ranking; decision: Decision; onClose: () => void
+export function Compare({ a, b, decision, ages, onClose }: {
+  a: Ranking; b: Ranking; decision: Decision
+  /** Each side's reading age in days, keyed by pathway.
+   *
+   *  Without it this panel presented "how unwell: 0.812 vs 0.406" in the present
+   *  tense for two people whose single readings can be 12 and 800 days old, and
+   *  concluded "NEWS2 separates them". Ages in this cohort run to 871 days, so
+   *  equal-looking evidence is routinely nothing of the kind. */
+  ages?: Record<string, number | null>
+  onClose: () => void
 }) {
   const steps = ladder(a, b)
   const decidedBy = steps.find((s) => s.decided)
@@ -94,9 +102,20 @@ export function Compare({ a, b, decision, onClose }: {
         <div className="cmp-terms">
           <div className="cmp-terms-h">Where that priority came from</div>
           <div className="cmp-trow">
-            <span className="cmp-tk">how unwell</span>
-            <span className="cmp-tv num">{n3(ta.u)}</span>
-            <span className="cmp-tv num">{n3(tb.u)}</span>
+            <span className="cmp-tk">
+              how unwell
+              <span className="cmp-tk-s">when measured</span>
+            </span>
+            <span className="cmp-tv num">
+              {n3(ta.u)}
+              {ages?.[a.pathway_number] != null && (
+                <span className="cmp-age">{fmt(ages[a.pathway_number]!)}d old</span>)}
+            </span>
+            <span className="cmp-tv num">
+              {n3(tb.u)}
+              {ages?.[b.pathway_number] != null && (
+                <span className="cmp-age">{fmt(ages[b.pathway_number]!)}d old</span>)}
+            </span>
             <span className="cmp-td num">{urgencyGap < 0.0005 ? 'no difference' : `${n3(urgencyGap)} apart`}</span>
           </div>
           <div className="cmp-trow">
@@ -111,8 +130,9 @@ export function Compare({ a, b, decision, onClose }: {
                 {fmt(a.adjusted_wait_days ?? 0)} days against {fmt(b.adjusted_wait_days ?? 0)}.
                 {urgencyGap < 0.0005 && ' Their vital signs contribute nothing at all: both score the same.'}</>
             ) : (
-              <>The gap here is <strong>how unwell they look</strong> — NEWS2 separates them where
-                waiting time does not.</>
+              <>The gap here is <strong>how unwell they were when measured</strong> — NEWS2
+                separates them where waiting time does not. Each score is a single reading,
+                and the two readings are not the same age.</>
             )}
           </p>
         </div>

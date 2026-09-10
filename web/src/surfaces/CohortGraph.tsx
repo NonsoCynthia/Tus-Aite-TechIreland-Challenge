@@ -15,25 +15,39 @@ const GraphCanvas = lazy(() => import('reagraph').then((m) => ({ default: m.Grap
  *  Deliberately outside the triage set: red, amber and green belong to CPC
  *  categories inside the product and nothing else may borrow them, so evidence
  *  classes are separated on the ink/clay/taupe axis instead. */
+/** The graph palette: a lightness ramp on the brand axis, paper through taupe
+ *  to clay and two ink steps.
+ *
+ *  An earlier version of this block claimed to be "deliberately outside the
+ *  triage set" while shipping #D2A07E (amber), #B5765F (red-orange, adjacent in
+ *  hue to --cat-urgent) and #7FA8A0 (green) — and a clinician reading an orange
+ *  node beside a red node on an evidence graph reads severity. The documented
+ *  "reagraph needs literals" exception covers where the values LIVE; it does not
+ *  license which hues are allowed.
+ *
+ *  The three large classes (305 each) take the most separated values. The four
+ *  small ones (6/6/2/1) are separated by SIZE, which the legend's count column
+ *  disambiguates anyway. */
 const KIND = {
   decision:       { fill: '#FAFAF8', label: 'Decision',           size: 20 },
   placement:      { fill: '#C4B6A6', label: 'Ranked placement',   size: 6 },
-  score:          { fill: '#6E86C4', label: 'Urgency score',      size: 5 },
-  referral_state: { fill: '#8A7FA8', label: 'Referral state',     size: 5 },
-  bed_status:     { fill: '#B5765F', label: 'Ward bed status',    size: 15 },
-  clinic_session: { fill: '#D2A07E', label: 'Clinic session',     size: 15 },
-  rule:           { fill: '#7FA8A0', label: 'Rule',               size: 13 },
-  obs:            { fill: '#6E86C4', label: 'Observation',        size: 5 },
-  condition:      { fill: '#8A8577', label: 'Condition',          size: 5 },
-  triage_event:   { fill: '#8A8577', label: 'Triage event',       size: 5 },
+  score:          { fill: '#8C93AD', label: 'Urgency score',      size: 5 },
+  referral_state: { fill: '#5B6480', label: 'Referral state',     size: 5 },
+  bed_status:     { fill: '#7A5B4D', label: 'Ward bed status',    size: 15 },
+  clinic_session: { fill: '#9C7C6B', label: 'Clinic session',     size: 15 },
+  rule:           { fill: '#E4DED4', label: 'Rule',               size: 13 },
+  obs:            { fill: '#8C93AD', label: 'Observation',        size: 5 },
+  condition:      { fill: '#6E6559', label: 'Condition',          size: 5 },
+  triage_event:   { fill: '#6E6559', label: 'Triage event',       size: 5 },
   evidence:       { fill: '#4A5470', label: 'Evidence',           size: 5 },
 } as const
 
+/* Edge roles, on the same axis. Nothing here may read as a severity. */
 const ROLE = {
-  hasPlacement: '#3A4570',
-  urgency:      '#5D74AE',
-  capacity:     '#9A6552',
-  timeframe:    '#776D92',
+  hasPlacement: '#2E3757',
+  urgency:      '#6E7796',
+  capacity:     '#7A5B4D',
+  timeframe:    '#57607C',
   multi_list:   '#4A5470',
 } as const
 
@@ -136,12 +150,12 @@ export function CohortGraphSurface({ hospital, date, onOpenPatient }: {
         <ul className="cg-legend">
           {shares.map(([kind, count]) => {
             const k = KIND[kind as keyof typeof KIND] ?? KIND.evidence
-            const pct = g.data ? (count / g.data.nodes.length) * 100 : 0
             return (
               <li key={kind}>
                 <i style={{ background: k.fill }} aria-hidden />
                 <span className="cg-lg-n">{k.label}</span>
-                <span className="cg-lg-bar"><b style={{ width: `${pct}%`, background: k.fill }} /></span>
+                {/* no share bar: five of seven classes are 6, 6, 2 and 1, so
+                    the bars rendered as 1px stubs and informed nobody */}
                 <span className="cg-lg-c num">{count}</span>
               </li>
             )
