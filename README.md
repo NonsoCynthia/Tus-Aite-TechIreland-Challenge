@@ -33,7 +33,10 @@ Start with [dataset/docs/GETTING_THE_DATA.md](dataset/docs/GETTING_THE_DATA.md).
 - Calibrates case mix against Irish healthcare structures, including HIPE specialty, age, sex, and
   length-of-stay statistics.
 - Calibrates list volumes and waiting-time bands against NTPF Open Data.
-- Labels every generated record as synthetic in the graph and the UI.
+- Carries an explicit synthetic-data notice with the dataset itself: the Hugging Face card
+  opens with "Every record here is synthetic. No real patient, clinician or hospital is
+  represented", and `dataset/README.md` says the same. The notice travels with the data
+  rather than being stamped on each record in the graph or repeated on every screen.
 - Uses seeded random generation so the same seed produces the same cohort for testing and demos.
 
 Implementation tools: Python 3.12, Pydantic v2, pandas, numpy, rdflib.
