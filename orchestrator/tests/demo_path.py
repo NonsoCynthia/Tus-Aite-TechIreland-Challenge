@@ -53,6 +53,22 @@ check("brand favicon wired", "tus-aite-favicon" in html)
 
 print("\n3. the cohort loads")
 cohort = get(f"/api/cohort/{HOSP}/{DATE}")["referrals"]
+
+# Every count below is pinned to the `sample` profile at 9001 on this date. That
+# is deliberate: a silent change in the data is exactly what these numbers exist
+# to catch. But `full` is a legitimate thing to be running -- the dataset track
+# tells you to use it for anything you show people -- and on it these pins fail
+# on the counts alone, twelve times, with nothing saying why. So say why once,
+# here, and let them fail.
+if len(cohort) != 308:
+    print(f"""
+  NOTE  This cohort holds {len(cohort)} referrals, not the 308 this suite is pinned to.
+        Every count below is written for the `sample` profile at hospital {HOSP} on
+        {DATE}. If you loaded `full` (make load FETCH_PROFILE=full) the counts
+        below are expected to fail, and the failures are the pins, not the system.
+        Update them from this run, or re-load the sample to compare like with like.
+""")
+
 check("308 referrals", len(cohort) == 308, f"got {len(cohort)}")
 with_target = [r for r in cohort if r["crt_threshold_days"] is not None]
 breached = [r for r in cohort if r["crt_breached"] is True]
