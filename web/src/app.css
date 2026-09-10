@@ -158,38 +158,13 @@
 .tile { background: var(--surface); padding: var(--pad); }
 /* clay marks ONE element per composition -- here, the breach tile only. */
 .tile.is-accent { box-shadow: inset 3px 0 0 var(--clay); }
-.tile-fig {
-  font-family: var(--font-brand); font-weight: 300;
-  font-size: 34px; line-height: 1.05; letter-spacing: -0.02em;
-}
-.tile-label { font-size: var(--t-body); margin-top: 4px; }
-.tile-note { font-size: var(--t-small); color: var(--text-2); margin-top: 6px; line-height: 1.4; }
-
-/* --- furthest past target ------------------------------------------------ */
-.worst {
-  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
-  padding: 14px 20px; border: 1px solid var(--rule);
-  background: var(--surface-2); margin-bottom: 26px;
-}
-.worst-k {
-  font-family: var(--font-brand); font-size: var(--t-small);
-  text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-2);
-}
-.worst-v { font-size: var(--t-body); }
 .big { font-family: var(--font-brand); font-size: 26px; font-weight: 300; }
 
 /* --- band distribution --------------------------------------------------- */
 .bands { display: grid; gap: 6px; max-width: 720px; }
-.band-row { display: grid; grid-template-columns: 130px 1fr 52px; align-items: center; gap: 12px; }
-.band-name { font-size: var(--t-body); }
-.band-track { height: 10px; background: var(--bg-sunk); display: block; }
-.band-fill { display: block; height: 100%; }
-.band-n { text-align: right; font-size: var(--t-body); }
 /* triage hues, reserved. every band also carries its name, so colour is never alone. */
 .cat-urgent      { background: var(--cat-urgent); }
-.cat-semiurgent  { background: var(--cat-semi); }
 .cat-routine     { background: var(--cat-routine); }
-.cat-uncategorised { background: var(--cat-uncat); }
 
 /* --- the spine, derived from the mark ------------------------------------ */
 .spine { position: relative; display: inline-block; height: 18px; vertical-align: middle; }
@@ -230,57 +205,22 @@
   border: 1px solid var(--rule); border-left: 3px solid var(--clay);
   background: var(--surface); padding: var(--pad); margin-bottom: 26px;
 }
-.stale-lead { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-.stale-lab { font-size: var(--t-body); color: var(--text-2); }
-.stale-p {
-  margin: 8px 0 0; max-width: 76ch; font-size: var(--t-body);
-  line-height: 1.6; color: var(--text-2);
-}
-.stale-p strong { color: var(--text); }
 
 /* --- wards ---------------------------------------------------------------- */
 .wards { margin-bottom: 26px; }
-.ward-grid {
-  /* 7 wards, 7 columns: the count is fixed by the hospital, so the row always
-     fills and nothing sits alone. Wraps to 4 then 2 on narrower screens. */
-  display: grid; grid-template-columns: repeat(7, 1fr);
-  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
-}
-@media (max-width: 1100px) { .ward-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (max-width: 620px)  { .ward-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 1100px) { }
+@media (max-width: 620px)  { }
 .ward { background: var(--surface); padding: 12px 12px 13px; }
-.ward-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .ward-id { font-size: var(--t-small); color: var(--text-2); letter-spacing: 0.02em; }
 /* TrolleyGAR is the HSE's own Green/Amber/Red instrument, so it keeps those
    hues legitimately. It is always named in words as well, and the swatch stays
    small so it never competes with a triage category chip. */
 .gar { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-2); }
 .gar i { width: 8px; height: 8px; flex: none; }
-.gar-G i { background: var(--cat-routine); }
-.gar-A i { background: var(--cat-semi); }
-.gar-R i { background: var(--cat-urgent); }
-.ward-track {
-  position: relative; height: 8px; background: var(--bg-sunk);
-  margin: 10px 0 8px; overflow: hidden;
-}
-.ward-fill { position: absolute; inset: 0 auto 0 0; background: var(--text-3); }
-.ward-safe {
-  position: absolute; top: -3px; bottom: -3px; width: 1px;
-  background: var(--text); opacity: 0.55;
-}
-.ward-bottom { display: flex; flex-direction: column; gap: 2px; }
 .ward-pct { font-family: var(--font-brand); font-size: 21px; font-weight: 300; line-height: 1.1; }
-.ward-tr { font-size: 11px; color: var(--text-2); line-height: 1.3; }
-.ward-tr strong { color: var(--text); }
 
 /* --- surface nav ---------------------------------------------------------- */
 .surfaces { display: flex; gap: 2px; margin-left: 8px; }
-.surf {
-  font: inherit; font-size: var(--t-small); color: var(--text-2);
-  background: none; border: 0; border-bottom: 2px solid transparent;
-  padding: 8px 12px; cursor: pointer;
-}
-.surf:hover { color: var(--text); }
 .surf.is-on { color: var(--text); border-bottom-color: var(--clay); }
 
 /* --- category tabs -------------------------------------------------------- */
@@ -302,8 +242,6 @@
 }
 .tab:hover { color: var(--text); }
 .tab[data-state="active"] { color: var(--text); border-bottom-color: var(--text); }
-.tab-swatch { width: 9px; height: 9px; flex: none; }
-.tab-n { color: var(--text-3); font-size: var(--t-small); }
 .tab[data-state="active"] .tab-n { color: var(--text-2); }
 .cat-outside { background: var(--cat-outside); }
 .panel-note {
@@ -311,7 +249,6 @@
   margin: 0 0 12px; max-width: 78ch; line-height: 1.5;
 }
 .panel-note strong { color: var(--text); }
-.pad-y { padding: 20px 0; }
 
 /* --- the rows ------------------------------------------------------------- */
 .rows { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -321,11 +258,6 @@
   vertical-align: bottom;
 }
 .th-sub { display: block; font-weight: 400; letter-spacing: 0; color: var(--text-3); }
-.c-rank { width: 62px; text-align: right; }
-.c-id   { width: 190px; }
-.c-wait { width: 210px; }
-.c-n2   { width: 210px; }
-.c-why  { width: auto; }
 .row { border-bottom: 1px solid var(--rule); height: var(--row-h); }
 .row:hover { background: var(--surface-2); }
 .row td { padding: 6px 10px; vertical-align: middle; }
@@ -337,17 +269,6 @@
 .wait-n, .n2 { font-size: var(--t-data); font-weight: 600; }
 .n2 .of { font-weight: 400; color: var(--text-2); font-size: 11px; }
 .over { color: var(--cat-urgent); font-weight: 600; }
-/* a normal reading over a year old is an absence of information, so it is
-   marked as a caveat rather than left to read as reassurance */
-.stale-flag { color: var(--clay); }
-.stale-flag strong { color: var(--clay); }
-
-/* --- contribution: both terms, never the weight alone --------------------- */
-.contrib { display: grid; gap: 3px; max-width: 260px; }
-.contrib-row { display: grid; grid-template-columns: 46px 1fr; align-items: center; gap: 8px; }
-.contrib-lab { font-size: 10px; color: var(--text-3); letter-spacing: 0.03em; }
-.contrib-track { height: 6px; background: var(--bg-sunk); display: block; }
-.contrib-track i { display: block; height: 100%; background: var(--text-3); }
 .contrib-track i.is-wait { background: var(--clay); }
 
 /* --- pagination ----------------------------------------------------------- */
@@ -356,7 +277,6 @@
   gap: 16px; flex-wrap: wrap; padding: 14px 2px 0;
 }
 .pager-of { font-size: var(--t-small); color: var(--text-2); }
-.pager-btns { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
 .pg {
   font: inherit; font-size: var(--t-small); color: var(--text-2);
   background: var(--surface); border: 1px solid var(--rule-firm);
@@ -411,8 +331,6 @@
 .j-mark.is-early { align-items: flex-start; text-align: left; transform: none; }
 .j-mt { font-size: 11px; color: var(--text); margin-top: 6px; line-height: 1.25; }
 .j-md { font-size: 10px; color: var(--text-2); }
-.j-silence-note { font-size: 11px; color: var(--text-2); margin: 2px 0 0; line-height: 1.5; }
-.j-silence-note strong { color: var(--clay); }
 
 /* --- patient ------------------------------------------------------------- */
 .back {
@@ -420,19 +338,10 @@
   background: none; border: 0; padding: 0 0 14px; cursor: pointer;
 }
 .back:hover { color: var(--text); }
-.p-head {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 24px; flex-wrap: wrap; margin-bottom: 22px;
-}
-.p-head h1 { font-size: 24px; }
-.p-sub { display: flex; align-items: center; gap: 12px; margin-top: 6px; font-size: var(--t-small); flex-wrap: wrap; }
 .chip {
   display: inline-block; padding: 3px 9px; font-size: 11px;
   color: var(--paper); letter-spacing: 0.02em;
 }
-.p-wait { text-align: right; }
-.p-wait-n { font-family: var(--font-brand); font-size: 40px; font-weight: 300; line-height: 1; }
-.p-wait-l { font-size: var(--t-small); color: var(--text-2); margin-top: 3px; }
 .p-sec { margin-bottom: 28px; }
 .p-note { font-size: var(--t-small); color: var(--text-2); max-width: 76ch; line-height: 1.55; margin: 10px 0 0; }
 .p-note strong { color: var(--text); }
@@ -441,23 +350,11 @@
 .vital { background: var(--surface); padding: 12px 14px; }
 /* a cited vital carries a clay underline: the agent actually used this one */
 .vital.is-cited { box-shadow: inset 0 -2px 0 var(--clay); }
-.vital-k { font-size: 11px; color: var(--text-2); line-height: 1.3; }
-.vital-v { font-family: var(--font-brand); font-size: 20px; font-weight: 300; margin-top: 4px; }
-.notread { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.chip-x {
-  border: 1px solid var(--rule-firm); background: var(--surface);
-  padding: 5px 10px; font-size: var(--t-small); color: var(--text-2);
-}
-.chip-x strong { color: var(--text); }
 .warn {
   border-left: 3px solid var(--clay); background: var(--surface-2);
   padding: 12px 16px; max-width: 76ch; font-size: var(--t-body); line-height: 1.55;
 }
 .row.is-clickable { cursor: pointer; }
-
-/* --- the run -------------------------------------------------------------- */
-.run-panel { border: 1px solid var(--rule); background: var(--surface); padding: 22px 24px; max-width: 920px; }
-.run-top { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 20px; }
 .run-btn {
   font-family: var(--font-brand); font-size: 15px; font-weight: 400;
   color: var(--paper); background: var(--ink); border: 1px solid var(--ink);
@@ -465,7 +362,6 @@
 }
 .run-btn:hover:not(:disabled) { background: #1b2d6e; }
 .run-btn:disabled { opacity: 0.55; cursor: default; }
-.run-meta { font-size: var(--t-small); color: var(--text-2); }
 .run-id { color: var(--text-3); }
 
 /* steps when data arrives; never interpolates between polls */
@@ -474,7 +370,6 @@
   display: block; height: 100%; background: var(--clay);
   transition: width var(--t-fast) linear;
 }
-.run-count { margin-top: 8px; font-size: var(--t-small); color: var(--text-2); }
 .run-n { font-family: var(--font-brand); font-size: 22px; font-weight: 300; color: var(--text); }
 .run-of { color: var(--text-2); }
 
@@ -483,17 +378,14 @@
   display: grid; grid-template-columns: 18px 150px 1fr auto; align-items: center;
   gap: 12px; padding: 12px 14px; background: var(--surface); font-size: var(--t-small);
 }
-.lane-dot { width: 9px; height: 9px; background: var(--rule-firm); }
 .lane.is-live .lane-dot { background: var(--clay); }
 .lane.is-done .lane-dot { background: var(--text-3); }
-.lane-a { color: var(--text-2); }
 .lane.is-live .lane-a, .lane.is-done .lane-a { color: var(--text); }
 .lane-r { color: var(--text-3); }
 .lane-s { color: var(--text-2); }
 .lane.is-todo { opacity: 0.55; }
 
 .run-done { margin-top: 22px; border-left: 3px solid var(--clay); background: var(--surface-2); padding: 16px 18px; }
-.run-done-h { font-size: var(--t-body); }
 .run-done-h .num { font-family: var(--font-brand); font-size: 20px; font-weight: 300; }
 .run-done-p { font-size: var(--t-small); color: var(--text-2); margin: 8px 0 14px; max-width: 76ch; line-height: 1.55; }
 .run-go {
@@ -504,17 +396,17 @@
 .run-go:hover { border-color: var(--text-3); }
 
 /* --- provenance graph: the one dark surface inside a light screen --------- */
-.prov { border: 1px solid var(--rule-firm); background: #0B1436; }
+.prov { border: 1px solid var(--rule-firm); background: var(--ink-deep); }
 .prov-canvas { position: relative; width: 100%; }
 .prov-note {
-  font-size: var(--t-small); color: #C4B6A6; margin: 0;
-  padding: 11px 16px; border-top: 1px solid rgba(196,182,166,0.18);
+  font-size: var(--t-small); color: var(--taupe); margin: 0;
+  padding: var(--d3) var(--d4); border-top: 1px solid var(--rule);
   max-width: none; line-height: 1.5;
 }
-.prov-note strong { color: #FAFAF8; }
+.prov-note strong { color: var(--paper); }
 .prov-load {
   display: flex; align-items: center; justify-content: center; height: 100%;
-  color: #8E93A8; font-size: var(--t-small);
+  color: var(--taupe); font-size: var(--t-small); opacity: 0.7;
 }
 
 /* --- the one modal -------------------------------------------------------- */
@@ -546,7 +438,6 @@
 .ovr-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 .ovr-go { padding: 9px 20px; font-size: var(--t-body); }
 .ovr-err { margin-top: 12px; }
-.p-actions { margin-left: auto; padding-right: 22px; }
 .flash {
   border-left: 3px solid var(--cat-routine); background: var(--surface-2);
   padding: 11px 16px; margin-bottom: 18px; font-size: var(--t-body);
@@ -594,31 +485,19 @@
   .landing-scrim { background: rgba(250,250,248,0.94); }
   .landing-lead { max-width: none; }
 }
-
-/* --- the run, dark: the one moment the system is visibly working ---------- */
-.run-dark {
-  background: var(--bg); color: var(--text);
-  min-height: calc(100vh - 58px);
-  padding: 12px 0 40px;
-}
 .run-dark .pad { padding-top: 28px; }
 .run-dark .lede h1 { color: var(--text); }
 .run-dark .lede-p { color: var(--text-2); }
-.run-dark .run-panel {
-  background: var(--surface); border-color: var(--rule);
-}
 .run-dark .run-btn {
   color: var(--ink); background: var(--taupe); border-color: var(--taupe);
 }
 .run-dark .run-btn:hover:not(:disabled) { background: #d3c8ba; }
-.run-dark .run-meta, .run-dark .run-count, .run-dark .lane-a { color: var(--text-2); }
 .run-dark .run-id, .run-dark .lane-r { color: var(--text-3); }
 .run-dark .run-n { color: var(--text); }
 .run-dark .run-bar { background: rgba(196,182,166,0.14); }
 .run-dark .run-bar i { background: var(--taupe); }
 .run-dark .lanes { background: var(--rule); border-color: var(--rule); }
 .run-dark .lane { background: var(--surface); }
-.run-dark .lane-dot { background: rgba(196,182,166,0.28); }
 .run-dark .lane.is-live .lane-dot { background: var(--taupe); }
 .run-dark .lane.is-done .lane-dot { background: rgba(196,182,166,0.55); }
 .run-dark .lane.is-live .lane-a, .run-dark .lane.is-done .lane-a { color: var(--text); }
@@ -637,33 +516,6 @@
 .run-dark .lane.is-live::after {
   content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
   background: var(--taupe);
-}
-
-/* --- pre-run: a real state, not an error --------------------------------- */
-.prerun {
-  position: relative; overflow: hidden; margin-bottom: 24px;
-  border: 1px solid var(--rule); min-height: 128px; display: flex; align-items: center;
-}
-.prerun img {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; object-position: 50% 62%;
-}
-.prerun-in {
-  position: relative; display: grid; gap: 5px; padding: 22px 26px; max-width: 62ch;
-  background: linear-gradient(90deg, rgba(250,250,248,0.95) 0%, rgba(250,250,248,0.86) 60%, rgba(250,250,248,0.2) 100%);
-}
-.prerun-in strong { font-size: var(--t-body); }
-.prerun-in span { font-size: var(--t-small); color: var(--text-2); }
-
-/* --- the breach tier boundary, which the sort key has and the copy lacked -- */
-.tier-edge td {
-  padding: 0; border: 0;
-  border-top: 2px solid var(--clay);
-  position: relative; height: 26px;
-}
-.tier-edge span {
-  position: absolute; left: 10px; top: 5px;
-  font-size: 11px; color: var(--clay); letter-spacing: 0.02em;
 }
 
 /* --- why this position: arithmetic, not assertion ------------------------ */
@@ -771,4 +623,17 @@
   font: inherit; font-size: var(--t-small); color: var(--text);
   background: rgba(255, 255, 255, 0.7); border: 1px solid var(--rule-firm);
   border-radius: var(--radius); padding: 0 var(--d3); min-height: 42px; max-width: 34ch;
+}
+
+/* A lost WebGL context leaves a black rectangle otherwise, which mid-demo reads
+   as a broken product rather than a dropped graphics context. */
+.prov-lost {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  gap: var(--d3); background: rgba(11, 20, 54, 0.9);
+  color: var(--taupe); font-size: var(--t-small);
+}
+.prov-lost button {
+  margin-left: var(--d2); background: var(--taupe); color: var(--ink-deep);
+  border: 0; border-radius: var(--radius); padding: 6px var(--d3);
+  font: inherit; font-size: var(--t-small); cursor: pointer;
 }

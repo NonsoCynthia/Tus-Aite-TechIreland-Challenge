@@ -272,14 +272,24 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
         </section>
       )}
 
-      {/* 5 — the recorded citation chain, unchanged */}
-      {dec.data && placed && (
+      {/* 5 — the chain. Cited where a run exists; on-record everywhere else.
+             A view-only day used to render nothing here at all, which read as a
+             missing feature rather than as the deliberate limit it is: evidence
+             is date-blind, so only the newest day can honestly be ranked, but
+             the referral and everything hanging off it exists on all 28. */}
+      {dec.data && placed ? (
         <section className="p-sec">
           <h2 className="sec-h">The chain behind this position
             <span className="sec-note">assembled from the recorded citations</span></h2>
           <Provenance pathway={pathway} decision={dec.data} scores={scores.data?.scores} />
         </section>
-      )}
+      ) : ctx.data ? (
+        <section className="p-sec">
+          <h2 className="sec-h">What is on record
+            <span className="sec-note">no agent has scored this day — nothing here was cited</span></h2>
+          <Provenance pathway={pathway} context={ctx.data} />
+        </section>
+      ) : null}
 
       {/* 6 — the edge of the instrument */}
       <Limits pathway={pathway} clinical={c ?? null}

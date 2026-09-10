@@ -264,8 +264,6 @@ function ReadoutBand({ s, d, noRun, ops, reference }: {
   const urgentDays = crtDays(reference, 1)
   const semiDays = crtDays(reference, 3)
   const wards = ops.data?.wards
-  const freeBeds = wards?.reduce((a, w) => a + (w.free ?? 0), 0)
-  const overSafe = wards?.filter((w) => w.occupancy_pct >= SAFE_OCCUPANCY).length
 
   return (
     <section className="ov-band" aria-label="Headline readouts">
@@ -285,11 +283,6 @@ function ReadoutBand({ s, d, noRun, ops, reference }: {
                n={d ? `read as ${d.capacity_direction} · ADR-007` : noRun ? 'not scored' : 'reading…'} />
       <Readout icon={Stethoscope} k="awaiting triage" v={fmt(s.awaitingTriage)}
                n={`${fmt(s.total - s.awaitingTriage)} triaged · ${fmt(s.suspended)} currently suspended`} />
-      <Readout icon={BedDouble} k="beds free now"
-               v={freeBeds == null ? '—' : fmt(freeBeds)}
-               n={overSafe == null
-                 ? (ops.isError ? 'the ward snapshots are unavailable' : 'reading the ward snapshots…')
-                 : `${overSafe} of ${wards?.length} wards at or over the ${SAFE_OCCUPANCY}% line`} />
     </section>
   )
 }
