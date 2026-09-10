@@ -528,7 +528,10 @@ export function List({ hospital, date, reference, onOpen }: {
 
   return (
     <div className="pad lst">
-      {flash && <div className="flash" role="status" aria-live="polite" aria-atomic="true">{flash}</div>}
+      {/* mounted unconditionally: a polite region has to be observed BEFORE its
+          text changes, or the first announcement is dropped */}
+      <div className="flash" role="status" aria-live="polite" aria-atomic="true"
+           hidden={!flash}>{flash}</div>
 
       <header className="lst-top">
         <div className="lst-title">
@@ -1104,7 +1107,7 @@ function Band(p: BandProps) {
                   label={p.outside ? 'Not ranked' : p.ranked ? 'Order' : 'Display'}
                   sub={p.outside ? 'no position' : p.ranked ? 'position in the list' : 'referral date'} />
               <Th k="priority" sort={p.sort} onSort={p.onSort}
-                  label="Balance" sub="unwell ← α → waited" />
+                  label="Balance" sub="unwell when measured ← α → waited" />
               <Th k="specialty" sort={p.sort} onSort={p.onSort}
                   label="Referral" sub="specialty" k2="pathway" sub2="pathway" />
               <Th k="wait" sort={p.sort} onSort={p.onSort}
@@ -1114,7 +1117,7 @@ function Band(p: BandProps) {
                 <span className="lst-th-s">the check that fired · core.ref_rules</span>
               </th>
               <Th k="news2" sort={p.sort} onSort={p.onSort}
-                  label="How unwell" sub="NEWS2" k2="age" sub2="reading age" />
+                  label="How unwell" sub="NEWS2 when measured" k2="age" sub2="reading age" />
               {!narrow && <th className="lst-th">
                 <span className="lst-th-l">Triage</span>
                 <span className="lst-th-s">status on this pathway</span>
@@ -1362,7 +1365,7 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
                 they read as leftover test data in a clinical list. */}
             {plantedCase(r.pathway_number) && (
               <span className="planted" title={plantedCase(r.pathway_number)!.why}>
-                planted · {plantedCase(r.pathway_number)!.what}
+                demo fixture · {plantedCase(r.pathway_number)!.what}
               </span>
             )}
           </span>

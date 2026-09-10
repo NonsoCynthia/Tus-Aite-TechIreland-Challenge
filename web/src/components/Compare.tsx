@@ -116,7 +116,7 @@ function ladder(a: Ranking, b: Ranking, alpha: number): Step[] {
   const tier = (r: Ranking, past: boolean): Cell =>
     r.crt_threshold_days == null
       ? { text: 'no target' }
-      : { text: past ? 'yes' : 'no', sev: sevBreach(!past) }
+      : { text: past ? 'past target' : 'within target', sev: sevBreach(!past) }
   out.push({
     rule: 'Past their target',
     a: tier(a, ta),

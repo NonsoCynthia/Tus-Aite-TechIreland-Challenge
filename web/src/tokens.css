@@ -63,8 +63,8 @@
 
         step   text on its own fill     fill against the page (--bg)
         sev-1        5.97:1                   1.09:1
-        sev-2        6.67:1                   1.13:1
-        sev-3        7.60:1                   7.60:1
+        sev-2        7.19:1                   1.36:1
+        sev-3        8.67:1                   8.67:1
         sev-4       11.07:1                  11.07:1
 
      The first published version of this table measured the fill column against
@@ -90,13 +90,14 @@
   --sev-1-bg:   #F5F0E6;   /* NOT --surface-2: step 1 was byte-identical to it, */
   --sev-1-edge: #BFB6A4;   /* so it vanished the moment a row was hovered       */
 
-  --sev-2-fg:   #664C40;   /* attention  text 6.67  fill-vs-page  1.13  tinted   */
-  --sev-2-bg:   #F3EBE6;
-  --sev-2-edge: #C9AB9B;
+  --sev-2-fg:   #523C31;   /* attention  text 7.19  fill-vs-page  1.36  tinted   */
+  --sev-2-bg:   #E6D5CB;   /* deepened: the old tint's EDGE was 2.15:1, under the */
+  --sev-2-edge: #B08D79;   /* 3:1 WCAG 1.4.11 floor for a meaningful object, and  */
+                           /* 71 of the 130 past-target referrals live at step 2  */
 
-  --sev-3-fg:   #FAFAF8;   /* high       text 7.60  fill-vs-page  7.60  SOLID    */
-  --sev-3-bg:   #794235;   /* moved off #6B5044: see the colour-vision note     */
-  --sev-3-edge: #794235;
+  --sev-3-fg:   #FAFAF8;   /* high       text 8.67  fill-vs-page  8.67  SOLID    */
+  --sev-3-bg:   #5A4438;   /* cooler and darker, off the green/brown line       */
+  --sev-3-edge: #5A4438;
 
   --sev-4-fg:   #FAFAF8;   /* severe     text 11.07 fill-vs-page 11.07  SOLID+ring */
   --sev-4-bg:   #47352D;
@@ -109,7 +110,10 @@
   --surface-2:  #F7F6F2;   /* a panel's own inner well                  */
   --text:       #122056;
   --text-2:     #545B6E;   /* AA on --surface at 14px                   */
-  --text-3:     #7C8290;   /* AA on --surface at 14px; labels only      */
+  /* was #7C8290 at 3.85:1 on white and 3.56 on --surface-2, i.e. NOT AA at any
+     of the sizes it is used at -- and it carries the paediatric REFUSED chip,
+     every "not recorded" flag and every uppercase eyebrow. */
+  --text-3:     #6B7183;   /* 4.87 on --surface, 4.50 on --surface-2    */
   --rule:       #E4E0D8;   /* the default hairline                      */
   --rule-firm:  #C9C3B7;   /* a divider that must be seen               */
   --accent:     #7A5B4D;   /* clay. ONE element per composition.        */

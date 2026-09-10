@@ -468,8 +468,14 @@
    so the bar and the numeral can never disagree. The two solid steps also grow
    the fill area rather than only changing it: 2px of extra height, drawn
    outside the track, so nothing reflows. */
-.wb-over { position: absolute; top: 0; bottom: 0; background: var(--sev-1-edge); }
-.wb[data-sev="2"] .wb-over { background: var(--sev-2-edge); }
+/* The SAME inversion the review caught in SevBar, in a second place: this bar
+   borrowed the chip's steps 1 and 2, which are a hairline and a tint because
+   they sit behind text. Against the track they measure 1.78 and 1.90, while the
+   WITHIN-target segment beside them (--text-3) is 3.41 -- so a referral 1.5x
+   past its target drew a FAINTER overflow than the part of the bar still inside
+   the target. An overflow must never be quieter than what it overflows. */
+.wb-over { position: absolute; top: 0; bottom: 0; background: var(--clay); }
+.wb[data-sev="2"] .wb-over { background: var(--sev-3-bg); }
 .wb[data-sev="3"] .wb-over { background: var(--sev-3-bg); top: -1px; bottom: -1px; }
 .wb[data-sev="4"] .wb-over { background: var(--sev-4-bg); top: -1px; bottom: -1px; }
 .wb-mark {

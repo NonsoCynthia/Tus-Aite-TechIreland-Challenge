@@ -251,7 +251,8 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
         </div>
       </header>
 
-      {flash && <div className="flash" role="status" aria-live="polite" aria-atomic="true">{flash}</div>}
+      <div className="flash" role="status" aria-live="polite" aria-atomic="true"
+           hidden={!flash}>{flash}</div>
 
       {/* Eight of the 308 are fixtures the dataset track plants at fixed pathway
           numbers because the demo depends on them existing. Saying what each one
@@ -506,7 +507,7 @@ function WhyHere({ placed, decision, reference, ages, compare, onCompare, onClos
 
       <div className="why-sum">
         <div className="why-row">
-          <span className="why-k">how unwell</span>
+          <span className="why-k">how unwell when measured</span>
           <span className="why-b"><i style={{ width: `${uTerm * 100}%` }} /></span>
           <span className="why-v num">{n3(a)} &times; {n3(placed.urgency_score)} = {n3(uTerm)}</span>
         </div>

@@ -368,11 +368,24 @@
   font-size: var(--t-micro); color: var(--text);
 }
 .ov-occ-w { font-weight: 400; }
-.ov-gar { display: inline-flex; align-items: center; gap: 5px; font-size: var(--t-micro); color: var(--text-2); }
-.ov-gar i { width: 8px; height: 8px; flex: none; }
-.ov-gar.is-G i { background: var(--cat-routine); }
-.ov-gar.is-A i { background: var(--cat-semi); }
-.ov-gar.is-R i { background: var(--cat-urgent); }
+/* TrolleyGAR, drawn as a bordered word rather than a filled swatch.
+
+   This was the last place in the product giving GAR a coloured mark, and it put
+   --cat-routine green in the SAME table row as an occupancy severity block --
+   five columns apart. Simulated under protanopia those two hues were one hue,
+   so a reader saw "ward escalation is Green" and "occupancy is high" in the same
+   colour. The patient page already draws GAR as ink weight plus pips and argues
+   for exactly this in its own docstring; the ward table is now consistent with
+   it. The status word was always there and now carries the whole signal. */
+.ov-gar {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--t-micro); padding: 1px var(--d2);
+  border: 1px solid var(--rule-firm); border-radius: var(--radius);
+  color: var(--text-2);
+}
+.ov-gar i { display: none; }
+.ov-gar.is-A { color: var(--text); border-color: var(--text-3); }
+.ov-gar.is-R { color: var(--text); border-color: var(--text); font-weight: 600; }
 
 @media (max-width: 700px) {
   .ov-nat-line { grid-template-columns: 56px minmax(0, 1fr); }
