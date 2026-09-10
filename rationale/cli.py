@@ -33,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="text",
         help="Output format. Defaults to text.",
     )
+    parser.add_argument(
+        "--style",
+        choices=["technical", "clinician"],
+        default="technical",
+        help="Rationale wording style. Defaults to technical.",
+    )
     return parser
 
 
@@ -54,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             decision = client.get_decision(args.hospital, args.as_of)
             packs = packs_from_decision_response(decision)
-    rationales = render_many(packs)
+    rationales = render_many(packs, style=args.style)
 
     if args.format == "json":
         print(json.dumps([asdict(rationale) for rationale in rationales], indent=2))

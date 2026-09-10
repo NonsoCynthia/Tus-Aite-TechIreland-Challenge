@@ -17,7 +17,7 @@ The `rationale/` package now contains:
 | `config.py` | Reads the repo-root `.env` and finds retrieval settings. |
 | `models.py` | Defines `EvidenceItem`, `EvidencePack`, and `Rationale`. |
 | `evidence_pack.py` | Converts `GET /decisions/...` responses into evidence packs. |
-| `render.py` | Deterministically renders concise rationale text from cited evidence. |
+| `render.py` | Deterministically renders technical audit text or clinician prose from cited evidence. |
 | `cli.py` / `__main__.py` | Runs rationale generation from the command line. |
 | `tests/` | Unit tests for packing, rendering, config, client, and CLI behavior. |
 
@@ -52,9 +52,40 @@ The `--pathway` mode now calls the single-placement evidence endpoint directly i
 whole hospital-day decision and filtering locally. This avoids timeouts on larger ranked lists, because
 retrieval resolves evidence only for the requested pathway.
 
+The CLI also supports switchable wording styles:
+
+| Style | Use |
+|---|---|
+| `technical` | Default. Shows grouped evidence nodes and resolved properties for audit/debug use. |
+| `clinician` | Plain prose for clinician review, without evidence-node IDs in the visible text. |
+
 The upstream coordinator/retrieval path was also aligned for rationale evidence: retrieval exposes
 `referral_state_valid_from` in cohort rows, and the coordinator uses it for `referral_state` citations.
 That matches the KG's `ReferralState` IRI template and lets CPC/CRT rationale evidence resolve.
+
+## Current Collaborator Status
+
+The rationale layer is implemented as a deterministic CLI, not an LLM service. It reads resolved
+evidence from retrieval, builds one evidence pack per ranked placement, and renders either technical
+audit output or clinician-facing prose. The default style is `technical`; pass `--style clinician` for
+plain prose suitable for review.
+
+What has been done:
+
+- Added the `rationale/` package with a retrieval client, evidence-pack models, renderer, CLI, tests,
+  and this README.
+- Added `rationale/Dockerfile` and a `docker compose run --rm rationale ...` workflow for teammates.
+- Changed rationale `--pathway` mode to call `GET /evidence/{hospital}/{date}/{pathway}` directly, so
+  it avoids full-decision timeouts on larger ranked lists.
+- Changed retrieval cohort output to include `referral_state_valid_from`.
+- Changed coordinator `referral_state` citations to use `referral_state_valid_from`, so CPC/CRT
+  rationale evidence resolves to real `ReferralState` KG nodes.
+- Added switchable output styles: `technical` for audit/debug output with evidence nodes, and
+  `clinician` for readable prose grounded in the same cited evidence but without evidence-node IDs in
+  the visible text.
+
+Known local-data note: decisions already written before this change may still contain stale citations
+in old run graphs. New coordinator runs cite the corrected `ReferralState` date.
 
 ## Prerequisites
 
@@ -117,6 +148,16 @@ python -m rationale \
   --pathway PW-9004-000123
 ```
 
+Render clinician-facing prose:
+
+```bash
+python -m rationale \
+  --hospital 9004 \
+  --as-of 2026-08-30 \
+  --pathway PW-9004-000123 \
+  --style clinician
+```
+
 Run the same CLI through Docker Compose:
 
 ```bash
@@ -124,6 +165,16 @@ docker compose run --rm rationale \
   --hospital 9004 \
   --as-of 2026-08-30 \
   --pathway PW-9004-000123
+```
+
+Compose with clinician-facing prose:
+
+```bash
+docker compose run --rm rationale \
+  --hospital 9004 \
+  --as-of 2026-08-30 \
+  --pathway PW-9004-000123 \
+  --style clinician
 ```
 
 Return machine-readable output:

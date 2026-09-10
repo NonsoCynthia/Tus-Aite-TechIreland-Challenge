@@ -210,5 +210,8 @@ Retrieval now exposes `referral_state_valid_from` in coordinator cohort rows, an
 that value when citing `ReferralState` evidence. This was added for rationale so CPC/CRT evidence points
 at real KG state nodes rather than using `referral_date`, which is not the `ReferralState` identifier.
 
+Detailed rationale setup, usage, implementation notes, and collaborator status are in
+[`rationale/README.md`](rationale/README.md).
+
 See `conductor/product.md`, `conductor/tech-stack.md`, and
 `conductor/tracks/explainable-agent-based-triage_20260828/spec.md` for the detailed project plan.

@@ -79,3 +79,79 @@ def test_unresolved_evidence_is_reported_not_silently_dropped() -> None:
 
     assert "unresolved evidence" in rationale.text
     assert "properties were not resolved" in rationale.text
+
+
+def test_clinician_style_renders_accessible_prose() -> None:
+    pack = EvidencePack(
+        decision="decision/9001/2026-08-30",
+        placement="placement/9001/2026-08-30/PW-9001-000007",
+        position=None,
+        referral=None,
+        pathway_number="PW-9001-000007",
+        evidence=(
+            EvidenceItem(
+                role="urgency",
+                iri="score/run-1/9001/PW-9001-000007/urgency",
+                type="Score",
+                properties={
+                    "scoreValue": "0.22499999999999998",
+                    "method": "urgency-news2-v1",
+                    "cites": "obs/9001/PW-9001-000007/2026-08-16%2009%3A16%3A00/spo2",
+                },
+            ),
+            EvidenceItem(
+                role="capacity",
+                iri="bed-status/9001/W-9001-04/2026-08-30%2020%3A00%3A00",
+                type="BedStatus",
+                properties={
+                    "statusOf": "ward/9001/W-9001-04",
+                    "occupancyPct": "83.52",
+                    "freeBeds": "15",
+                },
+            ),
+            EvidenceItem(
+                role="capacity",
+                iri="clinic-session/9001/CL-9001-1800/2026-08-28",
+                type="ClinicSession",
+                properties={
+                    "clinicName": "1800 outpatients",
+                    "sessionDate": "2026-08-28",
+                    "slotsAvailable": "12",
+                    "slotsTotal": "25",
+                },
+            ),
+            EvidenceItem(
+                role="timeframe",
+                iri="referral-state/9001/PW-9001-000007/2026-08-25",
+                type="ReferralState",
+                properties={
+                    "triageStatus": "triaged",
+                    "validFrom": "2026-08-25",
+                    "hasHighClinicalOrSocialNeeds": "false",
+                },
+            ),
+            EvidenceItem(
+                role="timeframe",
+                iri="rule/RULE-CRT-SEMI",
+                type="Rule",
+                properties={
+                    "statement": "A semi-urgent referral should be seen within 13 weeks",
+                    "thresholdDays": "91",
+                },
+            ),
+        ),
+    )
+
+    rationale = render_rationale(pack, style="clinician")
+
+    assert "Referral PW-9001-000007 is shown for clinician review" in rationale.text
+    assert "urgency score is 0.225 on a 0 to 1 scale" in rationale.text
+    assert "lower range" in rationale.text
+    assert "oxygen saturation observation" in rationale.text
+    assert "relevant ward was 83.52 percent occupied, with 15 beds free" in rationale.text
+    assert "12 of 25 slots available" in rationale.text
+    assert "triaged from 2026-08-25" in rationale.text
+    assert "semi-urgent referral should be seen within 13 weeks" in rationale.text
+    assert "Evidence nodes:" not in rationale.text
+    assert "score/run-1" not in rationale.text
+    assert "bed-status/9001" not in rationale.text

@@ -107,3 +107,36 @@ def test_cli_pathway_uses_single_placement_evidence_endpoint(
     assert "Ranked placement" in captured.out
     assert "bed-status/9004/W1/2026-08-30%2008%3A00%3A00" in captured.out
     assert FakeClient.calls == ["evidence"]
+
+
+def test_cli_supports_clinician_style(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    FakeClient.calls = []
+    monkeypatch.setattr(
+        cli,
+        "load_settings",
+        lambda: Settings(retrieval_base_url="http://testserver", bearer_token="token-1"),
+    )
+    monkeypatch.setattr(cli, "RetrievalClient", FakeClient)
+
+    assert (
+        cli.main(
+            [
+                "--hospital",
+                "9004",
+                "--as-of",
+                "2026-08-30",
+                "--pathway",
+                "PW-9004-000123",
+                "--style",
+                "clinician",
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert "shown for clinician review" in captured.out
+    assert "beds free" in captured.out
+    assert "Evidence nodes:" not in captured.out
