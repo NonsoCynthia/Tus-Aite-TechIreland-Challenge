@@ -93,8 +93,9 @@ Implementation tools: Python 3.12, SPARQL over Oxigraph, rdflib/httpx.
 - Names the exact urgency signals, capacity constraints, CPC category, and CRT status.
 - Prevents the language model from changing scores, changing rank, or introducing unsupported facts.
 
-Implementation tools: Anthropic Python SDK, `claude-opus-5`, prompt caching, Message Batches API for
-bulk validation runs.
+Current implementation tools: Python 3.12, httpx, deterministic template rendering. Planned wording
+layer: Anthropic Python SDK, `claude-opus-5`, prompt caching, Message Batches API for bulk validation
+runs.
 
 ### 8. Clinician Interface
 
@@ -143,20 +144,26 @@ Implementation tools: uv, Docker Compose, pytest, pytest-cov, ruff, mypy, GitHub
 ## Architecture Summary
 
 ```text
-Synthetic referrals + bed simulation
+dataset/ Synthetic referrals + bed simulation
         |
         v
-RDF/OWL knowledge graph in Oxigraph
+kg/ RDF/OWL knowledge graph in Oxigraph
         |
-        +--> Urgency agent: MTS/NEWS2 scoring
+        +--> urgency-agent/ MTS/NEWS2 scoring
         |
-        +--> Capacity agent: bed/resource pressure scoring
-        |
-        v
-Coordinating agent: ranked list + Decision/cites triples
+        +--> capacity-agent/ bed/resource pressure scoring
         |
         v
-FastAPI + Jinja2 + HTMX clinician interface
+coordinator/ ranked list + Decision/cites triples
+        |
+        v
+retrieval/ FastAPI mediator over Postgres + Oxigraph
+        |
+        v
+rationale/ technical audit output or clinician prose
+        |
+        v
+planned clinician interface
         |
         v
 Clinician accept/reorder/override, logged back to graph
@@ -195,15 +202,47 @@ the graph. Per ADR-002, agents never write to Postgres or the graph directly —
 (already built) is the single mediator: `POST /scores`/`/decisions`/`/overrides` write `agent.*` first,
 then synchronously project the matching triples into the graph on success.
 
+## Common Make Targets
+
+The root `Makefile` wraps the common local commands so collaborators do not need to remember long
+Docker invocations.
+
+| Target | Purpose |
+|---|---|
+| `make up` | Start Postgres, pgAdmin, Oxigraph, and retrieval. |
+| `make load FETCH_PROFILE=sample` | Load the dataset into Postgres. |
+| `make kg-views` | Create/update the KG SQL view and loader role. |
+| `make build` | Build loader, retrieval, and rationale images. |
+| `make urgency-run` | Run the urgency agent for `HOSPITAL`, `AS_OF`, and `RUN_ID`. |
+| `make capacity-run` | Run the capacity agent for the same inputs. |
+| `make coordinator-run` | Post a ranked decision using the scores for that `RUN_ID`. |
+| `make rationale-run` | Render rationale output for a hospital/date, optionally one `PATHWAY`. |
+| `make demo-run` | Run urgency, capacity, coordinator, then rationale in sequence. |
+
+Common variables:
+
+```bash
+make demo-run \
+  HOSPITAL=9001 \
+  AS_OF=2026-08-30 \
+  RUN_ID=run-9001-rationale-001 \
+  PATHWAY=PW-9001-000007 \
+  RATIONALE_STYLE=clinician
+```
+
+`RATIONALE_STYLE` accepts `technical` or `clinician`. `CAPACITY_DIRECTION` defaults to `pressure`.
+`demo-run` uses `PATHWAY` when provided; otherwise it renders `PW-$(HOSPITAL)-000007`.
+
 ## Rationale Layer Change
 
 The rationale layer can now be run through Docker Compose as a CLI container:
 
 ```bash
-docker compose run --rm rationale \
-  --hospital 9001 \
-  --as-of 2026-08-30 \
-  --pathway PW-9001-000007
+make rationale-run \
+  HOSPITAL=9001 \
+  AS_OF=2026-08-30 \
+  PATHWAY=PW-9001-000007 \
+  RATIONALE_STYLE=clinician
 ```
 
 Retrieval now exposes `referral_state_valid_from` in coordinator cohort rows, and the coordinator uses

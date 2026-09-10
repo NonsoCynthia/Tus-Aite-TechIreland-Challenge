@@ -125,7 +125,38 @@ python -m coordinator \
 
 ## Run Rationale Generation
 
-Install local dependencies:
+Recommended from the repo root:
+
+```bash
+make rationale-run \
+  HOSPITAL=9001 \
+  AS_OF=2026-08-30 \
+  PATHWAY=PW-9001-000007 \
+  RATIONALE_STYLE=clinician
+```
+
+Render technical audit output instead:
+
+```bash
+make rationale-run \
+  HOSPITAL=9001 \
+  AS_OF=2026-08-30 \
+  PATHWAY=PW-9001-000007 \
+  RATIONALE_STYLE=technical
+```
+
+Run the full local scoring/ranking/rationale sequence:
+
+```bash
+make demo-run \
+  HOSPITAL=9001 \
+  AS_OF=2026-08-30 \
+  RUN_ID=run-9001-rationale-001 \
+  PATHWAY=PW-9001-000007 \
+  RATIONALE_STYLE=clinician
+```
+
+Direct local Python usage is also supported. Install dependencies:
 
 ```bash
 python3 -m venv .venv-rationale
@@ -184,6 +215,12 @@ python -m rationale --hospital 9004 --as-of 2026-08-30 --format json
 ```
 
 ## Test It
+
+```bash
+make rationale-check
+```
+
+Equivalent direct commands:
 
 ```bash
 python -m pytest rationale/tests/ -q

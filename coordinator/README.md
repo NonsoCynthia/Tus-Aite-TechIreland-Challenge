@@ -45,6 +45,17 @@ python -m coordinator \
   --dry-run
 ```
 
+Collaborators can run the posted-decision path through the root `Makefile` without setting up a local
+Python environment:
+
+```bash
+make coordinator-run \
+  HOSPITAL=9001 \
+  AS_OF=2026-08-30 \
+  RUN_ID=run-0001 \
+  CAPACITY_DIRECTION=pressure
+```
+
 `--capacity-direction` is **required, with no default**, and the CLI refuses to start without it.
 `capacity_score` is a 0-1 float whose direction (does 1.0 mean "most capacity free" or "maximum
 pressure"?) is a choice, not a law of nature -- read backwards, the whole system's behaviour under
