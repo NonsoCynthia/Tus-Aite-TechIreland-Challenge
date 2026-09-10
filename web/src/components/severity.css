@@ -302,6 +302,21 @@
    these are words in their own case. It is also the size floor, which is right
    for a strip that must be legible without pulling rank on the table. */
 .sevleg .sev { font-size: var(--t-small); }
+/* THE NOTE, WHICH IS NOW AN <Aside> AND NOT A <p>.
+   The class did not change and neither did one declaration in it, which is the
+   point: the strip is `display: flex; flex-wrap: wrap`, `flex: 1 0 100%` makes
+   this a full-width row, and the disclosure therefore occupies exactly the row
+   the paragraph did. Nothing beside it moves, open or shut, and the four
+   swatches and their labels above are untouched.
+
+   What this class owns is the note's TYPOGRAPHY: components/aside.css sets no
+   font-size, no colour and no measure, by contract, so that an Aside looks like
+   the prose it is placed in rather than like a component. The 12px and the 1.5
+   here are also what the toggle's target-size arithmetic is computed against --
+   an 18px line box, a 24px control, cancelled to 18px. See aside.css.
+
+   92ch is unchanged and still right: the revealed half is longer than the
+   visible one, and a measure is a property of reading, not of length. */
 .sevleg-n {
   flex: 1 0 100%; margin: 0; max-width: 92ch;
   font-size: var(--t-small); line-height: 1.5; color: var(--text-2);

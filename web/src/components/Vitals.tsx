@@ -2,6 +2,7 @@ import { Activity, Brain, Droplet, HeartPulse, Thermometer, TriangleAlert, Wind 
 import { VITALS, positionOf, scoreOf, type Band, type Vital } from '../lib/news2'
 import { sevNews2Sub, sevReadingAge, type Sev } from '../lib/severity'
 import { SevBar, SevChip } from './Severity'
+import { Aside } from './Aside'
 import type { Observation } from '../lib/types'
 
 /** NEWS2 as six instruments, not as a sentence.
@@ -197,8 +198,7 @@ export function Vitals({ obs, recordedTotal, agentTotal, when, ageDays, stats, c
           <strong>No observation on this referral.</strong>
           <p>
             NEWS2 needs six readings and there are none, so the urgency agent had nothing to
-            score. That is a data-quality gap, not a low score: the two are different states and
-            are never merged here.
+            score. That is a data-quality gap, not a low score.
           </p>
         </div>
       </div>
@@ -245,7 +245,6 @@ export function Vitals({ obs, recordedTotal, agentTotal, when, ageDays, stats, c
             <strong>These do not agree.</strong> The six sub-scores above add to{' '}
             <strong className="num">{computed}</strong>; the record carries{' '}
             <strong className="num">{recordedTotal}</strong>. Neither is shown as the answer.
-            The band table in <code>lib/news2.ts</code> or the recorded total has moved.
           </span>
         </p>
       )}
@@ -264,11 +263,16 @@ export function Vitals({ obs, recordedTotal, agentTotal, when, ageDays, stats, c
           </span>
         </p>
       )}
+      {/* A DEFINITION, and the same one on every refused referral: why a scale
+          that was declined is drawn at all. What a reader cannot be allowed to
+          miss is that nothing here was used, so that claim is the line that
+          stays; the reason the bands are on screen is the argument for it. */}
       {!applied && (
-        <p className="pt-mini">
+        <Aside className="pt-mini" label="why the bands are still drawn"
+               summary="NEWS2 was not applied here, so no sub-score above was used by anything.">
           The bands are drawn so you can see what was declined. NEWS2 is validated in adults and
-          the agent refused to run it, so no sub-score above was used by anything.
-        </p>
+          the agent refused to run it.
+        </Aside>
       )}
     </div>
   )

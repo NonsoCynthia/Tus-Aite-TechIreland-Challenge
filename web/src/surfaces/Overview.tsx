@@ -9,6 +9,7 @@ import {
   breachPhrase, crtDays, failed, isRefusedPaediatric, rule, ruleStatement, specialtyFull,
   specialtyName,
 } from '../lib/ref'
+import { Aside } from '../components/Aside'
 import { QUIET_OFF_DAY, SevBar, SevChip, SevLegend, SevQuiet } from '../components/Severity'
 import {
   SAFE_OCCUPANCY, SEV_INTEGRITY, sevBooked, sevBreach, sevOccupancy, sevReadingAge, type Sev,
@@ -490,12 +491,14 @@ function BeforeRanking({ date, runnable }: { date: string; runnable: string | nu
         <ListOrdered size={ICON} strokeWidth={1.9} aria-hidden />
         Nothing has been ranked for this day
       </h2>
+      {/* 352 characters, and most of them were an enumeration of the columns of
+          the table two inches below: who is waiting, which have a target, how
+          stale the readings are. A reader who can see the table does not need it
+          read out. What the table cannot say is who put those numbers there, and
+          what the agent columns do when nothing has run. That is what is left. */}
       <p>
-        This is the list before any ranking: who is waiting and for how long, which of them
-        have a target and which have none, how stale the readings are, and how much bed and
-        clinic room the hospital has. What is missing is the agents' account of it. There is
-        no α, no scarcity, no placement and no rule verdict, so those cells read "no run"
-        rather than zero.
+        Everything here was recorded by a clinician, not computed by an agent. With no run,
+        α, scarcity, placement and rule verdict read "no run" rather than zero.
       </p>
       <p className="ov-before-cta">
         {here ? (
@@ -519,7 +522,14 @@ function BeforeRanking({ date, runnable }: { date: string; runnable: string | nu
 /** D2. `core.bed_status` and `core.clinic_sessions` are read latest-first with
  *  no date predicate, so every one of the 14 hospital-days is served the same
  *  rows. The payload carries the true date on every ward and every clinic; the
- *  panel shows it, and says plainly when it is not the day selected. */
+ *  panel shows it, and says plainly when it is not the day selected.
+ *
+ *  `source` is a DEFINITION: the same data-model quirk on all 14 hospital-days,
+ *  and this component is placed on three panels, so on one screen it was three
+ *  copies of one paragraph. It is behind the disclosure. What is NOT behind it
+ *  is the reading's age (invariant 2): the span, the day selected, and the fact
+ *  that the two differ are the summary, and the chip beside them still carries
+ *  the date as a mark. Only the argument for why the date is what it is moved. */
 function AsOf({ what, taken, selected, source }: {
   what: string; taken: string[]; selected: string; source: string
 }) {
@@ -542,9 +552,10 @@ function AsOf({ what, taken, selected, source }: {
         <CalendarDays size={ICON} strokeWidth={2} aria-hidden />
         <span className="num">{span}</span>
       </SevChip>
-      <span>
-        {what} are as of {span}, not {longDate(selected)}, the day selected above. {source}
-      </span>
+      <Aside label="where this date comes from"
+             summary={<>{what} are as of {span}, not {longDate(selected)}, the day selected above.</>}>
+        {source}
+      </Aside>
     </div>
   )
 }
@@ -606,8 +617,20 @@ function Readout({ icon: Icon, k, v, unit, n, sev = 0 }: {
 
 /* --- panel chrome --------------------------------------------------------- */
 
-function Panel({ icon: Icon, title, note, cite, children }: {
+/** A caption is one line per panel and there are five of them on this page, so
+ *  it is the repetition rule's own case: a definition read once and re-read on
+ *  every later visit. `cite` is what STAYS -- the claim, the source, the thing
+ *  invariant 2 or invariant 10 puts on the caption in the first place -- and
+ *  `citeMore` is the argument for it, behind the toggle. A panel whose whole
+ *  caption is already a line passes `cite` alone and gets no toggle: a
+ *  disclosure over one short sentence is more chrome than the sentence. */
+function Panel({ icon: Icon, title, note, cite, citeLabel, citeMore, children }: {
   icon: typeof Gauge; title: string; note?: string; cite?: string
+  /** The toggle's visible text: a noun phrase naming what opens. */
+  citeLabel?: string
+  /** The half of the caption that is a definition. Omit it and `cite` renders
+   *  as plain text, exactly as it did before. */
+  citeMore?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
@@ -618,7 +641,17 @@ function Panel({ icon: Icon, title, note, cite, children }: {
         {note && <span className="ov-panel-note">{note}</span>}
       </h2>
       <div className="ov-panel-b">{children}</div>
-      {cite && <div className="ov-cite">{cite}</div>}
+      {cite && (
+        <div className="ov-cite">
+          {citeMore
+            ? (
+              <Aside label={citeLabel ?? 'where this figure comes from'} summary={cite}>
+                {citeMore}
+              </Aside>
+            )
+            : cite}
+        </div>
+      )}
     </section>
   )
 }
@@ -727,7 +760,7 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun, date }: {
           that figure is the 2026-08-28 session, which is in the FUTURE for 11
           of them. It is dated now, in the cell and here. */}
       {citedFallback.length > 0 && (
-        <AsOf what="The clinic sessions this table cites where the agents produced no figure"
+        <AsOf what="Clinic sessions cited with no agent figure"
               taken={citedFallback} selected={date}
               source="core.clinic_sessions is read latest-first with no date filter, so every hospital-day is served this same series. Those cells carry that date and are not graded: nothing computed a clinic pressure for the day selected." />
       )}
@@ -911,7 +944,9 @@ function NationalPanel({ s }: { s: ReturnType<typeof summarise> }) {
   return (
     <Panel icon={Layers} title="Against the national picture"
            note="adjusted wait, NTPF bands"
-           cite={`NTPF Outpatient Waiting List by Speciality · OpenData_OPNational02_2026.csv · snapshot ${NTPF_SNAPSHOT}, every row of it: ${fmt(NTPF_SPECIALTIES)} specialty labels over ${fmt(NTPF_ROWS)} adult and child rows, ${fmt(NTPF_TOTAL)} people by the file's Total column. Its four band columns sum to ${fmt(NTPF_BAND_TOTAL)}, ${NTPF_BAND_TOTAL - NTPF_TOTAL} more; that difference is inside the published file, and the national shares here are of the band sum they are counted from. Both sides are cut on the same day boundaries: 183 / 365 / 548.`}>
+           cite={`NTPF Outpatient Waiting List by Speciality · OpenData_OPNational02_2026.csv · snapshot ${NTPF_SNAPSHOT}.`}
+           citeLabel="how this file was counted"
+           citeMore={`Every row of it: ${fmt(NTPF_SPECIALTIES)} specialty labels over ${fmt(NTPF_ROWS)} adult and child rows, ${fmt(NTPF_TOTAL)} people by the file's Total column. Its four band columns sum to ${fmt(NTPF_BAND_TOTAL)}, ${NTPF_BAND_TOTAL - NTPF_TOTAL} more; that difference is inside the published file, and the national shares here are of the band sum they are counted from. Both sides are cut on the same day boundaries: 183 / 365 / 548.`}>
       <div className="ov-nat">
         {s.waitBands.map((b) => {
           const here = s.total ? b.here / s.total : 0
@@ -964,7 +999,9 @@ function IntakePanel({ days, date }: {
 
   return (
     <Panel icon={TrendingUp} title="Intake" note={note}
-           cite={`Net change per day. dataset/out/referral_daily.csv holds ${fmt(DAILY_ROWS)} rows and removal_date is null in every one, so net change is intake: nothing has ever left this list.`}>
+           cite="Net change per day is intake: nothing has ever left this list."
+           citeLabel="how intake is counted"
+           citeMore={`dataset/out/referral_daily.csv holds ${fmt(DAILY_ROWS)} rows and removal_date is null in every one of them.`}>
       <PanelState q={days}>
         {!first && <p className="ov-quiet">No day in this hospital's history holds a cohort.</p>}
         {first && last && (
@@ -1020,7 +1057,9 @@ function StalenessPanel({ ops }: {
   return (
     <Panel icon={Clock} title="Age of the newest reading"
            note={age ? `${fmt(age.n)} readings` : undefined}
-           cite="One set of vitals per person, taken when the referral letter arrived and never revisited. A normal reading this old is an absence of information, not reassurance.">
+           cite="A normal reading this old is an absence of information, not reassurance."
+           citeLabel="where these readings come from"
+           citeMore="One set of vitals per person, taken when the referral letter arrived and never revisited.">
       <PanelState q={ops}>
         {age && (
           <>
@@ -1239,7 +1278,9 @@ function ClinicPanel({ ops, reference, d, date }: {
            note={clinics.length
              ? `${clinics.length} clinics · cited ${citedDays.length === 1 ? shortDate(citedDays[0]) : 'session marked'}`
              : undefined}
-           cite={'DATASET_README.md:623: "most outpatient referrals need a clinic appointment, not a bed, so this is where the real constraint usually sits". The agent read ONE session per clinic; every other session in the series is context and was not scored.'}>
+           cite="The agent read one session per clinic. Every other session in the series is context and was not scored."
+           citeLabel="why the clinic is the constraint"
+           citeMore={'DATASET_README.md:623: "most outpatient referrals need a clinic appointment, not a bed, so this is where the real constraint usually sits".'}>
       <PanelState q={ops}>
         <AsOf what="Cited clinic sessions" taken={cited} selected={date}
               source="core.clinic_sessions is read latest-first with no date filter, so every hospital-day is served this same series." />

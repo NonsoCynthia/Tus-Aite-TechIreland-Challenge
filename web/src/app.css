@@ -169,6 +169,44 @@
 .cta:hover:not(:disabled) { background: var(--ink-deep); }
 .cta:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* --- what the chrome could not say inline --------------------------------
+   A full-width strip directly under the bar, carrying a whole sentence: where
+   the decision on screen came from when it did not come from a run in this
+   process, and a lookup that failed. Both are statements of fact and NEITHER
+   IS AN ERROR, so neither is dressed as one -- .err above takes a 3px
+   --sev-4-bg edge because an error means a number on screen cannot be trusted,
+   and nothing here says that. This sits on the page's own well ground with a
+   hairline, no reserved triage hue, no severity step, and every word carried by
+   the text rather than by the ground under it.
+
+   Contrast COMPUTED on this ground, --bg-sunk #F2F1EC, not copied from the
+   token file, whose figures are quoted against --surface:
+     --text   #122056  13.59:1   the bold lead and every value
+     --text-2 #545B6E   5.99:1   the sentence, at --t-small 12px (AA needs 4.5)
+     --text-3 #6B7183   4.30:1   the glyph -- decorative, aria-hidden, and
+                                 duplicated by the words beside it, so 1.4.11's
+                                 3:1 is the bar it has to clear, and does.
+   The strip is in the flow rather than sticky: there is no second offset that
+   can be trusted under a sticky bar whose height is a min-height, and this is
+   provenance rather than an alarm. */
+.notes { display: grid; }
+.notes-i {
+  display: flex; align-items: flex-start; gap: var(--d3);
+  margin: 0; padding: var(--d3) var(--d6);
+  background: var(--bg-sunk); border-bottom: 1px solid var(--rule);
+  font-size: var(--t-small); line-height: 1.55; color: var(--text-2);
+}
+.notes-i svg { color: var(--text-3); flex: none; margin-top: 2px; }
+.notes-i b { color: var(--text); font-weight: 600; }
+.notes-i .num { color: var(--text); }
+/* the same affordance as .cta-why: a word, underlined, no box */
+.notes-act {
+  margin-left: var(--d2); padding: 0; background: none; border: 0;
+  font: inherit; font-size: var(--t-small); color: var(--text); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.notes-act:disabled { color: var(--text-3); cursor: progress; text-decoration: none; }
+
 /* --- layout --------------------------------------------------------------
    .pad fills its column. A reading measure is applied to PROSE only, via
    .measure, so a paragraph stays readable without the grid collapsing around

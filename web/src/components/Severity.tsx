@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { SEV_INTEGRITY, sevBreach, type Sev } from '../lib/severity'
+import { Aside } from './Aside'
 import './severity.css'
 
 /** The one severity primitive. Every attention state in the product renders
@@ -105,7 +106,17 @@ export type QuietMark = {
    *  in the same voice as the ladder's own words. */
   label: string
   /** Why that step is drawn quiet here rather than solid. Joined into the note
-   *  under the strip, so the reason is on screen and not only in a comment. */
+   *  under the strip, so the reason is on screen and not only in a comment.
+   *
+   *  KEEP IT SHORT. It is the last clause of the strip's aside, and the aside is
+   *  the surface the wordiness complaint was made about: at 91 and 186
+   *  characters these two strings were a third of the note on List and a third
+   *  of it on Overview. The load-bearing half is now the summary line, which is
+   *  fixed at 78 characters and does not carry these; a `why` that grows again
+   *  grows the half a reader chose to open, which is the half that is allowed to
+   *  be long, but not the half that is allowed to be unbounded. Whatever will
+   *  not fit belongs in the docblock above the mark, where the counted evidence
+   *  already lives. */
   why: string
 }
 
@@ -124,7 +135,7 @@ const drawable = (sev: Sev) => sev as Exclude<Sev, 0>
 export const QUIET_RULE_FIRED: QuietMark = {
   sev: drawable(RULE_SEV),
   label: 'a rule that fired',
-  why: 'a rule fires on most rows that breach, and a field of solid blocks would outshout the table',
+  why: 'a rule fires on most breaching rows, and solid blocks would outshout the table',
 }
 
 /** Overview's. Its three quiet marks -- the cited session in the specialty
@@ -137,11 +148,17 @@ export const QUIET_RULE_FIRED: QuietMark = {
  *  2026-08-28 on every one of them, so on the 12 days that are neither, all 14
  *  of these dates are marked at the same time. Fourteen solid blocks at the
  *  loudest step the product has, on most days, saying only that the evidence is
- *  date-blind -- and drowning the one thing that step is for. */
+ *  date-blind -- and drowning the one thing that step is for.
+ *
+ *  The `why` below no longer states the MECHANISM ("every ward and clinic here
+ *  carries the same snapshot"). It states the two facts that justify the tone --
+ *  the frequency, and what the solid block at this step is reserved for -- and
+ *  the mechanism stays in this docblock, counted, where it was always the more
+ *  useful of the two. That cut the string from 186 characters to 130. */
 export const QUIET_OFF_DAY: QuietMark = {
   sev: drawable(SEV_INTEGRITY),
   label: 'a date that is not the day selected',
-  why: 'every ward and clinic here carries the same snapshot, so on most days all fourteen dates are marked at once, and the solid block at this step is kept for a figure that does not reconcile',
+  why: 'on most days all fourteen of these dates are marked at once, and the solid block here is kept for a figure that does not reconcile',
 }
 
 /* --- the contract, checked rather than trusted -----------------------------
@@ -490,18 +507,57 @@ export function SevLegend({ className, quiet = DEFAULT_QUIET }: {
           prints when it has no value (List, Overview, DecisionRecord). Setting
           one inside the sentence that explains absence would put the
           product's own symbol for "nothing here" in the middle of the
-          legend's definition of it. A colon and a full stop cost nothing. */}
-      <p className="sevleg-n">
-        A mark grades a measurement, never a person: how far a wait is past its target, how old a
-        reading is, how far a ward is past its safe line. Every mark carries its own value. An
-        unmarked number is inside its line, or has no line at all: no target applies to Routine
-        or Uncategorised. A missing one says so in words.
+          legend's definition of it. A colon and a full stop cost nothing.
+
+          THE NOTE IS NOW A DISCLOSURE, and this is the surface it was built for.
+          Measured before: 314 characters of base note, 508 on the List once the
+          rule's `why` is joined on, 603 on the Overview. Six hundred characters
+          of unbroken 12px prose above a 595-mark table is the wordiness the
+          client complained about, and it was the worst instance of it in the
+          product.
+
+          What did NOT happen is the thing they asked for. A tooltip is banned by
+          the pack they signed off (DESIGN_PACK.md:2705-2708) and this file
+          already pays for the ban elsewhere: 26 of SevChip's 30 call sites pass
+          no `title` at all, which is exactly why .sev-sr exists. The split is
+          between what a reader must be told and what a reader may ask for, and
+          the line above is the first kind:
+
+            A mark grades a measurement, never a person. Every mark carries
+            its own value.
+
+          78 characters, and both halves are load-bearing. The first is the one
+          sentence that stops "severe" beside a name from reading as a claim
+          about the person, which is the whole reason the word "severity" is not
+          on this strip. The second is SC 1.4.1 stated as a promise: colour is
+          never the only channel, so nothing below needs to be decoded from a
+          shade. Neither can be behind a toggle.
+
+          Everything else is: the five axes, the three states, the missing
+          measurement, and the pale chip's sentence. Every clause the old note
+          earned is still here, in the same words, one click away. Nothing was
+          cut to make the number small -- the detail is 444 characters on the
+          List and 496 on the Overview, and it is allowed to be, because a reader
+          who opened it asked for it.
+
+          The label names what opens. "how to read a mark" is a noun phrase about
+          THIS strip; "more" would have told the reader only that something
+          exists, which is the tooltip's own failure spelled as a word, and
+          asideMismatch says so in development. */}
+      <Aside
+        className="sevleg-n"
+        label="how to read a mark"
+        summary="A mark grades a measurement, never a person. Every mark carries its own value.">
+        What a mark grades: how far a wait is past its target, how old a reading is, how far a
+        ward is past its safe line. An unmarked number is inside its line, or has no line at
+        all: no target applies to Routine or Uncategorised. A missing measurement says so in
+        words.
         {/* The pale chip's sentence is the CALLER'S, and there is none at all when the
             caller draws no quiet mark: on a surface with no pale chip on it, a sentence
             explaining pale chips is one more mark with no referent. */}
         {quiet.length > 0 && ' A pale chip is one of those four steps drawn without its fill, ' +
           `bounded by the colour that fill uses: ${quiet.map((m) => m.why).join('; ')}.`}
-      </p>
+      </Aside>
     </div>
   )
 }

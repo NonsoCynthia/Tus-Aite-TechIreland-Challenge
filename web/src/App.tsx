@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Building2, CalendarDays, Gauge, ListOrdered, Lock, Play, RefreshCw, ScrollText, Waypoints,
+  Building2, CalendarDays, Gauge, History, ListOrdered, Lock, Play, RefreshCw,
+  ScrollText, Waypoints,
 } from 'lucide-react'
 import { api } from './lib/api'
 import { Overview } from './surfaces/Overview'
@@ -33,10 +34,18 @@ const dayCount = (k: number) => `${k} ${k === 1 ? 'day holds' : 'days hold'} a c
 const CHROME = 1.75
 const SIGNAL = 2.25
 
-const HOSPITALS = [
-  { hipe: '9001', name: "St Brendan's University Hospital" },
-  { hipe: '9002', name: 'Kilbrannan Regional Hospital' },
-]
+/** The one HIPE id still typed into this file, and it is a FIRST SELECTION,
+ *  not a roster: which hospitals exist and what they are called comes from
+ *  GET /api/hospitals, which reads core.hospitals. If the roster arrives
+ *  without this id -- a different database, a removed hospital -- the selection
+ *  moves to the first hospital the records actually hold.
+ *
+ *  What stood here was a literal list of both ids AND display names, directly
+ *  above the comment below, which says hospital-DAYS are discovered and never
+ *  hardcoded. That was true of the days and had never been true of the
+ *  hospitals: a third hospital in the seed was invisible until someone edited
+ *  this file, and a renamed one would have kept its old name on screen. */
+const SEED_HIPE = '9001'
 // Hospital-days are DISCOVERED, never hardcoded: a batch loaded while the
 // service is up must appear in the selector without a frontend change.
 
@@ -58,7 +67,7 @@ const NAV: Array<{ group: string; items: Array<{ key: Surface; label: string; ic
 ]
 
 export function App() {
-  const [hospital, setHospital] = useState('9001')
+  const [hospital, setHospital] = useState(SEED_HIPE)
   const [date, setDate] = useState<string | null>(null)
   const [entered, setEntered] = useState(false)
   const [surface, setSurface] = useState<Surface>('overview')
@@ -71,6 +80,9 @@ export function App() {
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 20_000 })
   // seed data: fetched once for the life of the tab, never refetched
   const ref = useQuery({ queryKey: ['reference'], queryFn: api.reference, staleTime: Infinity })
+  // the same, and for the same reason: core.hospitals does not move while the
+  // service is up. It is the roster the two selectors draw.
+  const roster = useQuery({ queryKey: ['hospitals'], queryFn: api.hospitals, staleTime: Infinity })
   const days = useQuery({
     queryKey: ['hospital-days', hospital],
     queryFn: () => api.hospitalDays(hospital),
@@ -82,6 +94,15 @@ export function App() {
     const r = days.data?.runnable
     if (r && (date === null || !days.data?.days.some((d) => d.date === date))) setDate(r)
   }, [days.data, date])
+
+  // Follow the records rather than the literal: if the roster does not hold the
+  // seeded id, select the first hospital it does hold. An EMPTY roster is a
+  // failed read (api.ts), never an empty world, so it changes nothing.
+  useEffect(() => {
+    const list = roster.data?.hospitals
+    if (!list?.length) return
+    if (!list.some((h) => h.hospital_hipe === hospital)) setHospital(list[0].hospital_hipe)
+  }, [roster.data, hospital])
 
   // a different hospital is a different question; the last answer is not about it
   useEffect(() => { setProbeSaid(null) }, [hospital])
@@ -137,7 +158,37 @@ export function App() {
     enabled: !!date, retry: false,
   })
 
-  if (!date || !days.data) {
+  /** The roster in the shape both selectors take. NEVER EMPTY: Landing maps
+   *  this straight into <option>s, so an empty array would leave a <select>
+   *  with no options and a value matching none of them. When the read fails the
+   *  one entry is the selected HIPE code under its own name -- the code is what
+   *  the service actually knows, and a bare code says less than a name but
+   *  claims nothing that is not true. .notes below says the read failed. */
+  const picks = useMemo(() => {
+    const rows = roster.data?.hospitals ?? []
+    return rows.length
+      ? rows.map((h) => ({ hipe: h.hospital_hipe, name: h.hospital_name }))
+      : [{ hipe: hospital, name: `HIPE ${hospital}` }]
+  }, [roster.data, hospital])
+
+  /** [] is a failed read and not an empty world (api.ts), so this is the ONE
+   *  reading of it. isPending covers the first load; it is false once the query
+   *  has settled either way, including on error, where data is undefined. */
+  const rosterUnread = !roster.isPending && (roster.data?.hospitals.length ?? 0) === 0
+
+  /** Where the decision on screen came from. `_source` is written only by the
+   *  snapshot restore at process boot (orchestrator/app/state.py:136); a run in
+   *  this process stores its own dict, which carries no such key. So absent
+   *  means "a run in this process", and a real run clears it by replacing the
+   *  entry. /api/health reports the same fact as decisions_held[].source. */
+  const fromSnapshot = dec.data?._source === 'snapshot'
+  const snapAge = dec.data ? ageOf(dec.data.built_at) : ''
+
+  // The roster is one cached SELECT and it names the hospital on the first
+  // screen of the product, so the boot screen waits for it rather than showing
+  // a HIPE code that turns into a name a moment later. It settles either way:
+  // isPending goes false on success AND on error.
+  if (!date || !days.data || roster.isPending) {
     return (
       <div className="boot" data-surface="dark">
         {/* height 26 put the WORDMARK CAP HEIGHT at 26 x 266/676 = 10.2px, under
@@ -154,12 +205,12 @@ export function App() {
   }
 
   const runnable = days.data.runnable
-  const name = HOSPITALS.find((h) => h.hipe === hospital)?.name ?? hospital
+  const name = picks.find((h) => h.hipe === hospital)?.name ?? hospital
   const rankable = runnable == null || date === runnable
 
   if (!entered) {
     return (
-      <Landing hospital={hospital} date={date} name={name} hospitals={HOSPITALS}
+      <Landing hospital={hospital} date={date} name={name} hospitals={picks}
                onHospital={setHospital} onEnter={() => setEntered(true)} />
     )
   }
@@ -221,7 +272,7 @@ export function App() {
               <Building2 className="ico-s" strokeWidth={CHROME} aria-hidden />
               <select className="picker" value={hospital} aria-label="Hospital"
                       onChange={(e) => { setHospital(e.target.value); setPatient(null) }}>
-                {HOSPITALS.map((h) => <option key={h.hipe} value={h.hipe}>{h.name}</option>)}
+                {picks.map((h) => <option key={h.hipe} value={h.hipe}>{h.name}</option>)}
               </select>
             </label>
             <label className="picker-wrap">
@@ -280,6 +331,47 @@ export function App() {
           </div>
         </header>
 
+        {/* WHAT THE CHROME COULD NOT SAY INLINE.
+            A strip under the bar rather than a chip in it: the bar holds two
+            pickers, the probe, the run pill and the run button on ONE nowrap
+            row and is already tuned to fit at 1280 by shrinking the pickers, so
+            a sentence added to it would push the row into overflow. A strip is
+            also the only place a full sentence fits, and provenance needs a
+            sentence, not a badge. Neither note is an alarm and neither is
+            styled as one. */}
+        {(fromSnapshot || rosterUnread) && (
+          <div className="notes">
+            {fromSnapshot && dec.data && (
+              <p className="notes-i">
+                <History className="ico-s" strokeWidth={CHROME} aria-hidden />
+                <span>
+                  <b>This ranking was restored from a snapshot.</b>{' '}
+                  Run <span className="num">{dec.data.run_id.replace(/^run-/, '')}</span>{' '}
+                  produced it on <span className="num">{stamp(dec.data.built_at)}</span>
+                  {snapAge && <> (<span className="num">{snapAge}</span>)</>}. This
+                  service read that result back from the snapshot file when it started,
+                  and has not run the agents for this hospital-day. The records the run
+                  read may have changed since.
+                </span>
+              </p>
+            )}
+            {rosterUnread && (
+              <p className="notes-i">
+                <Building2 className="ico-s" strokeWidth={CHROME} aria-hidden />
+                <span>
+                  <b>The hospital list could not be read.</b>{' '}
+                  The read of core.hospitals returned no rows, so the selector is showing
+                  the HIPE code <span className="num">{hospital}</span> without its name.
+                  <button className="notes-act" disabled={roster.isFetching}
+                          onClick={() => qc.invalidateQueries({ queryKey: ['hospitals'] })}>
+                    {roster.isFetching ? 'asking again…' : 'ask again'}
+                  </button>
+                </span>
+              </p>
+            )}
+          </div>
+        )}
+
         <main className="content">
           {surface === 'overview' && (
             <Overview hospital={hospital} date={date} name={name}
@@ -310,15 +402,42 @@ export function App() {
 }
 
 
+/** How old a decision is, in one unit, and empty when built_at will not parse
+ *  -- an unreadable timestamp is an absence, and "NaNm ago" is worse than
+ *  saying nothing.
+ *
+ *  Hours all the way up is where a RESTORED decision lands badly: a snapshot
+ *  built three weeks ago read "504h ago". Nothing else changes -- a decision
+ *  under two days old reads exactly as it did. */
+function ageOf(isoUtc: string): string {
+  const t = new Date(isoUtc).getTime()
+  if (Number.isNaN(t)) return ''
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60_000))
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.round(mins / 60)
+  if (hrs < 48) return `${hrs}h ago`
+  const days = Math.round(hrs / 24)
+  return `${days} days ago`
+}
+
+/** built_at is UTC. Shown in the reader's own zone, in the same locale as every
+ *  other date on screen, and handed back unparsed rather than guessed at. */
+function stamp(isoUtc: string): string {
+  const d = new Date(isoUtc)
+  if (Number.isNaN(d.getTime())) return isoUtc
+  return d.toLocaleString('en-IE', {
+    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+}
+
 /** What the decision IS, kept in the chrome rather than repeated on every
  *  surface: which run produced the order on screen, how it is weighted, and how
  *  old it is. Alpha lives only here and in the orchestrator's memory -- it is
  *  not in agent.decision_rankings, so this pill is the only durable display of
  *  the number that produced the ranking. */
 function RunPill({ decision }: { decision: Decision }) {
-  const built = new Date(decision.built_at)
-  const mins = Math.max(0, Math.round((Date.now() - built.getTime()) / 60_000))
-  const age = mins < 1 ? 'just now' : mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`
+  const age = ageOf(decision.built_at)
   return (
     <div className="runpill" title={`decision ${decision.decision_id}`}>
       <span className="runpill-id num">{decision.run_id.replace(/^run-/, '')}</span>
@@ -326,8 +445,10 @@ function RunPill({ decision }: { decision: Decision }) {
       <span className="runpill-a">
         urgency <strong className="num">{Math.round(decision.alpha * 100)}%</strong>
       </span>
-      <span className="runpill-sep" aria-hidden />
-      <span className="runpill-age num">{age}</span>
+      {age && (<>
+        <span className="runpill-sep" aria-hidden />
+        <span className="runpill-age num">{age}</span>
+      </>)}
     </div>
   )
 }

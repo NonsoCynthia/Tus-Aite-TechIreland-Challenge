@@ -1,0 +1,102 @@
+/* The disclosure. Rationale for the OBJECT lives in Aside.tsx; this file only
+   spends tokens on it.
+
+   Two things this file exists to guarantee, both of them bugs this product has
+   already shipped once:
+
+   1. IT CANNOT WIDEN ITS PARENT. The body is `max-width: 100%` and the root is
+      `min-width: 0`, because a flex or grid item's automatic minimum size is its
+      CONTENT, not zero: `flex: 1 0 100%` on .sevleg-n sets the basis and does
+      nothing about the floor, so one long unbroken string in the revealed half
+      would push the strip wider than the column and the page sideways. That is
+      the same failure mode as the 189px of real horizontal scroll this product
+      has already been given once, arriving by a different route.
+
+   2. NOTHING HERE IS POSITIONED, and nothing overlays. The body is a block in
+      normal flow that pushes what follows it down. See Aside.tsx on why: this
+      product has no reliable containing block. */
+
+.aside { min-width: 0; }
+
+/* The line that stays. The CALLER owns its typography -- font-size, colour,
+   line-height and max-width all arrive on the root from the class the caller
+   merges (.sevleg-n) -- so this rule only kills the <p> margin the caller is
+   not expecting to have to kill. */
+.aside-s { margin: 0; }
+
+/* --- the toggle -----------------------------------------------------------
+   TARGET SIZE, MEASURED RATHER THAN BORROWED. WCAG 2.2 SC 2.5.8 Target Size
+   (Minimum, AA) is 24 by 24 CSS px, and this control sits inside 12px prose
+   whose line box is 18px. There is no token for this: --d5 is 24px and it is a
+   SPACING step, so setting the height from it would tie a hit area to a gutter
+   and break the day someone re-rhythms the spacing scale. 24px is written here,
+   as the accessibility figure it is.
+
+   HEIGHT. `* { box-sizing: border-box }` (tokens.css:318), so `min-height: 24px`
+   is the BORDER box: 24px including both 1px borders. Not the content box, not
+   24 + 2.
+
+   WIDTH cannot fail and is not constrained. With no label text at all the box
+   is already 2x8px padding + 4px gap + a 1.1em glyph + 2x1px border = 35.2px at
+   12px prose. Every real label is wider still.
+
+   THE LINE BOX MUST NOT GROW, or a 24px control inside a 12px paragraph would
+   reflow every line it sits on. An inline-flex box is an atomic inline, so its
+   MARGIN box is what the line box measures -- which means negative block margins
+   cancel the growth and change nothing else.
+
+   The cancellation is DERIVED, not typed: the button's own line box is 1.5em,
+   its border box is max(24px, 1.5em + 2px), and the margin is half the
+   difference. At 12px that is (18 - 24) / 2 = -3px and the margin box is exactly
+   18px, so the line box is exactly what it was without the button. It stays
+   exact if the prose grows: at 16px the min-height stops binding and the margin
+   goes to -1px, cancelling the borders instead. It is never positive, so the
+   control can never ADD height to a line either.
+
+   (The one thing it cannot know is a caller whose line-height is not 1.5. Then
+   the strut, not this box, sets the line, and the difference is at most the 6px
+   the min-height adds -- visible as a slightly taller line, never as a clipped
+   or overlapping one.) */
+.aside-t {
+  display: inline-flex; align-items: center; gap: var(--d1);
+  min-height: 24px; padding: 0 var(--d2);
+  margin-block: -3px; /* exact at 12px prose; superseded on every engine with */
+  margin-block: calc((1.5em - max(24px, 1.5em + 2px)) / 2); /* CSS max() */
+  font: inherit; line-height: 1.5; color: var(--text-2);
+  background: none;
+  border: 1px solid var(--rule-firm); border-radius: var(--radius);
+  cursor: pointer;
+}
+/* The affordance is the border and the glyph, both present at rest: a control
+   that only looks like a control on hover is a mouse-only control, which is the
+   thing this component exists instead of. Hover deepens what is already there
+   and reveals nothing. */
+.aside-t:hover { color: var(--text); border-color: var(--text-3); }
+/* The product's own ring (app.css:342), restated so it survives a future
+   :focus-visible reset. `outline-offset` is safe here and is NOT the case the
+   chip outline hit: that outline was clipped by `.lst-table .sub`, and this
+   component is barred from that table by contract (see Aside.tsx). */
+.aside-t:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Sized in em so the glyph tracks the prose it sits in rather than a fixed 13px
+   that would be wrong at every other size. flex: none so it is never squeezed by
+   a long label. */
+.aside-i { width: 1.1em; height: 1.1em; flex: none; }
+
+/* --- the revealed half ----------------------------------------------------
+   In the DOM at all times; `hidden` is what takes it out of the accessibility
+   tree, out of find-in-page and out of the tab order. Nothing here sets
+   `display`, so the UA's `[hidden] { display: none }` is not overridden -- the
+   rule below is the explicit guard, because a class-level `display` would beat
+   the UA sheet silently and the failure would be a disclosure that never
+   closes. */
+.aside-b[hidden] { display: none; }
+.aside-b {
+  max-width: 100%; min-width: 0;
+  margin-top: var(--d1);
+  padding-left: var(--d2); border-left: 1px solid var(--rule-firm);
+  /* the widening guard's other half: a URL or an IRI in the revealed text
+     breaks rather than pushing the column out */
+  overflow-wrap: break-word;
+}
+.aside-b > :first-child { margin-top: 0; }
+.aside-b > :last-child { margin-bottom: 0; }

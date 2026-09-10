@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { breachPhrase, ruleStatement } from '../lib/ref'
 import { SEV_INTEGRITY, sevBreach, NONE } from '../lib/severity'
 import { SevChip } from '../components/Severity'
+import { Aside } from '../components/Aside'
 import type { Decision, Overrides, Reference } from '../lib/types'
 import './record.css'
 
@@ -298,12 +299,18 @@ export function DecisionRecord({ hospital, date, reference }: {
             </tbody>
           </table>
         </div>
-        <p className="p-note measure">
-          A breached timeframe rule is not a fault in the ranking. It records that a referral
-          is already outside the window the health service set for its category. That is why
-          the order places every breached referral in a band above every unbreached one,
-          before any score is compared.
-        </p>
+        {/* A DEFINITION of the ordering: it says what a breach MEANS, it is the
+            same on all 14 hospital-days, and a reviewer who has read it once
+            reads past it on every later visit. The visible line keeps the claim
+            a reader must not get wrong -- a breach is not a fault in the
+            ranking -- and the toggle holds what follows from it. No count is
+            hidden: the Breached column above is per rule and per referral, and
+            nothing here divides by a cohort. */}
+        <Aside className="p-note measure" label="how a breach changes the order"
+               summary="A breached timeframe rule is not a fault in the ranking: it records a referral already outside its category's window.">
+          The window is the one the health service set for that category. The order places every
+          breached referral in a band above every unbreached one, before any score is compared.
+        </Aside>
       </section>
 
       <section className="rec-sec">
@@ -341,12 +348,11 @@ export function DecisionRecord({ hospital, date, reference }: {
           )}
           {bothPaedExc.length > 0 && (
             <div className="ledger-overlap">
-              The buckets overlap, which is why they are never summed:{' '}
-              <strong className="num">{bothPaedExc.length}</strong> referrals sit in two at
-              once, refused by the urgency agent and therefore unplaceable by the
-              coordinator, which records those same referrals as{' '}
-              <span className="num">missing_urgency_score</span>. Added rather than unioned
-              they read as <span className="num">{fmt(naiveSum)}</span> of{' '}
+              The buckets overlap and are never summed:{' '}
+              <strong className="num">{bothPaedExc.length}</strong> referrals sit in two at once,
+              refused by the urgency agent and therefore unplaceable, which the coordinator
+              records as <span className="num">missing_urgency_score</span>. Summed rather than
+              unioned they read as <span className="num">{fmt(naiveSum)}</span> of{' '}
               <span className="num">{fmt(total)}</span>.
             </div>
           )}
@@ -382,9 +388,8 @@ export function DecisionRecord({ hospital, date, reference }: {
                   {ovrOtherDecisions === 1 ? 'decision' : 'decisions'} for this same hospital-day.
                   A From and a To are positions in the ordering their own decision produced, so on
                   those rows the two numbers name places in a list this run never built, and the
-                  rules table and the ledger above say nothing about them. They are kept because
-                  the log is the record of what people did, and they are marked because they are
-                  not this decision's.</>
+                  rules table and the ledger say nothing about them. They are kept, and marked,
+                  because the log is the record of what people did.</>
               )}
               {ovrNone > 0 && (
                 <> <strong className="num">{fmt(ovrNone)}</strong>{' '}

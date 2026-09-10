@@ -1,5 +1,5 @@
 import type {
-  CohortGraph, CohortReferral, Decision, Overrides, Reference,
+  CohortGraph, CohortReferral, Decision, Hospital, Overrides, Reference,
   ReferralContext, Run, ScoresByPathway,
 } from './types'
 
@@ -27,8 +27,25 @@ export const api = {
   cohort: (hospital: string, date: string) =>
     get<{ referrals: CohortReferral[] }>(`/api/cohort/${hospital}/${date}`),
 
+  /** Which hospitals exist, and what they are called: `core.hospitals`, which
+      has held both since the seed while App.tsx carried them as a literal.
+      Seed data, so it is fetched once and never refetched, like the reference
+      layer.
+
+      AN EMPTY ARRAY IS NOT "no hospitals exist". sources.query() returns [] on
+      a failed read rather than raising, and the orchestrator cannot tell the
+      two apart, so [] has to be read as "the roster could not be read". The
+      table is the FK target of every referral, ward and clinic on screen
+      (dataset/db/migrations/003_core.sql), so a genuinely empty one cannot
+      coexist with a cohort being displayed. */
+  hospitals: () => get<{ hospitals: Hospital[] }>('/api/hospitals'),
+
   /** 404 until a run has produced one. The orchestrator serves what it built,
-      never GET /decisions, which appends rather than replaces. */
+      never GET /decisions, which appends rather than replaces.
+
+      The payload carries `_source: "snapshot"` when this decision was restored
+      from the snapshot file at boot rather than produced by a run in this
+      process. Absent means a run produced it. */
   decision: (hospital: string, date: string) =>
     get<Decision>(`/api/decision/${hospital}/${date}`),
 

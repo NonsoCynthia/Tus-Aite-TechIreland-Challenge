@@ -1,6 +1,21 @@
 /* Hand-written. Every read handler in retrieval is annotated `-> dict[str, Any]`,
    so /openapi.json carries request schemas only and codegen buys nothing here. */
 
+/** One row of `core.hospitals`, from GET /api/hospitals. Column names, not
+ *  invented ones, so a reader can find the row this came from.
+ *
+ *  App.tsx used to carry the hipe ids and the names as a literal. An EMPTY
+ *  array from that endpoint means the read failed, never "no hospitals exist" --
+ *  see api.hospitals(). */
+export interface Hospital {
+  /** char(4). Compared against the selector's string value. */
+  hospital_hipe: string
+  hospital_name: string
+  hse_health_region: string
+  hospital_type: string
+  total_inpatient_beds: number
+}
+
 /** The 14 fields GET /hospitals/{h}/cohort/{date} actually returns. No vitals. */
 export interface CohortReferral {
   hospital_hipe: string
@@ -85,6 +100,19 @@ export interface Decision {
   /** Harvested during the urgency pass: news2 is not in the cohort payload. */
   news2: Record<string, number | null>
   built_at: string
+  /** WHERE THIS DECISION CAME FROM, and the only signal that carries it into
+   *  the payload the surfaces draw.
+   *
+   *  A decision lives in orchestrator memory and is written to
+   *  /snapshots/decisions.json, which is read back at process boot. The restore
+   *  is the ONLY writer of this key (orchestrator/app/state.py:136); a decision
+   *  produced by a run in this process carries no such key at all. So ABSENT
+   *  means "this process ran it", and it clears itself the moment a real run
+   *  replaces the entry (state.py put_decision stores the run's own dict).
+   *
+   *  /api/health says the same thing about every held hospital-day as
+   *  decisions_held[].source, which defaults the absent case to 'run'. */
+  _source?: 'run' | 'snapshot'
 }
 
 export type RunStatus =

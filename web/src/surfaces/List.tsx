@@ -15,6 +15,7 @@ import type { Sev } from '../lib/severity'
 /** Median wait. ONE home, lib/stats.ts, shared with Overview.tsx -- the two
  *  surfaces used to hold a copy each and printed 141 against 142 on 2026-08-21. */
 import { median } from '../lib/stats'
+import { Aside } from '../components/Aside'
 import { SevChip, SevLegend } from '../components/Severity'
 import { Override } from '../components/Override'
 import type {
@@ -673,13 +674,21 @@ export function List({ hospital, date, reference, onOpen }: {
               <b className="num">{fmt(pre.n2n)}</b>
             </PreFig>
           </div>
+          {/* STATE, so it is rewritten shorter and stays visible rather than
+              going behind a toggle: it says what this hospital-day is, and it
+              carries the only instruction on a pre-run screen. 331 characters to
+              268. Nothing was cut except a repetition -- .lst-sub, two figures
+              above and also only drawn when nothing has scored, already says "in
+              referral-date order: a display order, not a ranking", so this line
+              no longer says it a second time. What is left is what nothing else
+              on this screen says: no rule has been tested yet, how to run the
+              agents, and what comes back when you do. */}
           <p className="pre-p">
-            Rows sit in referral-date order, which is a display order and carries no clinical
-            claim: nothing below has been scored, placed or tested against a rule yet.{' '}
+            Referral-date order carries no clinical claim: nothing below has been scored,
+            placed or tested against a rule.{' '}
             <strong>Run the agents from the top bar</strong> and these same{' '}
             <span className="num">{fmt(figures.onList)}</span> rows come back in a suggested
-            order, each one carrying its score, the evidence cited for it and every rule
-            tested against it.
+            order, each with its score, its cited evidence and every rule tested against it.
           </p>
         </section>
       )}
@@ -1114,45 +1123,91 @@ function Band(p: BandProps) {
       && slice[i - 1].crt_breached === true && r.crt_breached !== true)
     : -1
 
+  /* One clause, three branches, and it can no longer live inside the <p>: the
+     Outside tab's note is an <Aside> now, whose root is a <div>, and a <div>
+     inside a <p> is invalid. Written once here and placed in both, so the two
+     copies cannot drift. It is a STATE -- how many rows on this page sit where a
+     clinician put them -- so it stays on the visible line in both. */
+  const movedNote = moved > 0 ? (
+    <> · <strong className="num">{moved}</strong> row{moved > 1 ? 's' : ''} here sit
+    where a clinician placed {moved > 1 ? 'them' : 'it'}, not where the system did.</>
+  ) : null
+
   return (
     <>
-      <p className="lst-note">
-        {p.outside ? (
-          <>
-            Not scored, not placed. <strong>This is not a low position.</strong> NEWS2 is
-            validated in adults, so the urgency agent refuses paediatric specialties rather
-            than scoring a child on an adult scale. Category and waiting time are shown in
-            full, because a clinician recorded those.
-            {/* These rows are counted HERE and not in their clinical band, so
-                the tab counts above are the ranking's counts and differ from the
-                Overview's, which bands all 308 by CPC. Two correct numbers that
-                would otherwise change by 2 when you click between surfaces. */}
-            {p.rows.length > 0 && (
-              <> They are counted here rather than in their clinical band ({' '}
-                <strong>{
-                  Object.entries(p.rows.reduce((a: Record<string, number>, r) => {
-                    const b = bandOf(r.cpc); a[b] = (a[b] ?? 0) + 1; return a
-                  }, {})).map(([b, n]) => `${n} ${b}`).join(' · ')
-                }</strong> ), so the tab counts above are of the ranking, while the
-                Overview bands all {fmt(p.onList)} by category.</>
-            )}
-          </>
-        ) : target == null ? (
-          <>No clinical timeframe applies to this category, so nothing here can be “late”, and
-          nothing here is drawn against a target.</>
-        ) : (
-          <>
-            Target: seen within <strong className="num">{target}</strong> days ·{' '}
-            <strong className="num">{fmt(past)}</strong> of{' '}
-            <strong className="num">{fmt(p.rows.length)}</strong> already past it, and all of
-            them rank above everyone within it.
-          </>
-        )}
-        {moved > 0 && (
-          <> · <strong className="num">{moved}</strong> row{moved > 1 ? 's' : ''} here sit
-          where a clinician placed {moved > 1 ? 'them' : 'it'}, not where the system did.</>
-        )}
-      </p>
+      {/* THE ONE SPLIT ON THIS SURFACE, and the only <Aside> it places.
+          712 characters, the longest block here, and it was never one thing: it
+          is a CLAIM with the ARGUMENT for it attached.
+
+          THE CLAIM STAYS ON THE LINE, open or shut. "Not scored, not placed.
+          This is not a low position." is the sentence that stops a reader taking
+          the Outside tab for the bottom of the ranking, and the counts clause is
+          what stops this tab's number being read against the Overview's, which
+          bands all 308 by CPC and so counts these same rows inside a clinical
+          band. Both change how a number already on screen reads, so neither can
+          be one click away.
+
+          THE ARGUMENT GOES BEHIND THE TOGGLE: why NEWS2 is refused rather than
+          applied, why the record's own fields are printed in full anyway, and
+          the band-by-band breakdown of where these rows would otherwise sit. A
+          reader who has taken the claim does not need it argued twice.
+
+          139 characters visible against the 140 asideMismatch allows. movedNote
+          can add to that, and on this tab it has nothing to add: an override is
+          recorded against a position in a ranking, and a refused row has no
+          position, so `moved` is 0 here for every override this product can
+          create. If a stored record ever made it non-zero the visible line would
+          still be right and the DEV audit would say the line is long, which is
+          the correct order of those two.
+
+          This is OUTSIDE .lst-table. The Aside is barred from inside that table
+          by its own contract, and the row expander below is the table's own
+          disclosure. */}
+      {p.outside ? (
+        <Aside
+          className="lst-note"
+          label="why these are not scored"
+          summary={(
+            <>
+              Not scored, not placed. <strong>This is not a low position.</strong> Counted
+              here, not in their clinical band, so the tab counts differ from the Overview's.
+              {movedNote}
+            </>
+          )}>
+          <p>
+            NEWS2 is validated in adults, so the urgency agent refuses paediatric specialties
+            rather than scoring a child on an adult scale. Category and waiting time are shown
+            in full, because a clinician recorded those: the refusal is about the instrument,
+            not about the record.
+          </p>
+          {p.rows.length > 0 && (
+            <p>
+              In their clinical band these rows would read{' '}
+              <strong>{
+                Object.entries(p.rows.reduce((a: Record<string, number>, r) => {
+                  const b = bandOf(r.cpc); a[b] = (a[b] ?? 0) + 1; return a
+                }, {})).map(([b, n]) => `${n} ${b}`).join(' · ')
+              }</strong>. The tab counts above are of the ranking; the Overview bands all{' '}
+              {fmt(p.onList)} by category.
+            </p>
+          )}
+        </Aside>
+      ) : (
+        <p className="lst-note">
+          {target == null ? (
+            <>No clinical timeframe applies to this category, so nothing here can be “late”, and
+            nothing here is drawn against a target.</>
+          ) : (
+            <>
+              Target: seen within <strong className="num">{target}</strong> days ·{' '}
+              <strong className="num">{fmt(past)}</strong> of{' '}
+              <strong className="num">{fmt(p.rows.length)}</strong> already past it, and all of
+              them rank above everyone within it.
+            </>
+          )}
+          {movedNote}
+        </p>
+      )}
 
       {/* The scale, once, immediately above the rows it grades. Every graded
           mark in the table below -- the wait bar, the wait-against-target step,
@@ -1871,12 +1926,23 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
                   capacity is specialty-level and sets alpha only. And the
                   patient page states this text is template output while this
                   panel did not, so a reader could take it for a model's
-                  opinion. Both said here, next to it. */}
+                  opinion. Both said here, next to it.
+
+                  A DEFINITION, and it prints once per expanded row, so the rule
+                  would send it behind an <Aside> -- except that this panel is
+                  rendered inside <tr className="ev-row"> inside .lst-table, and
+                  Aside.tsx bars itself from that table by contract: the row
+                  expander a reader has already opened IS this table's
+                  disclosure, and a second idiom inside it teaches two. So it is
+                  rewritten shorter in place instead: 210 characters to 180.
+                  "written by the coordinator from the numbers above" went,
+                  because "template text from the coordinator" says the same in
+                  a third of the words. Nothing else could: each of the three
+                  remaining claims is the only thing saying it here. */}
               <p className="ev-p ev-p-meta">
-                Deterministic template text, written by the coordinator from the
-                numbers above. No model wrote this sentence. The capacity score
-                it names belongs to the whole specialty and set{' '}
-                <span className="num">α</span>; it did not move this referral.
+                Deterministic template text from the coordinator: no model wrote this
+                sentence. The capacity score it names belongs to the whole specialty and
+                set <span className="num">α</span>; it did not move this referral.
               </p>
               {/* Six decimals, not three. Three is where twelve adjacent pairs
                   in this decision become indistinguishable, and it is also
@@ -2182,11 +2248,27 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
             <div><dt>Pain</dt>
               <dd className="num">{r.clin?.pain ?? '—'}</dd></div>
           </dl>
+          {/* A DEFINITION -- ADR-004, and a data-model quirk true on all 14
+              hospital-days -- printed once per expanded row, so twelve rows
+              opened is twelve printings. The rule sends it behind an <Aside>,
+              and it cannot go: this panel renders inside <tr className="ev-row">
+              inside .lst-table, which Aside.tsx bars by contract. Rewritten
+              shorter in place instead, 311 characters to 230.
+
+              What went is what the <h3> two lines above already prints. It reads
+              "Recorded, not scored" over "record fields", so "and is not scored"
+              and "a record field" were the same words twice, an inch apart.
+              "which would collide with the triage categories, so it is shown as
+              a word in a neutral register" is the same claim as "shown as a word
+              and never in triage hues", in half the words.
+
+              What stays is what the heading cannot say: MTS keeps its own colour
+              vocabulary and is therefore given none here, and the condition code
+              is a random draw and never a finding. */}
           <p className="ev-cav">
-            MTS carries its own red/orange/yellow/green/blue vocabulary, which would collide with
-            the triage categories, so it is shown as a word in a neutral register and is not
-            scored (ADR-004). The condition code is a weighted random draw over the specialty's
-            mix, independent of acuity: a record field, never a finding.
+            MTS keeps its own red/orange/yellow/green/blue vocabulary, so it is shown as a
+            word and never in triage hues (ADR-004). The condition code is a weighted random
+            draw over the specialty's mix, independent of acuity: never a finding.
           </p>
         </section>
 

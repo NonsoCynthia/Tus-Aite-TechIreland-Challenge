@@ -156,8 +156,8 @@ export function Run({ hospital, name, date, runnable, onClose, onSeeGraph, onSee
           <div className="run-locked">
             <strong>This day can be read, but not scored.</strong>
             <p>
-              The evidence call carries no date: it returns the most recent observation on
-              record whichever day you ask about. Scoring{' '}
+              The evidence call carries no date and returns the newest observation on record, so
+              scoring{' '}
               {new Date(date).toLocaleDateString('en-IE', { day: 'numeric', month: 'long' })}{' '}
               would cite readings taken after it. Runs happen on{' '}
               {runnable && new Date(runnable).toLocaleDateString('en-IE',
@@ -351,16 +351,17 @@ export function Run({ hospital, name, date, runnable, onClose, onSeeGraph, onSee
                   <p className="run-done-p measure">
                     Before this run, <strong className="num">{fmt(before.past)}</strong> of the{' '}
                     <strong className="num">{fmt(before.withTarget)}</strong> referrals with a
-                    target were past it and none of them held a position.{' '}
+                    target were past it, and none held a position.{' '}
                     <strong className="num">{fmt(run.ranked)}</strong> hold one now, inside their
-                    own category and past target first within it, each carrying what it cited.
+                    own category, past target first, each carrying what it cited.
                   </p>
                 )}
+                {/* The count is the "outside" readout directly above; printing it
+                    again here was the same figure twice in two inches. */}
                 <p className="run-done-p measure">
-                  The <strong className="num">{fmt(run.refused_paediatric)}</strong> outside are
-                  paediatric referrals. NEWS2 is validated in adults, so the agent refuses them
-                  rather than scoring a child on an adult scale: a statement about coverage,
-                  not a low position.
+                  NEWS2 is validated in adults, so the agent refuses paediatric referrals rather
+                  than scoring a child on an adult scale: a coverage statement, not a low
+                  position.
                 </p>
                 <div className="run-go">
                   <button className="cta" onClick={onSeeGraph}>

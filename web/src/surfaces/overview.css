@@ -75,6 +75,12 @@
   font-size: var(--t-small); color: var(--text);
 }
 .ov-asof.is-off > span { min-width: 0; }
+/* The <Aside> that now holds the D2 quirk sits where that span did, and has to
+   take the rest of the row rather than the width of its own longest line: the
+   summary is one sentence and the revealed half is three, so a shrink-to-fit
+   box would set its column from the wrong half. `.aside` already carries
+   min-width: 0 (aside.css), which is the other half of the same guard. */
+.ov-asof.is-off > .aside { flex: 1 1 auto; }
 
 /* --- before anything has been ranked -------------------------------------
    A 404 from /api/decision is the ordinary state, not a failure, so this reads
@@ -182,6 +188,11 @@
   padding: var(--d2) var(--d4) var(--d3);
   border-top: 1px solid var(--rule); background: var(--bg-sunk);
 }
+/* NO RULE FOR THE CAPTION'S DISCLOSURE, deliberately. .ov-cite is 11px at
+   line-height 1.5 -- exactly the geometry .aside-t derives its own cancelling
+   margin from -- and colour, size and the body's rule all inherit or come from
+   aside.css. A rule here would only be a second place for them to drift. */
+
 .ov-quiet { font-size: var(--t-small); color: var(--text-2); margin: var(--d3) 0 0; }
 
 /* --- tables ---------------------------------------------------------------

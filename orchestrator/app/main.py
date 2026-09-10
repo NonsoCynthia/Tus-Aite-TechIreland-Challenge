@@ -390,6 +390,48 @@ def reference() -> dict[str, Any]:
     return out
 
 
+# ------------------------------------------------- the hospital roster
+
+_hosp_cache: dict[str, Any] = {}
+
+
+@app.get("/api/hospitals")
+def hospitals() -> dict[str, Any]:
+    """Which hospitals exist, and what they are called.
+
+    `core.hospitals` has held both since the seed, and no endpoint served it, so
+    App.tsx carried the HIPE ids AND the display names as a literal -- two lines
+    above a comment reading "Hospital-days are DISCOVERED, never hardcoded",
+    which was true of the days and never true of the hospitals above them. A
+    third hospital in the seed was invisible to the UI and a renamed one would
+    have shown its old name for as long as nobody edited the frontend.
+
+    Seed data, so it is read once and cached for the life of the process, the
+    same as /api/reference.
+
+    An EMPTY list is not the same claim as "no hospitals exist", and this
+    handler cannot tell the two apart: sources.query() returns [] when the read
+    fails rather than raising. So an empty read is NOT cached -- a retry costs
+    one SELECT and might succeed -- and the caller is told in api.ts to read []
+    as "the roster could not be read".
+    """
+    if _hosp_cache:
+        return _hosp_cache
+    rows = query(
+        "SELECT hospital_hipe, hospital_name, hse_health_region, hospital_type, "
+        "       total_inpatient_beds "
+        "  FROM core.hospitals ORDER BY hospital_hipe")
+    for r in rows:
+        # char(4) in 003_core.sql. The UI compares this against the selector's
+        # string value, so it is carried as a stripped string from here rather
+        # than left to whatever the driver and JSON make of a padded char.
+        r["hospital_hipe"] = str(r["hospital_hipe"]).strip()
+    out = {"hospitals": rows}
+    if rows:
+        _hosp_cache.update(out)
+    return out
+
+
 # ------------------------------------------------- overrides, read back (A6)
 
 @app.get("/api/overrides/{hospital_hipe}/{as_of_date}")

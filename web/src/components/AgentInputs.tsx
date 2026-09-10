@@ -2,6 +2,7 @@ import { BedDouble, CalendarDays, Stethoscope, TriangleAlert } from 'lucide-reac
 import { Vitals, type AgeStats } from './Vitals'
 import { SAFE_OCCUPANCY, SEV_INTEGRITY, sevOccupancy } from '../lib/severity'
 import { SevBar, SevChip } from './Severity'
+import { Aside } from './Aside'
 import type { Observation } from '../lib/types'
 
 /** What actually reached each agent, and (for capacity) what it could not do
@@ -257,8 +258,7 @@ export function AgentInputs({
           {!capacityRan && (
             <p className="pt-mini">
               No capacity score was recorded for this referral, so nothing below was read by an
-              agent. The ward and the clinic sessions are this specialty's operational context,
-              drawn for the reader.
+              agent. The ward and the clinic sessions are this specialty's context.
             </p>
           )}
 
@@ -310,16 +310,16 @@ export function AgentInputs({
                 </p>
               ) : readDate != null ? (
                 <p className="pt-mini">
-                  The recorded citation names the session of{' '}
+                  The citation names the session of{' '}
                   <span className="num">{dateShort(readDate)}</span>, which is not among the{' '}
-                  <span className="num">{sessions.length}</span> sessions returned for this
-                  specialty, so no row above is marked as the one that was read.
+                  <span className="num">{sessions.length}</span> sessions here, so no row above is
+                  marked as read.
                 </p>
               ) : capacityRan ? (
                 <p className="pt-mini">
-                  The capacity agent scored this referral, but no clinic session is cited on
-                  that score, so which of these <span className="num">{sessions.length}</span>{' '}
-                  it read is not on the record. None is marked read.
+                  The capacity agent scored this referral but cited no clinic session, so which of
+                  these <span className="num">{sessions.length}</span> it read is not on the
+                  record.
                 </p>
               ) : (
                 <p className="pt-mini">
@@ -553,27 +553,37 @@ function WardPanel({ w, read, pressure }: {
               </p>
               {/* The bed counts below are the ward's and the allocation is one
                   specialty's, so the panel says which is which rather than
-                  leaving a reader to divide one into the other. */}
+                  leaving a reader to divide one into the other.
+
+                  A SPLIT, not a full conversion. WHICH NUMBER THE PERCENTAGE
+                  DIVIDES BY is the fact these figures were wrong about until
+                  last round, so it stays on the visible line, with the two
+                  counts in it. What goes behind the toggle is the argument for
+                  it: the establishment it is NOT measured against, and the
+                  allocation below that a reader might otherwise divide into.
+                  Hiding the denominator itself would put the panel back where
+                  it started. */}
               {census != null && (censusHolds ? (
-                <p className="pt-mini">
-                  That percentage is <span className="num">{fmt(occ!)}</span> of the{' '}
-                  <span className="num">{fmt(census!)}</span> beds recorded on this ward
-                  (occupied + free). It is not measured against a bed establishment.
+                <Aside className="pt-mini" label="why occupied + free is the denominator"
+                       summary={<>That percentage is <span className="num">{fmt(occ!)}</span> of the{' '}
+                         <span className="num">{fmt(census!)}</span> beds recorded on this ward
+                         (occupied + free).</>}>
+                  It is not measured against a bed establishment.
                   {w.nominal_beds != null && (
                     <> The <span className="num">{fmt(w.nominal_beds)}</span> allocated below is
                       what this ward sets aside for this specialty, which is a share of the ward
                       and not the count the percentage divides by. The ward's own nominal total
                       is in the Overview's ward table.</>
                   )}
-                </p>
+                </Aside>
               ) : (
                 <p className="pt-mini">
                   <SevChip sev={SEV_INTEGRITY}>census does not reconcile</SevChip>{' '}
                   <span className="num">{fmt(occ ?? 0)}</span> occupied and{' '}
                   <span className="num">{fmt(free ?? 0)}</span> free make{' '}
                   <span className="num">{fmt(census)}</span>, which is not what{' '}
-                  <span className="num">{pct.toFixed(1)}%</span> was computed from. The two are
-                  left standing apart rather than divided into each other.
+                  <span className="num">{pct.toFixed(1)}%</span> was computed from, so the two are
+                  left standing apart.
                 </p>
               ))}
             </>

@@ -137,7 +137,7 @@ export function Override({ patient, decision, displayedOrder, onClose, onDone }:
           <strong>This crosses a clinical category boundary.</strong>
           <p>
             {fromBand} referrals are seen before {movingTo} ones. The system will not make
-            this move; you can, and it is recorded as recorded against the name above, not made by the system.
+            this move; you can, and it is recorded against the name above.
           </p>
           <label className="ovr-attest">
             <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />

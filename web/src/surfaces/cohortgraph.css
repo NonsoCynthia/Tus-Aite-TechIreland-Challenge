@@ -68,11 +68,23 @@
 .cg-lg-bar { height: 3px; background: var(--taupe-14); }
 .cg-lg-bar b { display: block; height: 100%; }
 .cg-lg-c { text-align: right; color: var(--text-3); font-size: var(--t-micro); }
+/* The two counting notes are one <Aside> now, so this class dresses its root
+   <div> rather than two <p>s: one rule above the group instead of two, and one
+   toggle instead of a second paragraph. Nothing here sizes the toggle -- the
+   cancelling margin .aside-t derives holds at 11px, so the summary's line box
+   is the line box it had as a paragraph. */
 .cg-note {
   margin: var(--d2) 0 0; padding-top: var(--d3);
   border-top: 1px solid var(--rule);
   font-size: var(--t-micro); line-height: 1.55; color: var(--text-2);
 }
+/* The revealed half is two paragraphs. Their gap is the panel's own spacing
+   step, not the UA's 1em, which at 11px would open an 11px hole inside a 296px
+   panel. aside.css already zeroes the first and last edge; this is more
+   specific than that rule, so the first child is restated rather than relied
+   on. */
+.cg-note .aside-b p { margin: var(--d2) 0 0; }
+.cg-note .aside-b p:first-child { margin-top: 0; }
 
 /* --- segmented controls -------------------------------------------------- */
 .cg-seg { display: flex; border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; }

@@ -11,6 +11,7 @@ import { Provenance } from '../components/Provenance'
 import { Override } from '../components/Override'
 import { Compare, WhatSeparates } from '../components/Compare'
 import { AgentInputs, type CapacityContext } from '../components/AgentInputs'
+import { Aside } from '../components/Aside'
 import type { AgeStats } from '../components/Vitals'
 import type { Decision, Overrides, Ranking, Reference, RuleCheck } from '../lib/types'
 import './patient.css'
@@ -415,10 +416,17 @@ function Limits({ pathway, clinical, news2, cohort, refused }: {
                    note="a patient-reported number NEWS2 has no parameter for" />
         <LimitChip k="Manchester triage" v={clinical?.mts_category ?? null}
                    tag="read but not scored · ADR-004"
-                   note="MTS carries its own red/orange/yellow/green/blue vocabulary. Those are not this product's triage hues, so the category is shown as a word and nothing else." />
+                   note="MTS carries its own red/orange/yellow/green/blue vocabulary, which is not this product's, so the category is shown as a word." />
+        {/* The one chip whose note is a DEFINITION rather than a description of
+            this record: a data-model quirk true on all 14 hospital-days and on
+            every one of the 308 pages. What the code IS stays visible, because
+            a reader who takes it for a finding has misread the panel; how the
+            page then treats it is the argument for that and goes behind. */}
         <LimitChip k="Condition" v={clinical?.icd10am_code ?? null}
                    tag="record field · not evidence"
-                   note="in this dataset the code is a weighted random draw over the specialty's case mix, statistically independent of acuity. It is never styled as a finding, and no code dictionary ships with this page." />
+                   note="in this dataset the code is a weighted random draw over the specialty's case mix, statistically independent of acuity"
+                   label="how the page treats it"
+                   detail="It is never styled as a finding, and no code dictionary ships with this page." />
       </div>
 
       {vals.length > 0 && (
@@ -469,7 +477,14 @@ function Limits({ pathway, clinical, news2, cohort, refused }: {
   )
 }
 
-function LimitChip({ k, v, tag, note }: { k: string; v: string | null; tag: string; note: string }) {
+/** `note` is the line that stays, open or shut. `detail` is optional and only
+ *  the chips whose note is a DEFINITION carry one: two of the three are short
+ *  statements about this record and a toggle for either would be more chrome
+ *  than the paragraph. */
+function LimitChip({ k, v, tag, note, label, detail }: {
+  k: string; v: string | null; tag: string; note: string
+  label?: string; detail?: string
+}) {
   return (
     <div className="pt-chip">
       <div className="pt-chip-h">
@@ -477,7 +492,9 @@ function LimitChip({ k, v, tag, note }: { k: string; v: string | null; tag: stri
         <span className="pt-chip-tag">{tag}</span>
       </div>
       <div className="pt-chip-v">{v ?? <span className="pt-flag">not recorded</span>}</div>
-      <p className="pt-mini">{note}</p>
+      {detail && label
+        ? <Aside className="pt-mini" label={label} summary={note}>{detail}</Aside>
+        : <p className="pt-mini">{note}</p>}
     </div>
   )
 }
@@ -555,13 +572,22 @@ function WhyHere({ placed, decision, reference, ages, compare, onCompare, onClos
         </div>
       </div>
 
-      <p className="p-note">
+      {/* A SPLIT, not a full conversion. The percentile and where the split
+          comes from are definitions: true on every hospital-day and on all 308
+          of these pages. The GUARANTEE is not. ADR-007 says capacity is
+          pressure, sets alpha for the hospital-day and never appears to move an
+          individual -- and alpha is multiplied into this person's own urgency
+          score three rows above. So the claim that it is one number for
+          everyone and moves nobody between categories is the line that stays,
+          and only the argument for it goes behind the toggle. */}
+      <Aside className="p-note" label="how these two terms are computed"
+             summary={<>The {Math.round(a * 100)}/{Math.round((1 - a) * 100)} split is set once for
+               the whole hospital-day. It is the same number for all{' '}
+               {fmt(decision.rankings.length)} people and moves nobody between categories.</>}>
         Waiting time is a percentile <em>within this category</em>, not a raw day count, so one
-        very long waiter cannot flatten everyone else. The {Math.round(a * 100)}/{Math.round((1 - a) * 100)}{' '}
-        split is set once for the whole hospital-day from how pressured its specialties are. It
-        is the same number for all {fmt(decision.rankings.length)} people here and cannot move
-        anyone between categories.
-      </p>
+        very long waiter cannot flatten everyone else. The split itself comes from how pressured
+        this hospital-day's specialties are.
+      </Aside>
 
       {checks.length > 0 && (
         <div className="pt-checks">
@@ -665,10 +691,10 @@ function NotScoredYet({ refused, skipped, error }: {
         </strong>
         <p>
           {refused
-            ? 'NEWS2 is validated in adults, so the urgency agent refuses paediatric specialties rather than scoring a child on an adult scale. That is a statement about what this system covers, not a low position. Everything else on this page was recorded by a clinician and is unaffected.'
+            ? 'NEWS2 is validated in adults, so the urgency agent refuses paediatric specialties rather than scoring a child on an adult scale: a coverage statement, not a low position. Everything else here was recorded by a clinician and is unaffected.'
             : skipped
-              ? 'The urgency agent found no observation on this referral. NEWS2 needs six readings and there were none, so nothing was scored. A missing measurement is a data-quality incident and is never shown as a low score.'
-              : 'Everything else here was recorded by a clinician and is unaffected. There is no position, no priority arithmetic and no citation chain, because nothing has been computed for this day. Runs happen on the newest day holding data.'}
+              ? 'The urgency agent found no observation on this referral. NEWS2 needs six readings and there were none, so nothing was scored. A missing measurement is a data-quality incident, never a low score.'
+              : 'Nothing has been computed for this day: no position, no priority arithmetic, no citation chain. Everything else here was recorded by a clinician and is unaffected. Runs happen on the newest day holding data.'}
         </p>
       </div>
     </section>

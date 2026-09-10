@@ -106,9 +106,12 @@ bulk validation runs.
 - Provides visible accept, reorder, and override controls.
 - Logs every clinician action back into the graph.
 - Shows CPC/CRT rule violations prominently.
-- Provides JSON API endpoints alongside the server-rendered UI.
+- Serves the JSON API and the built single-page UI from one origin, so the browser never makes a
+  cross-origin call and the retrieval service's bearer token never reaches it.
 
-Implementation tools: FastAPI, Jinja2, HTMX, Uvicorn, HTML, CSS.
+Implementation tools: React 19, TypeScript, Vite, TanStack Query, Reagraph (WebGL). The bundle is
+built at image build time and served as static files by the FastAPI/Uvicorn orchestrator; nothing
+in this interface is server-rendered. See `web/README.md`.
 
 ### 9. Frontend Aesthetics and Interaction Design
 
@@ -121,6 +124,9 @@ Implementation tools: FastAPI, Jinja2, HTMX, Uvicorn, HTML, CSS.
 - Override controls are always visible and treated as first-class clinician judgement, not errors.
 - UI copy avoids diagnostic claims and avoids implying the system has acted on a patient.
 - Designed for WCAG 2.2 AA contrast and keyboard operation.
+
+Implementation tools: hand-written CSS with custom-property design tokens (`web/src/tokens.css`),
+no CSS framework, self-hosted fonts so the interface makes zero external requests.
 
 ### 10. CPC/CRT Compliance Validation
 
@@ -159,7 +165,7 @@ RDF/OWL knowledge graph in Oxigraph
 Coordinating agent: ranked list + Decision/cites triples
         |
         v
-FastAPI + Jinja2 + HTMX clinician interface
+React + Vite clinician interface, built into the FastAPI orchestrator image
         |
         v
 Clinician accept/reorder/override, logged back to graph
@@ -171,9 +177,8 @@ Clinician accept/reorder/override, logged back to graph
 |---|---|
 | Language | Python 3.12 |
 | Web service | FastAPI |
-| Templates | Jinja2 |
-| Interactivity | HTMX |
-| Frontend | HTML + CSS, no SPA build step |
+| Clinician interface | React 19 + TypeScript, built by Vite |
+| Interface delivery | compiled in the orchestrator image, served as static files |
 | Triple store | Oxigraph |
 | Graph standards | RDF, OWL, SPARQL 1.1 |
 | Graph client/building | rdflib, httpx |

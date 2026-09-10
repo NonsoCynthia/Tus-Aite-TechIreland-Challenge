@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Maximize2, RotateCcw, TriangleAlert, ZoomIn, ZoomOut } from 'lucide-react'
 import type { GraphCanvasRef, GraphEdge as RGEdge, GraphNode as RGNode } from 'reagraph'
+import { Aside } from '../components/Aside'
 import { api } from '../lib/api'
 import type { CohortGraph, Decision } from '../lib/types'
 import './cohortgraph.css'
@@ -214,24 +215,45 @@ export function CohortGraphSurface({ hospital, date, onOpenPatient }: {
             )
           })}
         </ul>
-        {/* the finding the picture makes, said once */}
+        {/* TWO paragraphs of 201 and 205 characters, under a legend that has
+            already printed every count they cite. Both were DEFINITIONS -- what
+            an edge is, and what the shape of a specialty-scored graph looks like
+            -- true on every run, read once and re-read on every visit after
+            that. They are one disclosure now, and one toggle rather than two,
+            because a 296px panel floating over a graph cannot afford two.
+
+            WHAT STAYS VISIBLE IS THE CLAIM, and it is invariant 3's: capacity is
+            resource pressure, it sets alpha for the hospital-day, and it never
+            appears to move an individual. The picture puts that question on the
+            screen -- every placement running into a handful of ward nodes -- so
+            the answer cannot be behind a click. The counts that are the ARGUMENT
+            for it can: they are in the legend column directly above, with their
+            numbers, which is invariant 8 satisfied without this paragraph.
+
+            NOT the scope note. "150 of 305" and what the three headline figures
+            are counts OF stay where they are, in the panel on the left, in plain
+            text: that line is this run's state, not a definition, and it is the
+            only thing on the surface that says the figures are of the drawn
+            subset. */}
         {g.data && (
-          <p className="cg-note">
-            An <strong>evidence link</strong> is one role-tagged edge from a
-            placement. A placement's six cited vitals arrive as one link to its
-            urgency score, so the recorded citation count is higher than the
-            count of lines here.{' '}
-          </p>
-        )}
-        {g.data && (
-          <p className="cg-note">
-            The <strong className="num">{fmtN(g.data.placements)}</strong> placements drawn here
-            carry <strong className="num">{shares.find(([k]) => k === 'score')?.[1] ?? 0}</strong>{' '}
-            urgency scores of their own and converge on{' '}
-            <strong className="num">{shares.find(([k]) => k === 'bed_status')?.[1] ?? 0}</strong>{' '}
-            ward snapshots. Capacity is scored per specialty, so it sets one weight
-            for the whole hospital-day and can move nobody.
-          </p>
+          <Aside
+            className="cg-note"
+            label="how these counts are built"
+            summary="Placements share a handful of ward snapshots: capacity is scored per specialty, one weight for the hospital-day that can move nobody.">
+            <p>
+              An <strong>evidence link</strong> is one role-tagged edge from a
+              placement. A placement's six cited vitals arrive as one link to its
+              urgency score, so the recorded citation count is higher than the
+              count of lines here.
+            </p>
+            <p>
+              The <strong className="num">{fmtN(g.data.placements)}</strong> placements drawn here
+              carry <strong className="num">{shares.find(([k]) => k === 'score')?.[1] ?? 0}</strong>{' '}
+              urgency scores of their own and share{' '}
+              <strong className="num">{shares.find(([k]) => k === 'bed_status')?.[1] ?? 0}</strong>{' '}
+              ward snapshots between them.
+            </p>
+          </Aside>
         )}
       </div>
 

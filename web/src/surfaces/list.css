@@ -309,6 +309,24 @@
   margin: 0 0 var(--d3); max-width: 104ch;
 }
 .lst-note strong { color: var(--text); }
+
+/* The Outside tab's note is the one SPLIT on this surface, so .lst-note is now
+   also the class the <Aside> root carries (components/Aside.tsx merges it). The
+   caller owns the typography, which is the whole point of that merge: the
+   font-size, colour, line-height and max-width above already reach the summary
+   line and the revealed half alike, and aside.css kills the summary <p>'s own
+   margin. Nothing about the note's appearance changes when it is shut.
+
+   These two rules are the only thing this surface has to add, and they do one
+   job: give the revealed paragraphs the note's own rhythm. Written as `margin: 0`
+   plus `p + p` rather than as a first/last-child pair, so they never have to out-
+   specify aside.css's own `.aside-b > :first-child` and `> :last-child` -- there
+   is no margin left for those to zero. No colour, no ground, no border: the one
+   rule line down the left of the revealed half is aside.css's, and it is a
+   border, not a shadow. */
+.lst-note .aside-b p { margin: 0; }
+.lst-note .aside-b p + p { margin-top: var(--d2); }
+
 .lst-empty { padding: var(--d5) 0; }
 
 /* The severity scale, once, immediately above the rows it grades -- inside the
