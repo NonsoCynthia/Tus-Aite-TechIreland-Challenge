@@ -184,3 +184,21 @@ Three reviewers, three lenses, run against the code and the live API.
 | Two 9px labels carrying values | **OPEN** | |
 
 **Regression the gates caught:** the dead-CSS sweep removed `.cat-semiurgent` and `.cat-uncategorised`, which are built by string concatenation and invisible to a grep. Two of five triage swatches had been rendering with no colour. Restored, with a comment saying why they cannot be swept.
+
+---
+
+## Review gates — round 1 closed
+
+All 15 findings left open after the first pass are now fixed, except one that is
+not ours:
+
+**`"of 17"` — OPEN, upstream.** `lib/news2.ts` mirrors the agent's six band
+tables exactly, and they top out at 3 each, so 18 is reachable. The agent's
+`NEWS2_MAX = 17` rests on a docstring claiming *"temperature's top band is 2"*,
+which its own code contradicts (`temp <= 35.0 → 3`). Not reachable on this data —
+the minimum temperature across 5,200 observations is 35.2 — and the UI shows the
+constant the agent normalises against, so changing it here would desync the two.
+**For the urgency-agent track to resolve.**
+
+Final state: **50 planned tasks — 49 PASS, 1 PARTIAL (F5, day strip).
+42 review findings — 41 fixed, 1 upstream.** demo_path.py 71/71.
