@@ -163,7 +163,14 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
     c?.referral_received_date ? { key: 'rec', date: c.referral_received_date, label: 'received by the hospital' } : null,
     c?.obs_datetime ? {
       key: 'obs', date: c.obs_datetime.slice(0, 10), label: 'vital signs taken', clinical: true,
-      detail: `NEWS2 ${c.news2 ?? '—'} of 17${c.reading_age_days != null ? ` · ${fmt(c.reading_age_days)} days ago` : ''}`,
+      // The refusal has to reach HERE too. This was the one place on the page
+      // where the total appeared without the 'not applied' label that Vitals
+      // attaches to the identical number, so the page contradicted itself about
+      // a child within two sections. The reading's AGE still travels either way:
+      // a refusal is a statement about the instrument, not about the record.
+      detail: refused
+        ? `NEWS2 not applied${c.reading_age_days != null ? ` · ${fmt(c.reading_age_days)} days ago` : ''}`
+        : `NEWS2 ${c.news2 ?? '—'} of 17${c.reading_age_days != null ? ` · ${fmt(c.reading_age_days)} days ago` : ''}`,
     } : null,
     c?.sent_for_triage_date ? { key: 'snt', date: c.sent_for_triage_date, label: 'sent for triage' } : null,
     c?.triage_date ? {
@@ -356,7 +363,7 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
       ) : null}
 
       {/* 6: the edge of the instrument */}
-      <Limits pathway={pathway} clinical={c ?? null}
+      <Limits pathway={pathway} clinical={c ?? null} refused={refused}
               news2={ops.data?.clinical} cohort={cohort.data?.referrals} />
     </div>
   )
@@ -366,18 +373,27 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
 /** Three fields that were on the record and did not enter the score, each
  *  carrying where it came from, and the one statistic that explains why the
  *  instrument cannot do the discriminating on its own. */
-function Limits({ pathway, clinical, news2, cohort }: {
+function Limits({ pathway, clinical, news2, cohort, refused }: {
   pathway: string
   clinical: { pain: number | null; mts_category: string | null; icd10am_code: string | null } | null
   news2: Record<string, { news2: number | null }> | undefined
   cohort: Array<{ pathway_number: string; cpc: number | null }> | undefined
+  /** Specialty 0601. The urgency agent refuses it unconditionally, so there is
+      no score for this person -- only an adult instrument's reading of a child.
+      Round 1 vetoed exactly this sentence in Vitals; the flag never reached
+      here, so it came back one screen lower in a component the fix missed. */
+  refused: boolean
 }) {
   // Counted from this hospital-day, never typed in as a sentence.
   const vals = Object.values(news2 ?? {}).map((x) => x.news2).filter((x): x is number => x != null)
   const low = vals.filter((v) => v <= 2).length
   const urgent = (cohort ?? []).filter((r) => r.cpc === 1)
   const urgentZero = urgent.filter((r) => news2?.[r.pathway_number]?.news2 === 0).length
-  const mine = news2?.[pathway]?.news2 ?? null
+  // Gated, not merely unlabelled: a refused referral has no score to place on
+  // this axis, so it gets no `is-mine` bar and no 'scores N' strip. The
+  // histogram itself stays -- it is a statement about the INSTRUMENT across the
+  // hospital-day, not a claim about this person.
+  const mine = refused ? null : (news2?.[pathway]?.news2 ?? null)
   const buckets: number[] = []
   for (const v of vals) buckets[v] = (buckets[v] ?? 0) + 1
   const top = Math.max(1, ...buckets.filter((x) => x != null))
@@ -430,11 +446,13 @@ function Limits({ pathway, clinical, news2, cohort }: {
               <span className="num">{fmt(urgent.length)}</span> marked Urgent score{' '}
               <span className="num">0</span>
             </span>
-            {mine != null && (
+            {refused ? (
+              <span className="pt-stat">NEWS2 was not applied to this referral</span>
+            ) : mine != null ? (
               <span className="pt-stat is-mine">
                 this referral scores <strong className="num">{mine}</strong>
               </span>
-            )}
+            ) : null}
           </div>
           <p className="p-note">
             Six parameters cannot separate a cohort sitting almost entirely at the bottom of the

@@ -12,6 +12,9 @@ import { crtDays, isRefusedPaediatric, ruleStatement, specialtyName } from '../l
 import { plantedCase } from '../lib/planted'
 import { sevBreach, sevReadingAge, sevWaitRatio } from '../lib/severity'
 import type { Sev } from '../lib/severity'
+/** Median wait. ONE home, lib/stats.ts, shared with Overview.tsx -- the two
+ *  surfaces used to hold a copy each and printed 141 against 142 on 2026-08-21. */
+import { median } from '../lib/stats'
 import { SevChip, SevLegend } from '../components/Severity'
 import { Override } from '../components/Override'
 import type {
@@ -503,12 +506,13 @@ export function List({ hospital, date, reference, onOpen }: {
     if (ranked || !rows.length) return null
     const waits = rows.map((r) => r.adjusted_wait_days ?? 0).sort((a, b) => a - b)
     const n = waits.length
-    const median = n % 2 ? waits[(n - 1) / 2] : Math.round((waits[n / 2 - 1] + waits[n / 2]) / 2)
     const ratios = rows.map((r) => ratioOf(r, reference)).filter((x): x is number => x != null)
     const steps = rows.map((r) => sevReadingAge(r.clin?.reading_age_days ?? null))
     const n2 = rows.map((r) => r.clin?.news2).filter((x): x is number => x != null)
     return {
-      median, min: waits[0], max: waits[n - 1],
+      // lib/stats.ts, the same call Overview.tsx makes. Sorted here already for
+      // min/max; median() sorts its own copy, so the two cannot drift.
+      median: median(waits), min: waits[0], max: waits[n - 1],
       worst: ratios.length ? Math.max(...ratios) : null,
       // graded by the frozen scale rather than by a threshold invented here:
       // sevReadingAge answers what a year-old and a two-year-old reading are.
@@ -1316,6 +1320,11 @@ function Th({ k, label, sub, sort, onSort, align, k2, sub2 }: {
 
 /* --------------------------------------------------------------- one row -- */
 
+/* `outside` is a TAB fact (this row is not in the ranking). Whether NEWS2 may be
+   shown as acuity is a SPECIALTY fact. They coincide today only because the
+   grouping at :483 checks refusal before band, which a reviewer flagged as the
+   one line standing between this and a third escape of the same leak. So the
+   NEWS2 cell reads its own derivation and the coincidence stops being load-bearing. */
 function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expanded, onToggle, onOpen }: {
   r: Row; i: number; ranked: boolean; outside: boolean; narrow: boolean
   reference: Reference | undefined; tight: boolean; expanded: boolean
@@ -1334,6 +1343,12 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
   // 31.1x); the reading's age is the one that says a number cannot be trusted.
   const waitSev = sevWaitRatio(ratio)
   const ageSev = sevReadingAge(age)
+
+  // NEWS2 may not be shown as acuity for a refused specialty. `outside` alone
+  // would be enough only while refusal is grouped before band; this is the same
+  // derivation the refused set and the patient page use, so the cell is right
+  // whatever tab it is drawn in.
+  const naNews2 = outside || isRefusedPaediatric(r.specialty_hipe)
 
   const moved = !!r.ovr && r.ovrLive && r.ovr.to_position !== r.ovr.from_position
   // The ORDINAL is the row's place in the displayed order, not the coordinator's
@@ -1578,8 +1593,8 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
           patient page already does (Vitals.tsx, applied={false}). */}
       <td className="c-news">
         <div className="cell">
-          <span className={'n2 num' + (outside ? ' is-na' : '')}>
-            {outside
+          <span className={'n2 num' + (naNews2 ? ' is-na' : '')}>
+            {naNews2
               ? <span className="n2-na">not applied<span className="of"> · adult scale</span></span>
               : (
                 <>
@@ -1788,10 +1803,24 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
     ?? ctx.data?.observations[0]
 
   const wardKey = capCites.find((c) => c.evidence_type === 'bed_status')
+  // Same derivation as List's `refused` set (:475) and Patient's (:87): the
+  // SPECIALTY, never a decision -- /api/decision 404s on 13 of 14 days.
+  const evRefused = isRefusedPaediatric(r.specialty_hipe)
   const clinicKey = capCites.find((c) => c.evidence_type === 'clinic_session')
   const ward = wardKey ? ops?.wards.find((w) => w.ward_id === keyParts(wardKey.evidence_key)[1]) : undefined
   const clinic = clinicKey
     ? ops?.clinics.find((c) => c.clinic_code === keyParts(clinicKey.evidence_key)[1])
+    : undefined
+  /** `slots_booked / slots_total / slots_available` on the clinic row are the
+   *  FIVE-SESSION SERIES totals. `cited_pressure` is booked / total for the ONE
+   *  session the agent actually read. Printing both on one line made this
+   *  surface refute itself: General Surgery read "15 free - pressure 1.000"
+   *  while the session cited was 11 of 11 with nothing free. Resolve the cited
+   *  row so its own numbers can stand beside its own pressure.
+   *  Same resolution as Overview.tsx:569 citedSession(); kept local because
+   *  Overview.tsx is another agent's file this week. */
+  const citedSess = clinic && clinic.cited_session_date
+    ? clinic.sessions.find((s) => s.session_date === clinic.cited_session_date)
     : undefined
 
   const checks: RuleCheck[] = r.rank?.rule_checks ?? []
@@ -1966,8 +1995,19 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
               </div>
             ))}
           </div>
+          {/* The refusal is derived HERE from the specialty rather than taken from
+              a prop. Evidence is reachable from every tab, and the NEWS2 column's
+              own gate is per-TAB (`outside={k === 'Outside'}`), correct only while
+              the grouping at :483 puts refusal before band. Deriving it at the
+              point of use means reordering that ternary can never re-open this
+              sentence. The vitals themselves stay: a clinician recorded them, and
+              a refusal is a statement about the INSTRUMENT, not about the record. */}
           <p className="ev-cav">
-            {obsCites.length
+            {evRefused
+              ? <>These are the vitals a NEWS2 would be built from. NEWS2 is validated in
+                adults, so specialty 0601 is refused rather than scored, and no total was
+                formed from them.</>
+              : obsCites.length
               ? <>A clay underline marks a vital the urgency agent actually cited. NEWS2{' '}
                 <span className="num">{r.clin?.news2 ?? obs?.news2 ?? '—'}</span> of 17 is the
                 sum of these, zeros included.</>
@@ -1981,7 +2021,12 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
           <h3 className="ev-h">
             Cited capacity
             <span className="ev-hn">
-              {capCites.length ? `${capCites.length} rows · specialty-level` : 'no citations'}
+              {/* "rows" counted citations and read as lines on screen; the
+                  clinic citation now needs two lines to stop contradicting
+                  itself, so the count names what it actually counts. */}
+              {capCites.length
+                ? `${capCites.length} citation${capCites.length === 1 ? '' : 's'} · specialty-level`
+                : 'no citations'}
             </span>
           </h3>
           {capCites.length ? (
@@ -2010,19 +2055,65 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
                   </div>
                 )}
                 {clinic && clinicKey && (
-                  <div className="ev-cap-r">
-                    <span className="lab">clinic session</span>
-                    <span className="ev-cap-k num">{clinic.clinic_code}</span>
-                    <span className="ev-cap-v">
-                      <b className="num">{clinic.slots_booked}</b> of{' '}
-                      <span className="num">{clinic.slots_total}</span> slots booked ·{' '}
-                      <span className="num">{clinic.slots_available}</span> free · pressure{' '}
-                      <span className="num">{clinic.cited_pressure.toFixed(3)}</span>
-                    </span>
-                    <span className="ev-cap-d">
-                      the one session cited: {clinic.cited_session_date ?? keyParts(clinicKey.evidence_key)[2]}
-                    </span>
-                  </div>
+                  <>
+                    {/* The cited session, and nothing else, on the line that
+                        carries the cited pressure. booked / total here divides
+                        into the pressure printed beside it, every clinic, every
+                        day. */}
+                    <div className="ev-cap-r">
+                      <span className="lab">clinic session</span>
+                      <span className="ev-cap-k num">{clinic.clinic_code ?? '\u2014'}</span>
+                      <span className="ev-cap-v">
+                        {citedSess == null ? (
+                          /* The cited date is not among the sessions returned,
+                             so its slots cannot be shown and its pressure
+                             cannot be checked here. Absence, stated. */
+                          <>slots for that session were not returned · pressure{' '}
+                            <span className="num">{clinic.cited_pressure.toFixed(3)}</span>{' '}
+                            cannot be reconciled on this screen</>
+                        ) : citedSess.slots_total === 0 ? (
+                          /* scoring.py returns exactly 1.0 when slots_total is
+                             0, so "every slot taken" and "no clinic sat" are
+                             the same number. Only the session tells them apart,
+                             and this one says no clinic sat. */
+                          <>no clinic sat that day · <span className="num">0</span> slots offered ·
+                            pressure <span className="num">{clinic.cited_pressure.toFixed(3)}</span>{' '}
+                            is the value the agent uses when there is no session to divide into</>
+                        ) : (
+                          <><b className="num">{citedSess.slots_booked}</b> of{' '}
+                            <span className="num">{citedSess.slots_total}</span> slots booked ·{' '}
+                            <span className="num">{citedSess.slots_available}</span> free · pressure{' '}
+                            <span className="num">{clinic.cited_pressure.toFixed(3)}</span></>
+                        )}
+                      </span>
+                      <span className="ev-cap-d">
+                        the one session cited: {clinic.cited_session_date ?? keyParts(clinicKey.evidence_key)[2]}
+                      </span>
+                    </div>
+                    {/* The series totals are worth keeping and were the whole
+                        of this line before. They are context around the cited
+                        row, never the arithmetic behind its pressure, so they
+                        get their own line and say so. */}
+                    <div className="ev-cap-r">
+                      <span className="lab">clinic series</span>
+                      <span className="ev-cap-k num">
+                        {clinic.sessions.length
+                          ? `${clinic.sessions.length} sessions`
+                          : '\u2014'}
+                      </span>
+                      <span className="ev-cap-v">
+                        {clinic.sessions.length
+                          ? `across ${clinic.sessions.length} session${clinic.sessions.length === 1 ? '' : 's'}: `
+                          : 'series total, no sessions returned: '}
+                        <span className="num">{clinic.slots_booked}</span> of{' '}
+                        <span className="num">{clinic.slots_total}</span> booked ·{' '}
+                        <span className="num">{clinic.slots_available}</span> free
+                      </span>
+                      <span className="ev-cap-d">
+                        context, not the arithmetic behind the pressure above
+                      </span>
+                    </div>
+                  </>
                 )}
                 {!ward && !clinic && (
                   <div className="ev-cap-r">

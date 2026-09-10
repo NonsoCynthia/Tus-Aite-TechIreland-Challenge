@@ -185,8 +185,14 @@ export function WhatSeparates({ a, b, alpha }: { a: Ranking; b: Ranking; alpha: 
     body = <><strong>the clinical category</strong>: {by.a.text} against {by.b.text}. A hard
       boundary, decided before any score.</>
   } else if (by.rule === 'Past their target') {
-    const past = by.a.text === 'yes' ? a : b
-    const within = by.a.text === 'yes' ? b : a
+    // Read the side off the FACT, never off the rendered cell text. The cells
+    // say 'past target' / 'within target' / 'no target' (tier(), above) and
+    // never 'yes', so a text test here is always false and always names the
+    // wrong person: this step is only reached when exactly one of the two is
+    // breached, and the caller passes the higher-ranked side as `a`, which is
+    // by construction the breached one.
+    const past = a.crt_breached === true ? a : b
+    const within = past === a ? b : a
     body = <><strong>the target</strong>: <span className="num">{past.pathway_number}</span> is
       past its target and <span className="num">{within.pathway_number}</span> is not. That tier is
       decided before any score, whatever either of them scores.</>

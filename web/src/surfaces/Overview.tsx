@@ -12,6 +12,9 @@ import { SevBar, SevChip } from '../components/Severity'
 import {
   SAFE_OCCUPANCY, SEV_INTEGRITY, sevBooked, sevBreach, sevOccupancy, sevReadingAge, type Sev,
 } from '../lib/severity'
+/** Median wait. ONE home, lib/stats.ts, shared with List.tsx -- the two surfaces
+ *  used to hold a copy each and printed 142 against 141 on 2026-08-21. */
+import { median } from '../lib/stats'
 import type { CohortReferral, Decision, Reference } from '../lib/types'
 import './overview.css'
 
@@ -108,29 +111,6 @@ const clockTime = (iso: string) =>
 const dayNum = (iso: string) => String(new Date(iso).getDate())
 /** The calendar day a timestamp falls on, as the API writes dates. */
 const dayOf = (iso: string) => iso.slice(0, 10)
-
-/** Median wait, in days. ONE convention, and it is List.tsx's: on an even n the
- *  arithmetic mean of the two middle values, which is the standard definition.
- *
- *  This surface used to take the upper-middle element. Recomputed across the 14
- *  hospital-days of 9001 the two conventions disagree on two of them --
- *  2026-08-21 (n=286) read 142 here and 141 on the list, 2026-08-22 (n=286) read
- *  143 here and 142 there. Neither day holds a decision, so both surfaces render
- *  and one hospital-day carried two different "median wait" figures.
- *
- *  The rounding is matched too, not just the formula: two middle values one day
- *  apart average to a half-day, and both surfaces round half up so the figure
- *  printed is a whole number of days.
- *
- *  It belongs in lib/ beside the other shared arithmetic. It is still duplicated
- *  here because this change owns Overview.tsx and overview.css alone; the copy
- *  it is matched to is List.tsx:469. */
-const median = (xs: number[]) => {
-  if (!xs.length) return 0
-  const s = [...xs].sort((a, b) => a - b)
-  const n = s.length
-  return n % 2 ? s[(n - 1) / 2] : Math.round((s[n / 2 - 1] + s[n / 2]) / 2)
-}
 
 /* ---------------------------------------------------------------------------
    Aggregation. Two figures are counted the honest way and never any other:

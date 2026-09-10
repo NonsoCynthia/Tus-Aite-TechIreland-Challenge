@@ -219,79 +219,132 @@ screenshot. A claim is not evidence.
 | 2 | older days cannot be scored because evidence is date-blind | **3,963 referral-days, zero contamination.** Not one observation post-dates its own day. What *is* date-blind is **capacity** — all 14 days are served the same 30 Aug ward snapshot — which nobody had been citing, and which makes the Overview's ward panel a false statement on 13 of 14 days |
 | 3 | point 8 looked like a stale component | **not stale.** All 30 query keys are scoped to `[hospital, date]`. `runnable` is always the newest day, so the string is accurate and merely ambiguous |
 
-## A · Severity scale
+## A · Severity scale — **CLOSED**
 
 | ID | Task | Status | Evidence |
 |---|---|---|---|
-| A1 | `--sev-1..4` tokens, both grounds | **PASS** | `tokens.css`. First draft was **non-monotonic** (6.27→6.16→5.86→8.90) — the same fault it replaces. Solved: text **6.27 / 6.67 / 7.04 / 11.07**, fill-vs-page **1.08 / 1.18 / 7.35 / 11.57** |
+| A1 | `--sev-1..4` tokens, both grounds | **PASS** | `tokens.css`. First draft was **non-monotonic** (6.27→6.16→5.86→8.90) — the fault it replaces. Re-solved twice more after that. Final light text **5.97 / 7.19 / 8.67 / 11.07**, fill-vs-page **1.09 / 1.36 / 8.67 / 11.07**; dark text **6.56 / 7.03 / 7.43 / 11.05**. Strictly rising on both axes on both grounds, recomputed independently at close |
 | A2 | `lib/severity.ts` + `Severity.tsx` primitive | **PASS** | Bands chosen against observed ranges; demo_path §16 proves **every step fires** — wait ratio 35/28/43/39/20 |
-| A3 | Wait against target | TODO | |
-| A4 | Reading age | TODO | |
-| A5 | NEWS2 sub-scores, monotonic | TODO | |
-| A6 | Rule verdicts, six registers unified | TODO | |
-| A7 | Integrity alarms at sev-4 | TODO | |
-| A8 | Occupancy and clinic pressure | TODO | |
+| A3 | Wait against target | **PASS** | `sevWaitRatio` in `List.tsx`, `Run.tsx`, `Patient.tsx`. Replaces `.sub.is-over`, which **restated its base class verbatim** and drew nothing |
+| A4 | Reading age | **PASS** | `sevReadingAge` in `Vitals.tsx`, `List.tsx`, `Overview.tsx`. Replaces a **1.75:1** dashed underline |
+| A5 | NEWS2 sub-scores, monotonic | **PASS** | `sevNews2Sub` in `Vitals.tsx`. Old ladder was 3.56 / 5.99 / 15.37 / **14.70** — the most severe step was the *less* contrasty one |
+| A6 | Rule verdicts, six registers unified | **PASS** | `sevBreach` in `Compare`, `Run`, `Overview`, `DecisionRecord`, `List`, `Patient` |
+| A7 | Integrity alarms at sev-4 | **PASS** | `SEV_INTEGRITY` in `DecisionRecord.tsx`, `Overview.tsx`. The reconciliation gap had a **1.55:1** left edge as its entire signal |
+| A8 | Occupancy and clinic pressure | **PASS** | `sevOccupancy` in `AgentInputs`, `Overview`; `sevBooked` in `Overview` |
+| A9 | **`SevLegend` — the scale named on screen** | **PASS** | `Severity.tsx:138`, placed `List.tsx:1142`. Added at close: the scale spanned five axes and 595 marks and was explained only in code comments and in tooltips **26 of 30 chips never passed**. Built from the real chip classes, so legend and table cannot drift. Eyebrow reads *"how far past a line"* — deliberately **not** "severity", which `List.tsx` already uses for the CPC ordering field |
 
-## B · Icons
-
-| ID | Task | Status | Evidence |
-|---|---|---|---|
-| B1 | Adopt `--icon` / `--icon-sm` | TODO | declared in tokens.css, used nowhere |
-| B2 | One stroke per role; fix 12 unset call sites | TODO | |
-| B3 | `TriangleAlert` and `Check` to one size each | TODO | were 5 sizes / 4 strokes for 6 meanings |
-
-## C · Copy
+## B · Icons — **CLOSED**
 
 | ID | Task | Status | Evidence |
 |---|---|---|---|
-| C1 | Remove 57 em-dashes from running copy, keep 58 placeholders | TODO | |
-| C2 | Remove the synthetic-data label entirely | TODO | client instruction; **README feature 1 then needs amending** |
-| C3 | Remove "attribution, not authentication" | TODO | client instruction |
-| C4 | Cut box explainers to sources and caveats | TODO | |
+| B1 | Adopt `--icon` / `--icon-sm` | **PASS** | were declared in `tokens.css` and used nowhere; now in `app.css` and `list.css` |
+| B2 | One stroke per role; fix 12 unset call sites | **PASS** | **20 icon call sites, 0 without `strokeWidth`** |
+| B3 | `TriangleAlert` and `Check` to one size each | **PASS** | were 5 sizes / 4 strokes for 6 meanings |
 
-## D · Before/after
-
-| ID | Task | Status | Evidence |
-|---|---|---|---|
-| D1 | Pre-ranking view on unscored days | TODO | confirmed available for 2026-08-20: 285 referrals, 123 breached of 156 |
-| D2 | **Ward and clinic panels carry their true snapshot date** | TODO | **data-truth fix**; demo_path §17 pins why it is needed |
-| D3 | "Check for new data" wired | TODO | `refreshDays` exists and **no component has ever called it** |
-| D4 | Point 8's wording | TODO | |
-| D5 | Run overlay states what changes | TODO | |
-
-## E · Layout
+## C · Copy — **CLOSED**
 
 | ID | Task | Status | Evidence |
 |---|---|---|---|
-| E1 | `min-width` above the 1154px of fixed columns | TODO | **the cause of point 13**: Referral gets 0px between 1440 and 1656 |
-| E2 | Compact rule for `.pw-line` | TODO | 8 planted rows run 47px in a 36px row |
-| E3 | `.rulez` must not silently clip a rule | TODO | |
-| E4 | Intake chart overflow | TODO | 3.8px per column at 60 days |
-| E5 | Ward table "Also backs" must wrap | TODO | inherits `nowrap` via `.c-dim` |
-| E6 | Bound the rule board and sparkline | TODO | |
-| E7 | Override log: cap, page, sticky header | TODO | 200 rows ≈ 11,000px, no sticky header |
+| C1 | Remove em-dashes from running copy, keep bare placeholders | **PASS** | **0 in visible copy.** 10 remain, all in code comments; 51 bare `—` placeholders kept, which is a legitimate glyph |
+| C2 | Remove the synthetic-data label entirely | **PASS** | client instruction. Only surviving mention is a comment at `Landing.tsx:23` recording that it must not come back. **README feature 1 still claims it appears "in the graph and the UI" — that line is now false and is outside the granted scope** |
+| C3 | Remove "attribution, not authentication" | **PASS** | 0 occurrences |
+| C4 | Cut box explainers to sources and caveats | **PASS** | |
 
-## F · Brand
+## D · Before/after — **CLOSED**
 
 | ID | Task | Status | Evidence |
 |---|---|---|---|
-| F1 | Full-width rail above the kit's 13px cap floor | TODO | cap height is **8.7px**, 33% under; stems resample to **0.39px** |
-| F2 | Collapsed rail uses the mark SVG | TODO | image is 68px wide in a 48px box, overflows by 20px |
+| D1 | Pre-ranking view on unscored days | **PASS** | `Overview.tsx:402` `<section className="ov-before">`, `List.tsx:498`. The client's framing: see the state, then run and watch it become an order |
+| D2 | **Ward and clinic panels carry their true snapshot date** | **PASS** | `Overview.tsx:1179-1190` — reads each ward's own `snapshot`, and says **"mixed snapshots"** rather than guessing when they disagree. **data-truth fix**; demo_path §17 pins why |
+| D3 | "Check for new data" wired | **PASS** | `App.tsx:102`. `refreshDays` had existed and **no component had ever called it** |
+| D4 | Point 8's wording | **PASS** | `App.tsx:158,238` — selected day and runnable day named separately; non-runnable days marked `· view only` |
+| D5 | Run overlay states what changes | **PASS** | |
 
-## G · Correctness
+## E · Layout — **CLOSED**
 
 | ID | Task | Status | Evidence |
 |---|---|---|---|
-| G1 | Tied priority shows what separates | TODO | **12 adjacent pairs** print identical 3dp values then say "decides it" |
-| G2 | "What separates this from the one above" on the page | TODO | client point 12 |
-| G3 | KG context-lost: deps, latch, isConnected, z-index | TODO | client-reported; mechanism confirmed |
-| G4 | An untested rule must not render "holds" | TODO | renders green "0 tested · holds" |
-| G5 | Whole-list verdicts keyed by rule ID | TODO | a third rule takes RULE-TIEBREAK's verdict |
+| E1 | Table width above the fixed columns' sum | **PASS** | **the cause of client point 13.** Fixed columns summed 1154 against a `min-width: 1120`, so Referral got **0px** between 1440 and 1714. Replaced with a computed `tableMin()`; measured live at 1440×900 the columns were `[76,140,0,200,240,180,144,132,42]` |
+| E2 | Compact rule for `.pw-line` | **PASS** | `list.css:802`. 8 planted rows ran 47px in a 36px row |
+| E3 | `.rulez` must not silently clip a rule | **PASS** | `list.css:546,796` |
+| E4 | Intake chart overflow | **PASS** | was 3.8px per column at 60 days |
+| E5 | Ward table "Also backs" must wrap | **PASS** | inherited `nowrap` via `.c-dim`; would have pushed the table past 2,500px at 20 specialties |
+| E6 | Bound the rule board and sparkline | **PASS** | 20 rules would have given two fixed-size siblings ~900px of blank paper |
+| E7 | Override log: cap, page, sticky header | **PASS** | `DecisionRecord.tsx:343` `ovrRows.slice(0, ovrShown)`. 200 rows was ≈11,000px unlabelled |
 
-## Verification added this round
+## F · Brand — **CLOSED**
+
+| ID | Task | Status | Evidence |
+|---|---|---|---|
+| F1 | Full-width rail above the kit's 13px cap floor | **PASS** | `App.tsx:173-190`. Was **8.7px** cap, 33% under the kit's own floor, stems resampling to **0.39 CSS px** and antialiasing to ~39% alpha — contrast collapsed 17.2:1 → ~3.5:1. That was the illegibility, and it was resampling, not colour. Now **15.74px** |
+| F2 | Collapsed rail uses the mark SVG | **PASS** | `App.tsx:187-190` `<picture>` swaps to the vector mark below 1440. The lockup was 68px wide in a 48px box, hanging 10px past each edge and lapping the rail border. Now 17.83px in a 47px box |
+
+## G · Correctness — **CLOSED**
+
+| ID | Task | Status | Evidence |
+|---|---|---|---|
+| G1 | Tied priority shows what separates | **PASS** | `List.tsx:1413,1695`. **12 adjacent pairs** printed identical 3dp values and then said "decides it"; `is-precise` prints six decimals when they tie at display precision |
+| G2 | "What separates this from the one above" on the page | **PASS** | client point 12 |
+| G3 | KG context-lost: deps, latch, `isConnected`, z-index | **PASS** | `CohortGraph.tsx:346-357`, `cohortgraph.css:22`. `layout` was missing from the effect deps, so switching layout remounted the canvas and left the listener bound to the **detached** element; r3f then called `forceContextLoss()` on it 500ms later. A one-way latch too — Redraw never cleared `lost` |
+| G4 | An untested rule must not render "holds" | **PASS** | `Overview.tsx:917-932`. Was filtered out of the board entirely while `DecisionRecord` rendered it as "not tested" — **two audit surfaces disagreeing about whether a rule exists** |
+| G5 | Whole-list verdicts keyed by rule ID | **PASS** | `Overview.tsx:82-88`. A third whole-list rule would have silently taken `RULE-TIEBREAK`'s verdict |
+
+## Closing batch — the review gates' own findings
+
+| what | evidence |
+|---|---|
+| **The fifth ramp inversion** | Step 4 carried `box-shadow: inset 0 0 0 2px var(--sev-4-fg)` — a ring in the step's **foreground** colour, which on light is `--paper`. It added no area; it ate about a quarter of the block and replaced it with page. Mean luminance at equal glyph coverage: sev-3 **4.51**, sev-4 **2.35–2.64** across all three geometries it is used in. **The most severe step was 1.7–1.9× less present than the step below it.** Light-ground only, which is how it survived four reviews. Replaced with `outline: 2px solid var(--sev-4-bg)` — the fill's own colour grown outward, like `.wb-over`, so nothing reflows and the three surfaces that override `.sev` padding cannot erase it |
+| **The breakpoint was two pixels early, not three** | I derived chrome as 303px. It is **302**: `box-sizing: border-box` keeps the rail's `border-right` *inside* the 236px track. `NINE_COL_PX` 1714 → **1716**, measured live at 1714/1715/1716 and confirmed by exhaustive scan to 2600. At 1714–1715 the nine-column table was 1414px inside a 1412/1413px box |
+| **Rule statements left the tooltip** | They lived only in `title` on non-focusable spans, so keyboard and touch users never got them. The row chip's rule ID and the `+N more` count are now buttons that open the expander; the **sort-key ladder** — the surface whose whole job is explaining the order — prints each statement on screen. Step 3 cites two rules and only the first was ever even on the tooltip |
+| **`SevBar` named its step to nobody** | Its `aria-label` was always factual ("92.4% occupied, over the 85% line") and never said which step that was, so for a screen-reader user the scale did not exist on bars at all |
+| **The graph claimed totality** | Headline read "150 placements · 750 evidence links · 465 nodes" under "What the coordinator cited". True figures at `?limit=0` are **305 / 1,386 / 931**. Now reads "150 of 305" and says the counts follow the size control |
+| **Two medians for one hospital-day** | Overview took the upper-middle element, List averaged the two middle values. They disagreed on 2026-08-21 (142 vs 141) and 2026-08-22 (143 vs 142), both n=286. One convention now, in `lib/stats.ts` |
+| **`SAFE_OCCUPANCY` was declared three times** | The drawn 85% line and the band boundary under it could drift apart. Exported once from `lib/severity.ts:67`, cited to Bagust, Place & Posnett, BMJ 1999;319:155-8 |
+| **`useNarrow` seeded from the wrong measurement** | `window.innerWidth` includes a classic scrollbar; `matchMedia` excludes it. On Windows and Linux that was one frame of nine columns at a seven-column width |
+| **"Recent" for an 89-day-old reading** | A reassurance word directly below a panel arguing that a stale normal reading is an *absence* of information. Now states the age. Banding untouched — 52 of 308 rows sit in that 31–89 day window |
+| **The landing claimed a population** | "308 people are waiting" over a documentary photograph of a real waiting room. The screen can see a list, not a population. Now "308 referrals are on this list". No disclaimer added, and the synthetic-data label did not come back |
+
+## Three of my own faults, caught by the gates
+
+| | what I published | what it actually was |
+|---|---|---|
+| 1 | worried `--sev-3` collided with `--cat-urgent` under protanopia | that pair is the **safest** (ΔE 15.1). The real collision was `--cat-routine` vs `--sev-3` at **ΔE 3.1**, below the just-noticeable difference, co-occurring in the same Overview table row |
+| 2 | a contrast table measuring fills against `--surface` while the comment said "the page" | self-evidently wrong, since steps 3 and 4 use `--paper` as their foreground. Dark `--sev-2` published 6.90, actually **6.47** — non-monotonic |
+| 3 | a `SevBar` ramp where step 0 fell through to `--text-3` | 4.30:1 against fills of **1.00** and 1.26 — going from no-severity to step 1 made the bar *less* visible, and step 1 was byte-indistinguishable from its own track |
+
+## Verification
 
 - **demo_path §16** — every severity step fires on real data; NEWS2 total is still too degenerate
   to grade on (148 of 308 tie at 0)
 - **demo_path §17** — capacity evidence is date-blind, so it may never be labelled as the
   selected day's. Pins the fact that makes D2 necessary
 - **81 passed, 0 failed** (was 71)
+- Zero hex literals and zero raw `rgba()` across all eight surface CSS files, comment-stripped
+  with a real parser rather than line-grep
+- All 21 real `box-shadow` declarations `inset`; no gradient, glow or drop shadow anywhere
+- `var(--cat-*)` confined to exactly five band-swatch rules in `app.css` — including
+  `.cat-semiurgent` and `.cat-uncategorised`, which are built by **string concatenation** at
+  `List.tsx:755` and `Patient.tsx:44` and are invisible to grep. Both traced and confirmed to land
+
+## Known and deliberately not fixed
+
+- **A latent flat step on the dark ground.** `--sev-2-edge` resolves to exactly `--clay`, so
+  `SevBar` steps 1 and 2 are byte-identical there. It cannot currently reach a screen — every
+  `SevBar` call site is on a light surface — and closing it needs a token measuring between
+  1.97 and 3.09 on ink, which the frozen palette does not contain
+- **Two exact-fit widths.** 1440 and 1716 fit with **zero** spare. On a platform with classic
+  space-taking scrollbars, `.lst-vp`'s own vertical scrollbar eats ~15px and both would go
+  short. No constant can model this; it is recorded at `List.tsx:141-143`
+- **`.wait-x` left at `--t-micro`.** It is a value, but raising it grows the comfortable row
+  56px → 57px, and the wait *bar* directly above already carries the graded channel
+- **`.ev-rules li`'s 78px column at ≤1100px.** Pre-existing near-overlap: the "breached" chip
+  is 87.5px and clears the rule ID by 2.5px. Raising its type would overlap by 1.6px
+- **`Mark.tsx:18-19`** holds 2 hex literals as SVG fills, outside the eight audited stylesheets
+
+## Still needs the client
+
+- **Clearing `agent.*`** — 43+ stacked decisions. Classifier-blocked
+- **`node_modules` in the local commit history**, before anything is ever pushed
+- **README feature 1** — claims the synthetic label appears "in the graph and the UI". The UI
+  half was removed on instruction, so that line is now false. Outside the granted scope
+  (`orchestrator/` and `web/` only), so it has been flagged rather than edited

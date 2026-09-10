@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { Sev } from '../lib/severity'
+import { sevBreach, type Sev } from '../lib/severity'
 import './severity.css'
 
 /** The one severity primitive. Every attention state in the product renders
@@ -48,10 +48,27 @@ export function sevAria(sev: Sev): string {
 
 /** One class string, so the legend paints the REAL mark rather than a copy of
  *  it that can drift. If a step ever looks different in the table than in the
- *  legend, it is because someone changed this in two places. */
+ *  legend, it is because someone changed this in two places.
+ *
+ *  That was true of the STEP and false of the TONE. The legend painted all four
+ *  steps in `fill` and the table draws two tones, so on the List's first screen
+ *  -- the only surface that places the legend -- the legend showed 4 chips
+ *  while the table below it drew 37, of which 20 were the rule that fired: the
+ *  same step, in a tone the legend never showed. 54% of the marks on screen
+ *  were a shape the reader had no key for, and the two objects are not subtly
+ *  different: a solid block at 8.67:1 against the page and a tint at 1.42:1.
+ *  Both tones go through this function now, and both are drawn. */
 function blockClass(sev: Sev, tone: 'fill' | 'quiet'): string {
   return `sev sev-${sev} sev-${tone}`
 }
+
+/** The step a fired rule takes -- read from the scale, not typed here as a 3.
+ *
+ *  It is the one mark the table draws in `quiet` on the surface that places the
+ *  legend (List's rule column, one per breaching row). Taking it from sevBreach
+ *  means the legend follows the scale if that step ever moves, which is the
+ *  same contract blockClass has for the classes. */
+const RULE_SEV = sevBreach(false)
 
 export function SevChip({ sev, children, title, tone = 'fill' }: {
   sev: Sev
@@ -78,6 +95,8 @@ export function SevChip({ sev, children, title, tone = 'fill' }: {
   )
 }
 
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+
 /** A magnitude against a track. `of` is where the reference line sits, as a
  *  fraction, so the eye reads "past this point" rather than a bare length. */
 export function SevBar({ sev, value, of, label, height = 6 }: {
@@ -95,6 +114,10 @@ export function SevBar({ sev, value, of, label, height = 6 }: {
      bar's severity was visible and inaudible. Doing it in the component is what
      makes that true of all of them at once. */
   const name = [label, sevAria(sev)].filter(Boolean).join(', ')
+  /* Clamped once, and BEFORE the comparison below, so what is compared is what
+     is drawn rather than what was passed. */
+  const v = clamp01(value)
+  const m = of == null ? null : clamp01(of)
   return (
     <span className="sevbar" style={{ height }} data-sev={sev}
           /* an unlabelled bar at step 0 says nothing a screen reader can use,
@@ -103,9 +126,21 @@ export function SevBar({ sev, value, of, label, height = 6 }: {
           role={name ? 'img' : undefined}
           aria-label={name || undefined}
           aria-hidden={name ? undefined : true}>
-      <i className="sevbar-f" style={{ width: `${Math.max(0, Math.min(100, value * 100))}%` }} />
-      {of != null && (
-        <i className="sevbar-m" style={{ left: `${Math.max(0, Math.min(100, of * 100))}%` }} />
+      <i className="sevbar-f" style={{ width: `${v * 100}%` }} />
+      {m != null && (
+        /* The marker has to be legible on whatever is behind it, and what is
+           behind it is the fill only where the fill has REACHED it. The step
+           does not settle that: occupancy and wait ratio both score 0 until
+           their line is passed, so for those the fill is always under the
+           marker by the time the step climbs -- but the staleness meter grades
+           this reading's age against a line that is the cohort MEDIAN, and a
+           reading over a year old can still sit left of a median older than it.
+           Today it cannot (the median runs 139-146 days across all 14
+           hospital-days), which is exactly the kind of accident that put six
+           inversions of this ramp into the product. So the side is stated, not
+           inferred, and severity.css colours the marker from it. */
+        <i className="sevbar-m" data-on={m <= v ? 'fill' : 'track'}
+           style={{ left: `${m * 100}%` }} />
       )}
     </span>
   )
@@ -134,6 +169,16 @@ export function SevBar({ sev, value, of, label, height = 6 }: {
  *  four swatches sit on whatever surface the caller sits on and therefore look
  *  exactly like the marks below them. A legend that flatters its own swatches
  *  teaches the wrong scale.
+ *
+ *  It also draws BOTH TONES, because the table does. Four fill chips explained
+ *  4 of the 37 marks on the List's first screen and left 20 -- the rule that
+ *  fired, one on every breaching row -- looking like a different object
+ *  entirely: solid at 8.67:1 beside a tint at 1.42:1, both meaning the same
+ *  step, on the same screen. The quiet chip is shown as what it is rather than
+ *  the row chip being made solid, because the table was deliberately cut from
+ *  62 solid marks to 8 to answer a saturation complaint, and teaching the
+ *  reader a mark costs nothing while re-adding 20 solid blocks would spend
+ *  that fix.
  */
 export function SevLegend({ className }: { className?: string }) {
   return (
@@ -151,10 +196,33 @@ export function SevLegend({ className }: { className?: string }) {
           </li>
         ))}
       </ol>
+      {/* The second tone, which is 54% of the marks on the first screen below
+          this strip and had no key at all.
+
+          Not a fifth step, so not inside the <ol> above: it is one of those
+          four steps drawn in the other tone, and the markup says that by
+          keeping the ladder to itself and labelling this separately.
+
+          Only the step sevBreach gives, and only one chip: the tone also
+          carries the integrity mark at step 4, but that is drawn on Overview,
+          which does not place this legend -- and a legend that shows a mark its
+          surface never draws is the same fault as one that flatters its own
+          swatches. If this strip is ever placed on Overview, this group grows.
+
+          No triangle icon, though the real chip carries one: the icon is List's
+          composition, not the tone's, and copying it here would be exactly the
+          drift blockClass exists to prevent. What identifies the tone is the
+          pale fill inside a solid edge, and that IS the real thing. */}
+      <span className="sevleg-g">
+        <span className="sevleg-t lab">a rule that fired</span>
+        <span className={blockClass(RULE_SEV, 'quiet')} data-sev={RULE_SEV}>{SEV_WORD[RULE_SEV]}</span>
+      </span>
       <p className="sevleg-n">
         A mark grades a measurement, never a person: how far a wait is past its target, how old a
         reading is, how far a ward is past its safe line. Every mark carries its own value; an
-        unmarked number is inside the line, and a missing one says so in words.
+        unmarked number is inside the line, and a missing one says so in words. The pale chip is
+        one of those four steps drawn without its fill, bounded by the colour that fill uses: a
+        rule fires on most rows that breach, and a field of solid blocks would outshout the table.
       </p>
     </div>
   )

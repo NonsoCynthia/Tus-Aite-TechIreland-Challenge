@@ -91,9 +91,24 @@
   --sev-1-edge: #BFB6A4;   /* so it vanished the moment a row was hovered       */
 
   --sev-2-fg:   #523C31;   /* attention  text 7.19  fill-vs-page  1.36  tinted   */
-  --sev-2-bg:   #E6D5CB;   /* deepened: the old tint's EDGE was 2.15:1, under the */
-  --sev-2-edge: #B08D79;   /* 3:1 WCAG 1.4.11 floor for a meaningful object, and  */
-                           /* 71 of the 130 past-target referrals live at step 2  */
+  --sev-2-bg:   #E6D5CB;   /* deepened from a lighter tint. 71 of the 130         */
+  --sev-2-edge: #B08D79;   /* past-target referrals live at step 2.               */
+  /* The edge is stated honestly, because an earlier version of this comment
+     claimed it cleared the 3:1 WCAG 1.4.11 floor and named no ground -- the same
+     unnamed-ground error that already put a wrong fill column in this file once.
+     Measured, --sev-2-edge #B08D79 clears 3:1 in exactly one place:
+
+         --surface   #FFFFFF   3.03   the panel the ranked table sits on
+         --bg        #FAFAF8   2.90   the page
+         --surface-2 #F7F6F2   2.80   a panel's inner well
+         --bg-sunk   #F2F1EC   2.68   table headers and the evidence expander
+         its own fill          2.13
+
+     1.4.11 governs a graphical object REQUIRED to understand the content, and
+     no severity mark here is ever required: every one carries its number or its
+     word, which is the standing invariant three files up. So this is not a
+     conformance failure. It is a step whose graphical channel is genuinely weak
+     off --surface, and saying so is worth more than a floor we do not clear. */
 
   --sev-3-fg:   #FAFAF8;   /* high       text 8.67  fill-vs-page  8.67  SOLID    */
   --sev-3-bg:   #5A4438;   /* cooler and darker, off the green/brown line       */

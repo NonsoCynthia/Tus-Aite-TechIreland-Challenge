@@ -414,7 +414,16 @@
    verbatim, so a referral 31x past target was typeset exactly like one at
    1.04x) and .sub.is-stale (a 1px dashed underline at 1.75:1 for a reading up
    to 871 days old). Both are severity steps now. */
-.lst-table .sub.is-split { display: flex; align-items: baseline; gap: 4px; }
+/* `overflow: visible` is not cosmetic here. Step 4's escalation over step 3 is
+   `outline: 2px solid` grown OUTWARD (severity.css) -- the fix for the fifth
+   inversion, where an inset ring drawn in the step's own foreground made the
+   most severe step 1.7-1.9x LESS present than the one below it. An outline is
+   clipped by an ancestor's `overflow: hidden`, which `.lst-table .sub` sets, so
+   the escalation was being erased on exactly the rows that need it: the 12
+   readings over two years old, up to 871 days. Truncation is unaffected --
+   `.sub-t` below carries its own ellipsis, which is what actually shortens the
+   prose while the graded block stays. */
+.lst-table .sub.is-split { display: flex; align-items: baseline; gap: 4px; overflow: visible; }
 .lst-table .sub.is-split > .sev, .lst-table .sub.is-split > .sub-age { flex: none; }
 .sub-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The block keeps its fill and loses only the vertical padding, so a graded
@@ -518,15 +527,50 @@
 }
 .wb-in { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text-3); }
 /* The overflow past target takes the SAME severity step as the chip beside it,
-   so the bar and the numeral can never disagree. The two solid steps also grow
-   the fill area rather than only changing it: 2px of extra height, drawn
-   outside the track, so nothing reflows. */
+   so the bar and the numeral can never disagree. Steps 3 and 4 also grow the
+   fill area rather than only changing it: 2px of extra height (5px -> 7px),
+   drawn outside the track, so nothing reflows. */
 /* The SAME inversion the review caught in SevBar, in a second place: this bar
    borrowed the chip's steps 1 and 2, which are a hairline and a tint because
-   they sit behind text. Against the track they measure 1.78 and 1.90, while the
-   WITHIN-target segment beside them (--text-3) is 3.41 -- so a referral 1.5x
-   past its target drew a FAINTER overflow than the part of the bar still inside
-   the target. An overflow must never be quieter than what it overflows. */
+   they sit behind text. Against the track (--bg-sunk #F2F1EC) those two fills
+   measure 1.00 and 1.26, while the WITHIN-target segment beside them (--text-3)
+   is 4.30 -- so a referral 1.5x past its target drew an overflow 4.3x LESS
+   present than the part of the bar still inside the target, and step 1
+   (--sev-1-bg #F5F0E6 on #F2F1EC) was not distinguishable from the empty track
+   at all. An overflow must never be quieter than what it overflows.
+
+   This block previously published those three as 1.78 / 1.90 / 3.41, and not
+   one of them is a contrast against this track. 1.78 is --sev-1-edge, the
+   chip's hairline BORDER rather than its fill (1.7782 on --bg-sunk). 3.41 is
+   nearest --text-3 measured against --sev-2-bg, the step's own fill rather than
+   the track it sits on (3.4171). 1.90 is one of the three figures severity.css
+   withdrew from its bar table as wrong (severity.css:112). The conclusion they
+   were offered for was right and UNDERSTATED -- the true gap is wider than the
+   figures claimed -- which is exactly why a reviewer who trusted them would
+   have filed this as cosmetic. Recomputed against the track this bar actually
+   draws on, by WCAG relative luminance.
+
+   The ramp as it now stands. Contrast against --bg-sunk, and the drawn height
+   beside it, because a step that cannot add contrast adds AREA instead. Neither
+   column ever falls, and every step raises one of them:
+     within target  --text-3      4.30    5px
+     step 1         --clay        5.41    5px
+     step 2         --sev-3-bg    8.01    5px
+     step 3         --sev-3-bg    8.01    7px   <- same fill as step 2
+     step 4         --sev-4-bg   10.23    7px
+
+   Steps 2 and 3 are ONE colour, separated only by those 2px. Written down
+   rather than papered over. The only opaque token in the frozen palette that
+   falls between 8.01 and 10.23 is --sev-2-fg (9.06), which is step 2's TEXT
+   colour, not a fill: put it here and the bar would be 1.13:1 from --sev-3-bg,
+   a difference nobody sees, while a foreground token acquired a second job.
+   The numeral above the bar carries the true multiple and the chip beside it
+   names the step, so nothing rests on this colour alone -- but do not read this
+   bar's colour by itself and call it the step.
+
+   This surface is light-only (.wb renders inside .lst-table, and no
+   [data-surface="dark"] ancestor -- .boot, .rail, .prov, .runlay, .cg -- holds
+   one), so these are the only figures this bar is ever drawn at. */
 .wb-over { position: absolute; top: 0; bottom: 0; background: var(--clay); }
 .wb[data-sev="2"] .wb-over { background: var(--sev-3-bg); }
 .wb[data-sev="3"] .wb-over { background: var(--sev-3-bg); top: -1px; bottom: -1px; }

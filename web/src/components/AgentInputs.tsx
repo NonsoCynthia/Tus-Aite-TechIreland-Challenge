@@ -1,6 +1,6 @@
 import { BedDouble, CalendarDays, Stethoscope, TriangleAlert } from 'lucide-react'
 import { Vitals, type AgeStats } from './Vitals'
-import { SAFE_OCCUPANCY, sevOccupancy } from '../lib/severity'
+import { SAFE_OCCUPANCY, SEV_INTEGRITY, sevOccupancy } from '../lib/severity'
 import { SevBar, SevChip } from './Severity'
 import type { Observation } from '../lib/types'
 
@@ -35,6 +35,13 @@ export interface BedStatus {
 export interface CapacityWard {
   ward_id: string
   is_primary: boolean
+  /** THIS SPECIALTY'S ALLOCATION to the ward -- NOT the ward's bed
+   *  establishment. A /context row carries one specialty, so the 92-bed
+   *  W-9001-02 reports 45 here. /operations sums every specialty's allocation
+   *  and calls THAT `nominal_beds` (lib/api.ts:47-50: "which is why a 92-bed
+   *  ward used to report 45"); this field is one term of that sum. It is never
+   *  the ward's size and never the denominator of occupancy_pct, so it is drawn
+   *  as an allocation or it is not drawn. */
   nominal_beds: number | null
   latest_bed_status: BedStatus | null
 }
@@ -263,7 +270,25 @@ export function AgentInputs({
  *  That 85 is SAFE_OCCUPANCY from lib/severity.ts, the same constant
  *  sevOccupancy bands on. It was declared a SECOND time in this file, which is
  *  exactly how a drawn line and the colour beneath it drift a point apart and
- *  stop meaning each other. One constant, one line, one band boundary. */
+ *  stop meaning each other. One constant, one line, one band boundary.
+ *
+ *  The bed counts here are the WARD's. `nominal_beds` beside them is one
+ *  SPECIALTY's allocation, and it used to be drawn under the word "nominal" --
+ *  so every patient page showed 91 people in a 45-bed ward, and disagreed with
+ *  the Overview's ward table by 2x about the same ward. Two numbers, one name.
+ *
+ *  The ward-level bed count this payload really carries is the census,
+ *  occupied + free, which is also the denominator occupancy_pct is computed
+ *  from (lib/api.ts:53-55) -- so it is the one figure that may stand beside the
+ *  percentage. The allocation stays, under its own name, because it is a true
+ *  and relevant fact: it is this specialty's share of that ward.
+ *
+ *  The ward's nominal establishment is /operations' summed `nominal_beds`, and
+ *  it is deliberately absent rather than approximated: /operations is keyed by
+ *  hospital-day and this component is given neither a hospital nor an as-of
+ *  date. Substituting it here would not have removed the contradiction anyway
+ *  -- W-9001-02 is 91 occupied against a nominal 90, over its establishment on
+ *  surge beds. 91 of the 92 recorded is the only pair that reconciles. */
 function WardPanel({ w, cited, pressure }: {
   w: CapacityWard; cited: boolean; pressure: number | null
 }) {
@@ -271,6 +296,16 @@ function WardPanel({ w, cited, pressure }: {
   const pct = num(b?.occupancy_pct)
   const gar = b?.gar_status ?? null
   const sev = sevOccupancy(pct)
+  const occ = b?.occupied ?? null
+  const free = b?.free ?? null
+  // occupied + free: the census actually recorded on the ward, and the only
+  // ward-level bed count in this payload.
+  const census = occ != null && free != null ? occ + free : null
+  // ...and it stands beside the percentage only while it reproduces it. If it
+  // does not, the figure is not describing these two numbers and is not drawn
+  // as their fraction. occupancy_pct arrives rounded to 2dp, hence 0.05.
+  const censusHolds = pct != null && census != null && census > 0
+    && Math.abs((occ! / census) * 100 - pct) <= 0.05
   // The word beside the figure names the line the number has crossed, so the
   // fill is never the only channel and the threshold is never implied.
   const state = sev === 0 ? null
@@ -292,7 +327,10 @@ function WardPanel({ w, cited, pressure }: {
       <div className="pt-ward-main">
         <div className="pt-ward-fig">
           <div className="pt-ward-pct num">{pct == null ? '—' : `${pct.toFixed(1)}%`}</div>
-          <div className="pt-ward-fig-l">occupied</div>
+          <div className="pt-ward-fig-l">
+            occupied
+            {censusHolds && <> · <span className="num">{fmt(occ!)} of {fmt(census!)}</span></>}
+          </div>
           {state && <SevChip sev={sev}>{state}</SevChip>}
         </div>
         <div className="pt-ward-meter">
@@ -315,15 +353,41 @@ function WardPanel({ w, cited, pressure }: {
                 Above <span className="num">{SAFE_OCCUPANCY}%</span> a hospital loses the slack it
                 needs to admit safely (Bagust, Place &amp; Posnett, BMJ 1999;319:155-8).
               </p>
+              {/* The bed counts below are the ward's and the allocation is one
+                  specialty's, so the panel says which is which rather than
+                  leaving a reader to divide one into the other. */}
+              {census != null && (censusHolds ? (
+                <p className="pt-mini">
+                  That percentage is <span className="num">{fmt(occ!)}</span> of the{' '}
+                  <span className="num">{fmt(census!)}</span> beds recorded on this ward
+                  (occupied + free). It is not measured against a bed establishment.
+                  {w.nominal_beds != null && (
+                    <> The <span className="num">{fmt(w.nominal_beds)}</span> allocated below is
+                      what this ward sets aside for this specialty, which is a share of the ward
+                      and not the count the percentage divides by. The ward's own nominal total
+                      is in the Overview's ward table.</>
+                  )}
+                </p>
+              ) : (
+                <p className="pt-mini">
+                  <SevChip sev={SEV_INTEGRITY}>census does not reconcile</SevChip>{' '}
+                  <span className="num">{fmt(occ ?? 0)}</span> occupied and{' '}
+                  <span className="num">{fmt(free ?? 0)}</span> free make{' '}
+                  <span className="num">{fmt(census)}</span>, which is not what{' '}
+                  <span className="num">{pct.toFixed(1)}%</span> was computed from. The two are
+                  left standing apart rather than divided into each other.
+                </p>
+              ))}
             </>
           )}
         </div>
       </div>
 
       <dl className="pt-facts">
-        <Fact k="free beds" v={b?.free ?? null} note={b?.free === 0 ? 'none' : undefined} />
-        <Fact k="occupied" v={b?.occupied ?? null} />
-        <Fact k="nominal beds" v={w.nominal_beds ?? null} />
+        <Fact k="free beds" v={free} note={free === 0 ? 'none' : undefined} />
+        <Fact k="occupied" v={occ} />
+        <Fact k="ward census" v={census} note="occupied + free" />
+        <Fact k="beds allocated" v={w.nominal_beds ?? null} note="this specialty's share of the ward" />
         <Fact k="outliers" v={b?.outliers ?? null} />
         <Fact k="delayed transfers" v={b?.delayed_transfers_of_care ?? null} />
         <Fact k="surge in use" v={b?.surge_capacity_in_use ?? null} />

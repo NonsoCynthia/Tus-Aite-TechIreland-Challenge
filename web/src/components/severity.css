@@ -126,11 +126,83 @@
 .sevbar[data-sev="2"] .sevbar-f { background: var(--clay); }
 .sevbar[data-sev="3"] .sevbar-f { background: var(--sev-3-bg); }
 .sevbar[data-sev="4"] .sevbar-f { background: var(--sev-4-bg); }
-/* the threshold, drawn over the fill so it is legible at every step */
+/* THE THRESHOLD LINE, AND WHAT IT IS DRAWN AGAINST.
+
+   This comment used to say the marker was "drawn over the fill so it is
+   legible at every step". It was drawn over the fill and it was not legible.
+   One colour (--text at opacity 0.7) was painted on six different grounds, and
+   on the light ground --text is a dark navy while steps 3 and 4 are dark
+   browns, so the line faded as the bar filled -- STRICTLY FALLING, and the
+   sixth inversion of this ramp to ship:
+
+     ground                       old marker vs its ground
+     track  --bg-sunk                    5.54
+     fill step 0  --rule-firm            4.42
+     fill step 1  --sev-2-edge           3.22
+     fill step 2  --clay                 2.00
+     fill step 3  --sev-3-bg             1.50   below the 3:1 non-text floor
+     fill step 4  --sev-4-bg             1.26   a 1px line at 1.26 is not there
+
+   This is the 85% safe-occupancy line and the cohort-median line: the
+   reference the bar exists to be read against. It disappeared on exactly the
+   wards and patients that are PAST it -- 4 of 7 wards at 9001/2026-08-30 and
+   the 48 of 308 referrals whose only reading is over a year old.
+
+   The fix is that the marker takes the FOREGROUND OF WHATEVER IT SITS ON.
+   Steps 3 and 4 already own a foreground token, and those tokens invert with
+   the ground, so they do the work on both grounds without a second rule. Step
+   2's fill is --clay, a brand constant that does NOT invert, so its foreground
+   is --paper on both grounds. Steps 0 and 1 have grounds light enough on the
+   light side and dark enough on the dark side that --text is right at both.
+
+   Measured, at opacity 1, on both grounds. Neither column drops below 3:1 and
+   neither falls once the severity starts climbing:
+
+     what the marker sits on     ink            LIGHT   DARK
+     the bare track              --text         13.59   18.09
+     fill step 0                 --text          8.76    9.19
+     fill step 1                 --text          5.07    5.86
+     fill step 2                 --paper         5.86    5.86
+     fill step 3                 --sev-3-fg      8.67    7.43
+     fill step 4                 --sev-4-fg     11.07   11.05
+
+   Do not assume the light rule transfers. It does not: on light the ink flips
+   at step 2 (--text is 2.51 on --clay, --paper is 5.86), on dark it flips at
+   step 3 (--text IS --paper there and holds 5.86 through step 2, while
+   --sev-3-fg is ink). The rules below are written so that ONE set is right on
+   both, and the reason is the token, not the coincidence.
+
+   The opacity is gone. Every figure above is now a contrast between two
+   tokens, computed from the tokens themselves; at 0.7 every one of them was a
+   composite that depended on how the compositor rounds, and this file has
+   already published three contrast tables that were wrong in print. The floor
+   also rises from 3.22 to 5.07. A published clinical threshold is not
+   decoration and does not need softening.
+
+   WHICH GROUND, not which step. The marker's ground is the fill only when the
+   fill has reached it; short of that it is on the bare track, where --paper
+   would measure 1.06 and vanish all over again. That is a property of value
+   against `of`, not of the step -- and at three of the four call sites the two
+   agree by construction (occupancy and wait ratio both score 0 until the line
+   is passed), but the staleness meter grades this reading's AGE while its line
+   is the cohort MEDIAN, and nothing makes an old reading older than the median.
+   It holds on all 14 hospital-days only because that median runs 139-146 days,
+   well under the 365 where step 3 starts. So SevBar states the side in
+   `data-on` and this file reads it, rather than inferring it from the step and
+   being right by luck.
+
+   The 1px is drawn on the side of the line it is coloured for -- inside the
+   fill when the fill has reached it, on the track when it has not -- so it can
+   never straddle the boundary and be half-invisible on a narrow bar. The line
+   itself does not move: it stays the edge at `of`. */
 .sevbar-m {
   position: absolute; top: -1px; bottom: -1px; width: 1px;
-  background: var(--text); opacity: 0.7;
+  background: var(--text);
 }
+.sevbar-m[data-on="fill"] { transform: translateX(-1px); }
+.sevbar[data-sev="2"] .sevbar-m[data-on="fill"] { background: var(--paper); }
+.sevbar[data-sev="3"] .sevbar-m[data-on="fill"] { background: var(--sev-3-fg); }
+.sevbar[data-sev="4"] .sevbar-m[data-on="fill"] { background: var(--sev-4-fg); }
 
 /* --- the legend ----------------------------------------------------------
    A strip, not a panel. No ground and no border of its own, for two reasons:
@@ -150,7 +222,26 @@
      word on fill 5.97 7.19 8.67 11.07 (light), 6.56 7.03 7.43 11.05 (dark)
    Steps 1 and 2 are near-invisible as fills, which is the truth about them: at
    those steps the mark is its edge and its word, and that is why the legend
-   prints the word inside the swatch rather than beside it. */
+   prints the word inside the swatch rather than beside it.
+
+   THE SECOND TONE is drawn here too, and it is measured the same way. The
+   quiet mark at the breach step is --sev-2-bg inside a --sev-3-bg edge, and
+   the useful fact about it is that its EDGE is the very colour the solid chip
+   is FILLED with -- which is what makes the two read as one step rather than
+   as two objects, and is the sentence the note under the strip now makes:
+
+     ground        fill-vs-ground   edge-vs-ground   word on its own fill
+     --bg               1.36             8.67                7.19
+     --surface          1.42             9.06                7.19
+     --surface-2        1.32             8.38                7.19
+     dark --bg          1.33             7.43                7.03
+     dark --surface     1.16             6.48                7.03
+     dark --surface-2   1.05             5.86                7.03
+
+   The fill column is a tint by design, exactly as steps 1 and 2 are, and the
+   edge clears the 3:1 WCAG 1.4.11 floor for a meaningful object on all six --
+   so the quiet mark is carried by its edge and its word, and nothing rests on
+   that pale fill. */
 .sevleg {
   display: flex; flex-wrap: wrap; align-items: baseline;
   gap: var(--d1) var(--d3);
@@ -163,6 +254,12 @@
   display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--d1) var(--d2);
 }
 .sevleg-steps li { display: inline-flex; }
+/* The second tone, kept with its own label. The strip wraps, and a label that
+   wraps away from the chip it names becomes a label for the ladder before it,
+   which is the opposite of what it says -- so the pair is one flex item. The
+   gap inside is --d2, matching the rhythm between the chips in the ladder,
+   against the strip's own --d3 between groups. */
+.sevleg-g { display: inline-flex; align-items: baseline; gap: var(--d2); }
 /* --t-small, not --t-micro: --t-micro is reserved for uppercase labels, and
    these are words in their own case. It is also the size floor, which is right
    for a strip that must be legible without pulling rank on the table. */
