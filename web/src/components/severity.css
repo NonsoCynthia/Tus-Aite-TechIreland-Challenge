@@ -18,23 +18,73 @@
 .sev-4 { color: var(--sev-4-fg); background: var(--sev-4-bg); border-color: var(--sev-4-edge); }
 
 /* 3 and 4 both read at distance. Separating THEM from each other is the harder
-   problem: they have the same fill area, the same weight and the same geometry,
-   so the only thing between "high" and "severe" was 1.46:1 of lightness on a
-   brown -- below the 3:1 non-text threshold and invisible past about a metre.
-   At distance the four-step scale resolved to two.
+   problem: they have the same geometry and the same weight, so the only thing
+   between "high" and "severe" was 1.46:1 of lightness on a brown -- below the
+   3:1 non-text threshold and invisible past about a metre.
 
    Hue is not available (the triage set is reserved). Area is, and area is this
-   file's own stated principle, so sev-4 takes a doubled inset ring: it reads as
-   a heavier block at any distance, and it is still a rule rather than a shadow,
-   which the brand kit forbids. */
+   file's own stated principle. */
 .sev-3, .sev-4 { font-weight: 600; }
-.sev-4 { box-shadow: inset 0 0 0 2px var(--sev-4-fg); padding: 2px var(--d3); }
+.sev-4 { padding: 2px var(--d3); }
+
+/* AREA, AND OUTWARD. Step 4 used to take `box-shadow: inset 0 0 0 2px
+   var(--sev-4-fg)` -- a 2px ring in the step's FOREGROUND colour, drawn INSIDE
+   the block. On the light ground that foreground is --paper, so the ring did
+   not add area to the block: it ate a quarter of it and replaced it with page.
+
+   Measured as area, which is how a block reads once 2px stops resolving. Mean
+   luminance of the whole painted block against --bg, computed with the same
+   ~12% paper glyph coverage on both steps so the comparison is fair:
+
+     geometry                     sev-3 solid   sev-4 + inset ring   sev-4 now
+     11px chip, pad 1/8 vs 2/12      4.51             2.58            5.01
+     list .sub, pad 0 6px both       4.51             2.35            5.01
+     record pill, pad 3/8 both       4.51             2.64            5.01
+
+   The ring made the most severe step 1.7-1.9x LESS present than the step below
+   it, in every geometry it is used in. That is the fifth inversion of this ramp
+   in this project and the same class of fault as the other four: a step that
+   escalates in the swatch and de-escalates on the screen. (On the dark ground
+   the ring did not invert -- there --sev-4-fg is ink inside a pale block, so it
+   darkened the mean, 7.77 against sev-3's 6.66. It was a light-ground fault
+   only, which is exactly how it survived review.)
+
+   The replacement is the model the wait bar already uses (.wb-over in
+   list.css, which at steps 3 and 4 grows 1px above and below its track): grow
+   the FILL outward, in the fill's own colour, so nothing reflows. An outline is
+   painted outside the border box and takes part in no layout at all, so this
+   survives the three surfaces that override .sev's padding
+   (.lst-table .sub .sev, .rule-chip > .sev, .pt-sub .sev) -- a padding-based
+   escalation would have been silently erased by all three, and the busiest of
+   them is the 595-mark list.
+
+     step 3   solid, block = content + padding
+     step 4   solid, block = content + padding + 2px on every side
+              mean vs --bg 5.01 (light) and 9.85 (dark), both above step 3's
+              4.51 and 6.66, and 1.26-1.64x its painted area
+
+   `quiet` is excluded on purpose: area is a fill channel, and quiet's whole
+   contract is to withhold the fill. It escalates 3 -> 4 on ink instead
+   (word-on-fill 7.19 -> 8.12 light, 7.03 -> 8.32 dark) plus the padding above.
+
+   If a chip is ever made focusable, give the focus ring an outline-offset --
+   these two rules both want the outline property. */
+.sev-fill.sev-4 { outline: 2px solid var(--sev-4-bg); outline-offset: 0; }
 
 /* `quiet` keeps the tinted register at the top two steps, for a surface that
    already has something louder to say. The hue still escalates; only the fill
    is withheld. */
 .sev-quiet.sev-3 { color: var(--sev-2-fg); background: var(--sev-2-bg); border-color: var(--sev-3-bg); }
 .sev-quiet.sev-4 { color: var(--sev-4-bg); background: var(--sev-2-bg); border-color: var(--sev-4-bg); }
+
+/* The step word, for assistive technology only.
+   Absolutely positioned with no offsets, so it stays at its static position and
+   cannot push a scrollbar; an absolutely positioned child of a flex container
+   is not a flex item, so it also takes none of .sev's 4px gap. */
+.sev-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
 
 /* --- the bar ------------------------------------------------------------- */
 .sevbar {
@@ -47,17 +97,30 @@
    The chip's steps 1 and 2 are a hairline and a tint because they sit BEHIND
    text and must not fight it. A bar has no text to protect, so borrowing those
    two fills made the escalation run backwards: step 0 fell through to --text-3
-   at 3.41:1 against the track while steps 1 and 2 came in at 1.55 and 1.90, so
-   going from NO severity to step 1 made the bar 2.2x LESS visible and it did
-   not recover until step 3. That is the exact fault this scale exists to end,
-   and it was measured, not noticed.
+   at 4.30:1 against the track while the chip's step 1 and 2 fills came in at
+   1.00 and 1.26, so going from NO severity to step 1 made the bar 4.3x LESS
+   visible and it did not recover until step 3. That is the exact fault this
+   scale exists to end, and it was measured, not noticed.
 
-   Contrast against the track (--bg-sunk), now strictly rising:
-     step 0  --rule-firm  1.55   the quietest, correctly
-     step 1  sev-2 edge   1.90
-     step 2  clay         3.60
-     step 3  sev-3 fill   6.50
-     step 4  sev-4 fill  10.23                                              */
+   Contrast against the track (--bg-sunk), strictly rising:
+     step 0  --rule-firm   1.55
+     step 1  --sev-2-edge  2.68
+     step 2  --clay        5.41
+     step 3  --sev-3-bg    8.01
+     step 4  --sev-4-bg   10.23
+
+   Three of those five figures were previously published here as 1.90 / 3.60 /
+   6.50. Re-measured against the track this bar actually draws on: the ordering
+   they claimed is right and the numbers were not. This file has now had two
+   contrast tables that were wrong in print, so: recompute, never copy.
+
+   ON THE DARK GROUND this ramp has a flat step. There --sev-2-edge resolves to
+   exactly --clay, so steps 1 and 2 are byte-identical and both measure 3.09
+   against --bg-sunk. It has never shipped: SevBar is rendered only from Vitals,
+   AgentInputs, Patient and Overview, all of which are light, and no
+   [data-surface="dark"] subtree (.boot, .rail, .prov, .runlay, .cg) holds one. Put a bar on a dark surface and steps 1 and 2 become one step.
+   Fixing it needs a token between 1.97 and 3.09 on ink, which the frozen
+   palette does not have -- so it is written down rather than papered over. */
 .sevbar-f { position: absolute; inset: 0 auto 0 0; background: var(--rule-firm); }
 .sevbar[data-sev="1"] .sevbar-f { background: var(--sev-2-edge); }
 .sevbar[data-sev="2"] .sevbar-f { background: var(--clay); }
@@ -67,4 +130,44 @@
 .sevbar-m {
   position: absolute; top: -1px; bottom: -1px; width: 1px;
   background: var(--text); opacity: 0.7;
+}
+
+/* --- the legend ----------------------------------------------------------
+   A strip, not a panel. No ground and no border of its own, for two reasons:
+   the swatches must sit on the same surface as the marks they explain, or they
+   are not the same swatches (step 1 is 1.09 against --bg and 1.14 against
+   --surface -- it is a hairline by design, and a legend that gave it a ground
+   of its own would show a step the table never draws); and a bordered box above
+   a table competes with the table for the first look, which is the one thing
+   this strip must not do.
+
+   Verified on every ground it can be placed on. Fill against the ground, then
+   edge against the ground, then word on its own fill -- all three rise at every
+   step, on all three light grounds:
+     --bg         fill 1.09 1.36 8.67 11.07   edge 1.92 2.90 8.67 11.07
+     --surface    fill 1.14 1.42 9.06 11.57   edge 2.01 3.03 9.06 11.57
+     --surface-2  fill 1.05 1.32 8.38 10.70   edge 1.86 2.80 8.38 10.70
+     word on fill 5.97 7.19 8.67 11.07 (light), 6.56 7.03 7.43 11.05 (dark)
+   Steps 1 and 2 are near-invisible as fills, which is the truth about them: at
+   those steps the mark is its edge and its word, and that is why the legend
+   prints the word inside the swatch rather than beside it. */
+.sevleg {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--d1) var(--d3);
+}
+/* .lab's typography, but held at --text-2 rather than --text-3 so the strip
+   clears AA at 11px on the sunk ground too (4.30 -> 5.99). */
+.sevleg .sevleg-t { color: var(--text-2); flex: none; }
+.sevleg-steps {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--d1) var(--d2);
+}
+.sevleg-steps li { display: inline-flex; }
+/* --t-small, not --t-micro: --t-micro is reserved for uppercase labels, and
+   these are words in their own case. It is also the size floor, which is right
+   for a strip that must be legible without pulling rank on the table. */
+.sevleg .sev { font-size: var(--t-small); }
+.sevleg-n {
+  flex: 1 0 100%; margin: 0; max-width: 92ch;
+  font-size: var(--t-small); line-height: 1.5; color: var(--text-2);
 }

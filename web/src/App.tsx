@@ -231,7 +231,10 @@ export function App() {
                 {days.data.days.map((d) => (
                   <option key={d.date} value={d.date}>
                     {dayLong(d.date)}
-                    {' · '}{d.referrals} waiting
+                    {/* the same noun as the landing: this counts ROWS on a
+                        list, which is all the service can see, not people in a
+                        room. One word, and it is no longer a headcount. */}
+                    {' · '}{d.referrals} referrals
                     {d.date === runnable ? '' : ' · view only'}
                   </option>
                 ))}

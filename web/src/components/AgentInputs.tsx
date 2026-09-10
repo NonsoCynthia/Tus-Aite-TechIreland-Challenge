@@ -1,6 +1,6 @@
 import { BedDouble, CalendarDays, Stethoscope, TriangleAlert } from 'lucide-react'
 import { Vitals, type AgeStats } from './Vitals'
-import { sevOccupancy } from '../lib/severity'
+import { SAFE_OCCUPANCY, sevOccupancy } from '../lib/severity'
 import { SevBar, SevChip } from './Severity'
 import type { Observation } from '../lib/types'
 
@@ -65,11 +65,6 @@ const GAR_WEIGHT = { G: 1, A: 2, R: 3 } as const
 const ICON_PX = 16
 const ICON_SM_PX = 14
 const STROKE = 1.75
-
-/** The safe-operating line every occupancy figure in this product is read
- *  against. sevOccupancy uses the same number; it is drawn here so the reader
- *  can see where it falls rather than being told. */
-const SAFE_OCCUPANCY = 85
 
 const num = (v: unknown): number | null => {
   if (v == null || v === '') return null
@@ -263,7 +258,12 @@ export function AgentInputs({
  *  span was always exactly 100, the 100% tick was pinned to the right edge on
  *  every ward, and the only line a reader actually needs -- 85%, the
  *  safe-operating line -- was absent from this page altogether. 100% is now the
- *  end of the scale, because that is what it is, and 85% is the mark. */
+ *  end of the scale, because that is what it is, and 85% is the mark.
+ *
+ *  That 85 is SAFE_OCCUPANCY from lib/severity.ts, the same constant
+ *  sevOccupancy bands on. It was declared a SECOND time in this file, which is
+ *  exactly how a drawn line and the colour beneath it drift a point apart and
+ *  stop meaning each other. One constant, one line, one band boundary. */
 function WardPanel({ w, cited, pressure }: {
   w: CapacityWard; cited: boolean; pressure: number | null
 }) {

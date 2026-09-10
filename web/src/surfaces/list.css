@@ -37,6 +37,29 @@
  * Depth is hairlines and wells, never a gradient, a glow or a drop shadow. The
  * inset box-shadows below are 1–3px rules, which is how the rest of the product
  * draws an edge that has to be seen.
+ *
+ * One type rule, added late and applied narrowly. tokens.css says --t-micro
+ * (11px) is for "uppercase labels ONLY, never a value" and --t-small (12px) is
+ * "the floor. nothing carrying meaning goes below." This file spent --t-micro
+ * on 39 declarations and only a handful were label-shaped. Raising the TOKEN is
+ * not the fix: it would move all 39 at once and re-break column widths measured
+ * to the pixel, four days before a demo.
+ *
+ * What is raised instead is the distance-reading channel, and only that: the
+ * priority numeral (.spn-n), which is the product's core output, and the
+ * severity chip's own text in the table's two graded cells (.rule-chip .sev and
+ * .lst-table .sub .sev). Each was measured in the running app against the
+ * column it sits in, and each is paid for out of its own padding rather than
+ * out of the table's width -- .lst-vp's scrollWidth is 1414 before and after,
+ * and no row grew by a pixel in either density.
+ *
+ * Everything else stays at 11px on purpose: the uppercase labels the token is
+ * for (.lst-th-l, .tb-x, .lab), the qualifier register (.sub, .of, .ev-cav),
+ * and the expander's caption grid, which is read up close a row at a time and
+ * is not the channel this file has to carry across a room. The declaration
+ * count is still 39 -- one came off .spn-n and one went on .key-r-w, the
+ * ladder's new rule statement, which sits in the same register as the .key-w
+ * prose beside it and would be louder than its own step at any other size.
  */
 
 .lst { display: block; }
@@ -157,10 +180,19 @@
 }
 .key-k { font-size: var(--t-body); color: var(--text); font-weight: 550; }
 .key-w { font-size: var(--t-micro); color: var(--text-2); line-height: 1.45; }
-.key-r {
+/* The rule a step comes from, and WHAT IT SAYS. The statement used to be a
+   `title` on this span and nowhere else, so on a keyboard or a touch screen the
+   step named RULE-CRT-URGENT and stopped there. core.ref_rules states every one
+   of them in a single short line ("An urgent referral should be seen within 28
+   days"), the ladder is reference material inside a fold, and there is room --
+   so it is on the surface rather than under a pointer. */
+.key-r { display: grid; gap: var(--d1); margin-top: 3px; min-width: 0; }
+.key-r-1 { display: grid; gap: 1px; min-width: 0; }
+.key-r-id {
   font-size: var(--t-micro); color: var(--text-3); letter-spacing: 0.01em;
-  margin-top: 3px; overflow-wrap: anywhere;
+  overflow-wrap: anywhere;
 }
+.key-r-w { font-size: var(--t-micro); color: var(--text-2); line-height: 1.45; }
 /* A step that needs a caveat gets one under it. Step 4 is where twelve pairs
    print the same number and are still separated by it; step 5 is where the
    sixteen that are genuinely equal are placed. */
@@ -279,6 +311,15 @@
 .lst-note strong { color: var(--text); }
 .lst-empty { padding: var(--d5) 0; }
 
+/* The severity scale, once, immediately above the rows it grades -- inside the
+   category panel rather than up in the toolbar, so it sits with the table and
+   not with the page furniture. The legend itself belongs to
+   components/Severity.tsx, which takes a className and merges it onto .sevleg:
+   this surface gives it a margin in the panel's own rhythm and nothing else. It
+   has no ground and no border here for the reason severity.css states -- the
+   swatches have to sit on the same surface as the marks they explain. */
+.lst-legend { margin: 0 0 var(--d3); }
+
 /* --- the table -----------------------------------------------------------
    The viewport is bounded so the header can stick to it. .scroll-x keeps wide
    content inside this box; the page body never scrolls sideways. */
@@ -373,12 +414,19 @@
    verbatim, so a referral 31x past target was typeset exactly like one at
    1.04x) and .sub.is-stale (a 1px dashed underline at 1.75:1 for a reading up
    to 871 days old). Both are severity steps now. */
-.lst-table .sub.is-split { display: flex; align-items: baseline; gap: 5px; }
+.lst-table .sub.is-split { display: flex; align-items: baseline; gap: 4px; }
 .lst-table .sub.is-split > .sev, .lst-table .sub.is-split > .sub-age { flex: none; }
 .sub-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* the block keeps its fill and loses only the vertical padding, so a graded
-   qualifier costs a 46px row no height at all */
-.lst-table .sub .sev { padding: 0 6px; }
+/* The block keeps its fill and loses only the vertical padding, so a graded
+   qualifier costs a 46px row no height at all.
+
+   Its TEXT is raised to --t-small with the rest of the severity channel, and
+   the two pixels that pays for it come off the side padding (6px -> 4px) and
+   off .sub.is-split's gap (5px -> 4px). Measured at 1716 in the running app:
+   without that refund the reading date truncated on 6 of the 20 rows on screen;
+   with it, on none, and the chip grows 83.7px -> 84.9px. The age is flex: none
+   either way, so it is never the thing that goes. */
+.lst-table .sub .sev { padding: 0 4px; font-size: var(--t-small); }
 
 .c-pos { text-align: right; }
 .pos {
@@ -434,14 +482,19 @@
   height: var(--spine-bar); background: var(--text-3);
 }
 .spn-n {
-  font-size: var(--t-micro); color: var(--text-2); flex: none;
+  font-size: var(--t-small); color: var(--text-2); flex: none;
   width: 30px; text-align: right;
 }
 .spn.is-tight .spn-g { height: 16px; }
 .spn.is-tight .spn-u { top: 1px; }
 .spn.is-tight .spn-w { bottom: 1px; }
-/* six decimals when two would print the same number as the row above */
-.spn.is-precise .spn-n { width: 52px; }
+/* Six decimals when two would print the same number as the row above.
+   "0.282693" measures 52.30px at 11px, so the 52px box was already 0.3px short
+   before this numeral was raised at all; at --t-small it is 56.48px and the box
+   is 58. Widening it takes the 6px off .spn-g, which is elastic (flex 1 1 auto,
+   min-width 0) -- the column itself is untouched, so the table arithmetic in
+   List.tsx does not move. */
+.spn.is-precise .spn-n { width: 58px; }
 
 /* --- two rows the printed priority cannot separate ------------------------
    Twelve adjacent in-band pairs in this decision differ only from the fourth
@@ -503,7 +556,31 @@
   max-width: 100%; min-width: 0;
   color: var(--text); font-size: var(--t-micro); line-height: 1.4;
 }
-.rule-chip > .sev { flex: none; padding: 1px 6px; }
+/* The severity block is one level deeper now -- .rule-open wraps it -- so this
+   is a descendant selector, not a child one. Written as `>` it stopped matching
+   the moment the ID became a control, and the chip silently lost its padding
+   and its flex: none. Its text is raised with the rest of the severity channel:
+   the chip goes 143.3px -> 152.3px inside a 240px column whose min-width is
+   unchanged, and .rule-d truncates as it already did on every row. */
+.rule-chip .sev { flex: none; padding: 1px 6px; font-size: var(--t-small); }
+
+/* The rule ID is a CONTROL. What a rule SAYS used to live only in a `title` on
+   a non-focusable span: a mouse could read it and nothing else could -- no
+   keyboard, no touch, no screen reader with the tooltip suppressed. The button
+   opens the row's expander, which carries every statement in full (.ev-rst).
+   It draws no chrome of its own, so the chip is still the only thing seen. */
+.rule-open {
+  flex: none; min-width: 0; max-width: 100%;
+  display: inline-flex; align-items: baseline;
+  font: inherit; color: inherit; text-align: left;
+  background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+}
+.rule-open:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* The hover affordance is an underline on the ID, exactly as .pw-open does it,
+   and NOT a change to the chip's border. The border at every severity step is
+   part of a measured ramp; re-tinting it on hover would put a colour into the
+   scale that the scale never agreed to. */
+.rule-open:hover b { text-decoration: underline; text-underline-offset: 3px; }
 .rule-chip svg { align-self: center; flex: none; }
 .rule-chip b { font-weight: 650; letter-spacing: 0.01em; }
 .rule-d {
@@ -512,12 +589,20 @@
 }
 /* A rule that will not fit is COUNTED, never dropped. Compact used to clip the
    second chip with `overflow: hidden` and no ellipsis, which contradicted the
-   compact block's own promise not to hide one of the two facts in a cell. */
+   compact block's own promise not to hide one of the two facts in a cell.
+
+   It is a control for the same reason the rule ID is: it named the rules it was
+   standing in for in a `title` and nowhere else. It opens the expander, where
+   all of them are listed with their statements. */
 .rule-more {
-  flex: none; font-size: var(--t-micro); color: var(--text-2); line-height: 1.4;
-  padding: 1px var(--d2);
+  flex: none; font: inherit;
+  font-size: var(--t-micro); color: var(--text-2); line-height: 1.4;
+  padding: 1px var(--d2); cursor: pointer;
+  background: none;
   border: 1px solid var(--rule-firm); border-radius: var(--radius);
 }
+.rule-more:hover { color: var(--text); border-color: var(--text-3); }
+.rule-more:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .rule-ok, .rule-pre {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: var(--t-micro); color: var(--text-3);

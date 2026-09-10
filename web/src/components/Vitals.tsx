@@ -85,11 +85,22 @@ const bandFor = (v: Vital, value: number) =>
  *  all, which is what a severity of 0 means: the absence of a severity is not a
  *  severity. This was the one existing four-step ramp in the product and it
  *  bottomed out at 3.56:1; it is now the same four steps everything else uses.
+ *
+ *  The two UNMARKED steps used to say "fresh" and "recent", so an 89-day-old
+ *  reading was called RECENT: a reassurance, two days short of the same reading
+ *  being called stale, on the same panel that argues a stale normal reading is
+ *  an absence of information rather than reassurance. The banding is right and
+ *  is unchanged — under 90 days genuinely needs no mark — so only the WORD
+ *  moved. Where there is no mark the word now states the interval and nothing
+ *  else, and the reader decides what it is worth. From 90 days, where the
+ *  product does take a position, it keeps saying so.
  */
 export const ageState = (days: number | null): { word: string; sev: Sev } => {
   if (days == null) return { word: 'age unknown', sev: 0 }
   const sev = sevReadingAge(days)
-  const word = sev === 0 ? (days <= 30 ? 'fresh' : 'recent')
+  // inclusive at 30, which is why it is "within" and not "under": a reading
+  // exactly 30 days old is inside the first interval, not below it.
+  const word = sev === 0 ? (days <= 30 ? 'within 30 days' : 'within 90 days')
     : sev === 1 ? 'stale'
       : sev === 3 ? 'over a year old'
         : 'over two years old'

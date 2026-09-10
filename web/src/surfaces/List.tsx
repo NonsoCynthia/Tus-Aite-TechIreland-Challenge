@@ -12,7 +12,7 @@ import { crtDays, isRefusedPaediatric, ruleStatement, specialtyName } from '../l
 import { plantedCase } from '../lib/planted'
 import { sevBreach, sevReadingAge, sevWaitRatio } from '../lib/severity'
 import type { Sev } from '../lib/severity'
-import { SevChip } from '../components/Severity'
+import { SevChip, SevLegend } from '../components/Severity'
 import { Override } from '../components/Override'
 import type {
   CohortReferral, Citation, Decision, Observation, OverrideRecord, Overrides,
@@ -103,13 +103,50 @@ const COL = {
  *  a planted chip does not fit in less. */
 const COL_REF = 260
 
-/** Nine columns need 1414px of table, seven need 1138. Content width is the
- *  viewport less the rail and the page padding: 300px at 1440 and above (rail
- *  236 + 2x32), 96px below it (rail 64 + 2x16). So nine columns first fit at
- *  1714px, and asking for nine at 1440 is what forced the overlap. Triage and
- *  Context are the two that go: Triage reads "triaged" on 307 of 308, Context's
- *  subline was identical on every row, and both are in the expander in full. */
-const NINE_COL_PX = 1714
+/** Nine columns need 1414px of table, seven need 1138:
+ *
+ *    9 cols  76+140+200+240+180+144+132+42 = 1154 + 260 Referral = 1414
+ *    7 cols  76+140+200+240+180+42         =  878 + 260 Referral = 1138
+ *
+ *  The chrome between the viewport and the table is THREE terms, and this
+ *  comment used to count two. It stopped at "300px at 1440 and above (rail 236
+ *  + 2x32)", which is the content column -- but the table does not get the
+ *  content column, it gets what is inside .lst-vp, and .lst-vp has a 1px border
+ *  on each side (list.css). That third term is where 1714 came from:
+ *
+ *    >= 1440   rail 236 + .pad 2x32 + .lst-vp 2x1 = 302px
+ *    <  1440   rail  64 + .pad 2x16 + .lst-vp 2x1 =  98px   (app.css @1439)
+ *
+ *  The rail's own border-right is NOT a fourth term: `* { box-sizing:
+ *  border-box }` (tokens.css) keeps it inside the 236px grid track. Measured in
+ *  the running app at a 1716px viewport, .main starts at x=236 and is 1480 wide,
+ *  not 1479.
+ *
+ *  Measured at each width -- .lst-vp clientWidth, and whether it actually grew a
+ *  horizontal scrollbar:
+ *
+ *    viewport  rail  .pad  chrome  .lst-vp inner  cols  needs  result
+ *      1280      64  2x16      98           1182     7   1138  44px spare
+ *      1440     236  2x32     302           1138     7   1138  fits exactly
+ *      1715     236  2x32     302           1413     9   1414  1px SHORT
+ *      1716     236  2x32     302           1414     9   1414  fits exactly
+ *      1920     236  2x32     302           1618     9   1414  204px spare
+ *
+ *  So the ninth column first fits at 1716 and the old 1714 switched it on two
+ *  pixels early: at 1714 and 1715 the table was 1414px inside a 1412/1413px box,
+ *  and .lst-vp grew a sideways scrollbar at the exact width that added the
+ *  column. Confirmed on the running build at 1715: scrollWidth 1414 against
+ *  clientWidth 1413.
+ *
+ *  One thing this constant cannot model: on a platform with classic rather than
+ *  overlay scrollbars, .lst-vp's own VERTICAL scrollbar takes ~15px more of that
+ *  inner width, and the fit moves with it. The measurements above are macOS
+ *  overlay scrollbars, where it takes none.
+ *
+ *  Triage and Context are the two that go below the breakpoint: Triage reads
+ *  "triaged" on 307 of 308, Context's subline was identical on every row, and
+ *  both are in the expander in full. */
+const NINE_COL_PX = 1716
 
 const tableMin = (narrow: boolean): number =>
   COL.pos + COL.spine + COL.wait + COL.rule + COL.news
@@ -869,9 +906,28 @@ function SortKeyLadder({ alpha, ranked, reference, ties }: {
             <span className="key-k">{s.k}</span>
             <span className="key-w">{s.w}</span>
             {s.note && <span className="key-note">{s.note}</span>}
+            {/* The rule a step comes from, and what it SAYS. The statement
+                was a `title` on this span and nowhere else, so the ladder --
+                the surface whose whole job is explaining the order -- named
+                RULE-CRT-URGENT and left the sentence under a pointer. Step 3
+                cites two rules and only the first one's statement was even on
+                the tooltip. */}
             {s.rule && (
-              <span className="key-r num" title={ruleStatement(reference, s.rule.split(' · ')[0])}>
-                {s.rule}
+              <span className="key-r">
+                {s.rule.split(' · ').map((id) => {
+                  // ruleStatement falls back to the ID itself while
+                  // core.ref_rules is still loading, and printing the ID twice
+                  // says nothing: the step shows the ID alone on the first
+                  // paint, as it always did, and gains the sentence when the
+                  // reference lands.
+                  const st = ruleStatement(reference, id)
+                  return (
+                    <span className="key-r-1" key={id}>
+                      <span className="key-r-id num">{id}</span>
+                      {st !== id && <span className="key-r-w">{st}</span>}
+                    </span>
+                  )
+                })}
               </span>
             )}
           </li>
@@ -985,9 +1041,10 @@ type BandProps = {
 
 function Band(p: BandProps) {
   const [page, setPage] = useState(0)
-  // Nine columns need 1414px of table and only have it from a 1714px viewport
-  // up, so below that the table drops Triage and Context rather than paint the
-  // Referral cell over the Waited column. See COL and NINE_COL_PX above.
+  // Nine columns need 1414px of table and only have it from a 1716px viewport
+  // up (rail 236 + .pad 2x32 + .lst-vp's own 2x1 border = 302px of chrome), so
+  // below that the table drops Triage and Context rather than paint the Referral
+  // cell over the Waited column. See COL and NINE_COL_PX above.
   const narrow = useNarrow(NINE_COL_PX)
   // a new sort, a new filter or a new category always starts at the top of the
   // category, never mid-list
@@ -1075,6 +1132,14 @@ function Band(p: BandProps) {
           where a clinician placed {moved > 1 ? 'them' : 'it'}, not where the system did.</>
         )}
       </p>
+
+      {/* The scale, once, immediately above the rows it grades. Every graded
+          mark in the table below -- the wait bar, the wait-against-target step,
+          the reading's age, the rule that fired -- is drawn from this one
+          four-step ladder, and the ladder had never been stated anywhere on the
+          surface that spends it. It belongs to components/Severity.tsx; this
+          surface places it and does not redraw it. */}
+      <SevLegend className="lst-legend" />
 
       <div className={'scroll-x lst-vp' + (p.tight ? ' is-tight' : '')}>
         {/* min-width is DERIVED, never written down: the specified widths plus
@@ -1437,23 +1502,55 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
           <div className="rulez">
             {shownRules.map((c) => (
               <span className="rule-chip" key={c.rule_id}>
-                <SevChip sev={sevBreach(c.passed)} tone="quiet"
-                         title={ruleStatement(reference, c.rule_id)}>
-                  <TriangleAlert className="ico-sig" strokeWidth={1.75} aria-hidden="true" />
-                  <b className="num">{c.rule_id}</b>
-                </SevChip>
+                {/* The rule ID is a CONTROL, not a label with a tooltip.
+                    What the rule SAYS -- ruleStatement, from core.ref_rules --
+                    used to exist only as a `title` on a non-focusable span, so
+                    a mouse could read it and nothing else could: on a keyboard
+                    and on every touch screen the cell was an opaque
+                    RULE-CRT-URGENT. The expander one row below already carries
+                    every statement in full (.ev-rst), so the ID opens it, and
+                    the statement is the control's accessible name. The visible
+                    text is the first thing in that name, which is what SC 2.5.3
+                    asks for. */}
+                <button
+                  type="button" className="rule-open"
+                  aria-expanded={expanded}
+                  title={ruleStatement(reference, c.rule_id)}
+                  aria-label={`${c.rule_id}: ${ruleStatement(reference, c.rule_id)}. `
+                    + (expanded
+                      ? 'Hide the evidence for this referral'
+                      : 'Show the evidence for this referral, where this rule is stated in full')}
+                  onClick={(e) => { e.stopPropagation(); onToggle() }}
+                  onKeyDown={(e) => e.stopPropagation()}>
+                  <SevChip sev={sevBreach(c.passed)} tone="quiet">
+                    <TriangleAlert className="ico-sig" strokeWidth={1.75} aria-hidden="true" />
+                    <b className="num">{c.rule_id}</b>
+                  </SevChip>
+                </button>
                 {/* the detail ellipsises rather than wrapping the row onto a
                     second line, so it carries its own full text */}
                 {c.detail && <span className="rule-d num" title={c.detail}>{c.detail}</span>}
               </span>
             ))}
             {hiddenRules > 0 && (
-              <span className="rule-more num"
-                    title={fired.slice(shownRules.length)
-                      .map((c) => `${c.rule_id}: ${ruleStatement(reference, c.rule_id)}`)
-                      .join(' · ') + ' · open the row for every rule tested'}>
+              // Same fault, same fix: this named the rules it stands in for in a
+              // `title` and nowhere else. It opens the expander, which lists all
+              // of them with their statements.
+              <button
+                type="button" className="rule-more num"
+                aria-expanded={expanded}
+                title={fired.slice(shownRules.length)
+                  .map((c) => `${c.rule_id}: ${ruleStatement(reference, c.rule_id)}`)
+                  .join(' · ') + ' · open the row for every rule tested'}
+                aria-label={`${hiddenRules} more rule${hiddenRules > 1 ? 's' : ''} fired: `
+                  + fired.slice(shownRules.length)
+                    .map((c) => `${c.rule_id}, ${ruleStatement(reference, c.rule_id)}`)
+                    .join('; ')
+                  + '. Show the evidence for this referral, where every rule tested is listed'}
+                onClick={(e) => { e.stopPropagation(); onToggle() }}
+                onKeyDown={(e) => e.stopPropagation()}>
                 +{hiddenRules} more
-              </span>
+              </button>
             )}
           </div>
         ) : r.rank ? (

@@ -256,9 +256,17 @@
 }
 .ov-chart-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
 .ov-cols-chart { display: flex; align-items: flex-end; gap: 3px; min-width: min-content; }
-.ov-col { flex: 1 1 0; min-width: 22px; display: grid; gap: 3px; justify-items: center; }
+/* 26px, not 22px: both numerals in this chart now sit at --t-small, and "+12"
+   in tabular figures at 12px is ~21px. The floor has to clear the widest label
+   the series can produce, or the ellipsis that keeps a label off its neighbours
+   starts eating the value instead. The chart scrolls past the panel, so a wider
+   floor costs scroll, never a truncated number. */
+.ov-col { flex: 1 1 0; min-width: 26px; display: grid; gap: 3px; justify-items: center; }
+/* the count added that day: a value, so --t-small, the floor for anything
+   carrying meaning. It was --t-micro, which the token file declares for
+   uppercase labels and "never a value". */
 .ov-col-n {
-  font-size: var(--t-micro); color: var(--text-2); white-space: nowrap;
+  font-size: var(--t-small); color: var(--text-2); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
 .ov-col-track {
@@ -267,8 +275,15 @@
   border-bottom: 1px solid var(--rule-firm);
 }
 .ov-col-track i { display: block; width: 100%; background: var(--text-3); min-height: 1px; }
+/* The day of the month. 9px was below every size the token file declares, and
+   it is a numeral a reader reads off, so it goes to --t-small -- the stated
+   floor for anything carrying meaning -- rather than to --t-micro, which the
+   token file reserves for uppercase labels and "never a value".
+   The axis is NOT thinned to every third day, because it did not need to be:
+   two tabular digits at 12px are ~14px inside a 26px column floor, so every
+   day in the charted window keeps its label. */
 .ov-col-k {
-  font-size: 9px; color: var(--text-3); white-space: nowrap;
+  font-size: var(--t-small); color: var(--text-3); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
 .ov-col.is-on .ov-col-track i { background: var(--text); }
@@ -355,7 +370,14 @@
 /* THE accent. clay, once, for the session the capacity agent actually read. */
 .ov-spark-c.is-cited { border-bottom-color: var(--accent); }
 .ov-spark-c.is-cited i { background: var(--accent); }
-.ov-spark-k { font-size: 9px; color: var(--text-3); flex: none; align-self: flex-end; }
+/* The session date range, also a value, also raised off 9px to the --t-small
+   floor. nowrap so a two-date range cannot break across lines now that it is
+   wider; .ov-spark shrinks inside the 320px cell instead, which is what it is
+   built to do -- it already scrolls its own bars. */
+.ov-spark-k {
+  font-size: var(--t-small); color: var(--text-3); flex: none;
+  align-self: flex-end; white-space: nowrap;
+}
 .ov-cited-tag { color: var(--accent); font-weight: 600; }
 
 /* --- wards ----------------------------------------------------------------

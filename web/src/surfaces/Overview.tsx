@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   Activity, BedDouble, Building2, CalendarCheck, CalendarDays, Check, Clock, Gauge,
-  Layers, ListOrdered, Lock, Play, Scale, Stethoscope, TrendingUp, TriangleAlert, Users,
+  Layers, ListOrdered, Lock, Minus, Play, Scale, Stethoscope, TrendingUp, TriangleAlert,
+  Users,
 } from 'lucide-react'
 import { api, BANDS, bandOf } from '../lib/api'
 import {
@@ -9,7 +10,7 @@ import {
 } from '../lib/ref'
 import { SevBar, SevChip } from '../components/Severity'
 import {
-  SEV_INTEGRITY, sevBooked, sevBreach, sevOccupancy, sevReadingAge, type Sev,
+  SAFE_OCCUPANCY, SEV_INTEGRITY, sevBooked, sevBreach, sevOccupancy, sevReadingAge, type Sev,
 } from '../lib/severity'
 import type { CohortReferral, Decision, Reference } from '../lib/types'
 import './overview.css'
@@ -19,9 +20,12 @@ import './overview.css'
    counted at render time from a payload.
 --------------------------------------------------------------------------- */
 
-/** Safe-operating occupancy. Bagust, Place & Posnett, BMJ 1999;319:155-8.
- *  The band boundaries around it are sevOccupancy's, never this file's. */
-const SAFE_OCCUPANCY = 85
+/* Safe-operating occupancy -- Bagust, Place & Posnett, BMJ 1999;319:155-8 -- is
+   imported from lib/severity above, beside the bands that grade against it.
+   It used to be declared here as well, a second time in components/AgentInputs
+   and a third time implicitly as sevOccupancy's first boundary. A drawn safe
+   line that can drift from the band edge grading the same number is the
+   "never hardcode a threshold" fault in another costume: one declaration. */
 
 /** Colour is never the only channel: the GAR letter always resolves to a word. */
 const GAR_WORD = { G: 'Green', A: 'Amber', R: 'Red' } as const
@@ -105,11 +109,27 @@ const dayNum = (iso: string) => String(new Date(iso).getDate())
 /** The calendar day a timestamp falls on, as the API writes dates. */
 const dayOf = (iso: string) => iso.slice(0, 10)
 
-/** Upper-middle median, the convention the rest of the product already uses. */
+/** Median wait, in days. ONE convention, and it is List.tsx's: on an even n the
+ *  arithmetic mean of the two middle values, which is the standard definition.
+ *
+ *  This surface used to take the upper-middle element. Recomputed across the 14
+ *  hospital-days of 9001 the two conventions disagree on two of them --
+ *  2026-08-21 (n=286) read 142 here and 141 on the list, 2026-08-22 (n=286) read
+ *  143 here and 142 there. Neither day holds a decision, so both surfaces render
+ *  and one hospital-day carried two different "median wait" figures.
+ *
+ *  The rounding is matched too, not just the formula: two middle values one day
+ *  apart average to a half-day, and both surfaces round half up so the figure
+ *  printed is a whole number of days.
+ *
+ *  It belongs in lib/ beside the other shared arithmetic. It is still duplicated
+ *  here because this change owns Overview.tsx and overview.css alone; the copy
+ *  it is matched to is List.tsx:469. */
 const median = (xs: number[]) => {
   if (!xs.length) return 0
   const s = [...xs].sort((a, b) => a - b)
-  return s[Math.floor(s.length / 2)]
+  const n = s.length
+  return n % 2 ? s[(n - 1) / 2] : Math.round((s[n / 2 - 1] + s[n / 2]) / 2)
 }
 
 /* ---------------------------------------------------------------------------
@@ -821,14 +841,24 @@ function StalenessPanel({ ops }: {
             </div>
             {ages.length > 0 && (
               <div className="ov-hist">
-                {hist.map((h) => (
-                  <div className={'ov-hist-row' + (h.lo >= 365 ? ' is-past-year' : '')} key={h.key}>
-                    <span className="ov-hist-k">{h.key}</span>
-                    <SevBar sev={sevReadingAge(h.lo)} value={h.n / maxN} height={8}
-                            label={`${h.key}: ${fmt(h.n)} readings`} />
-                    <span className="num ov-hist-n">{fmt(h.n)}</span>
-                  </div>
-                ))}
+                {hist.map((h) => {
+                  const sev = sevReadingAge(h.lo)
+                  // Where the rule is drawn and where the ramp steps are the
+                  // same fact, so they are read from the same place. This was
+                  // `h.lo >= 365`, a boundary re-derived beside the scale that
+                  // already owns it: sevReadingAge is what "a year old" means
+                  // here, and 365 is only ever its argument. The same test
+                  // List.tsx:477 uses to count year-old readings.
+                  const pastYear = sev >= sevReadingAge(365)
+                  return (
+                    <div className={'ov-hist-row' + (pastYear ? ' is-past-year' : '')} key={h.key}>
+                      <span className="ov-hist-k">{h.key}</span>
+                      <SevBar sev={sev} value={h.n / maxN} height={8}
+                              label={`${h.key}: ${fmt(h.n)} readings`} />
+                      <span className="num ov-hist-n">{fmt(h.n)}</span>
+                    </div>
+                  )
+                })}
                 <div className="ov-hist-mark">
                   below the rule: a year old or older,{' '}
                   <span className="num">{fmt(age.over_1y)}</span> readings
@@ -882,20 +912,40 @@ function RulePanel({ d, decNote, reference, onOpenList }: {
   // above counts as past target
   const crtBreached = d.rankings.filter((r) =>
     failed(r.rule_checks).some((c) => c.rule_id.startsWith('RULE-CRT-'))).length
-  // A whole-list rule keeps its place on the board even when no referral
-  // carried a check for it: RULE-ORDER and RULE-TIEBREAK are verdicts on the
-  // decision, and filtering the board on the per-referral tally alone made
-  // both of them vanish rather than say "holds".
+  // EVERY rule in core.ref_rules, tested or not.
+  //
+  // This was filtered to `tally.has(id) || isWholeList(...)`, which kept a rule
+  // only when some referral carried a check for it. A per-referral rule that
+  // nothing was ever tested against therefore vanished from this board, while
+  // DecisionRecord.tsx -- drawn straight from reference.rules -- went on
+  // reporting the same rule as "not tested". Two audit surfaces disagreeing
+  // about whether a rule exists is worse than either answer on its own.
+  //
+  // The filter also made the "not tested" branch below unreachable: any id that
+  // survived it either had tested >= 1 or took the whole-list path, so the one
+  // case the branch was written for could not occur.
   const ids = (reference?.rules ?? []).map((r) => r.rule_id)
-    .filter((id) => tally.has(id) || isWholeList(reference, id))
+  // Still a union, never the reference alone: a rule the coordinator tested
+  // that core.ref_rules does not carry is a fact about this decision and keeps
+  // its place, with whatever statement the reference can give it.
   for (const id of tally.keys()) if (!ids.includes(id)) ids.push(id)
+  const untested = ids.filter((id) => !isWholeList(reference, id) && !tally.has(id)).length
   const perReferral = [...tally.entries()]
     .filter(([id]) => !isWholeList(reference, id))
     .reduce((a, [, b]) => a + b.tested, 0)
 
   return (
     <Panel icon={Activity} title="Rules"
-           note={`${fmt(perReferral)} per-referral checks · ${fmt(d.rankings.length)} placements`}>
+           note={`${fmt(ids.length)} rules · ${fmt(perReferral)} per-referral checks`}>
+      {/* The board is drawn from the reference, so it has a state the decision
+          cannot fill: the rules have not arrived yet. Saying so is not the same
+          as a decision that tested nothing. */}
+      {!reference?.rules?.length && (
+        <p className="ov-quiet">
+          core.ref_rules has not arrived, so this board shows only the rules this decision
+          carried a check for.
+        </p>
+      )}
       <div className="ov-rules" tabIndex={0} role="group" aria-label="Rule board">
         {ids.map((id) => {
           const t = tally.get(id) ?? { tested: 0, failed: 0 }
@@ -909,7 +959,15 @@ function RulePanel({ d, decNote, reference, onOpenList }: {
               <div className="ov-rule-top">
                 <span className="num ov-rule-id">{id}</span>
                 {held == null ? (
-                  <span className="ov-verdict is-none">no verdict</span>
+                  // TWO ways to reach "no verdict", and they are different
+                  // claims: a per-referral rule that no referral was tested
+                  // against, and a whole-list rule this decision payload
+                  // carries no verdict field for. The word matches
+                  // DecisionRecord.tsx, so the two audit surfaces read alike.
+                  <span className="ov-verdict is-none">
+                    <Minus size={ICON} strokeWidth={2.5} aria-hidden />
+                    {whole ? 'no verdict' : 'not tested'}
+                  </span>
                 ) : held ? (
                   <span className="ov-verdict is-ok">
                     <Check size={ICON} strokeWidth={2.5} aria-hidden />holds
@@ -948,6 +1006,19 @@ function RulePanel({ d, decNote, reference, onOpenList }: {
           <>, and <span className="num">{fmt(carrying - crtBreached)}</span> past the triage
           turnaround window with no category to be late against</>
         )}.
+        {/* An untested rule is not a passing rule, and the board no longer
+            hides it. Counted here so the reader is told the board holds a rule
+            this day says nothing about, without having to scan for it. */}
+        {untested > 0 && (
+          <span>
+            <span className="num">{fmt(untested)}</span>
+            {untested === 1
+              ? ' rule in core.ref_rules was tested against no referral on this day, so this'
+                + ' hospital-day says nothing about whether it holds.'
+              : ' rules in core.ref_rules were tested against no referral on this day, so this'
+                + ' hospital-day says nothing about whether they hold.'}
+          </span>
+        )}
         <button className="ov-link" onClick={onOpenList}>
           Open the ranked order
         </button>

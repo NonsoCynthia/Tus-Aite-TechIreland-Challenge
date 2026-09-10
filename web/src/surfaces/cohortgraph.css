@@ -44,6 +44,16 @@
   font-size: var(--t-small); color: var(--text-2);
 }
 .cg-nums strong { color: var(--text); font-size: var(--t-data); }
+/* The figures above are counts of the DRAWN subset. This line is what stops the
+   heading from being read as a claim about the whole run, so it sits directly
+   under them, in the same quiet register as .cg-note, and is not optional
+   chrome: at the default limit it is the only thing on the panel that says 150
+   is not 305. */
+.cg-scope {
+  /* no max-width: the panel is already 320px, and a measure inside it would
+     set a second, narrower column for no reason */
+  margin: 0; font-size: var(--t-small); line-height: 1.5; color: var(--text-2);
+}
 .cg-src { font-size: var(--t-micro); color: var(--text-3); }
 .cg-load { font-size: var(--t-small); color: var(--text-3); }
 

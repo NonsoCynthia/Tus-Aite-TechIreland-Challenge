@@ -52,11 +52,24 @@ export function sevNews2Sub(score: number | null): Sev {
   return 4
 }
 
-/** Occupancy against the 85% safe-operating line (Bagust, Place & Posnett,
- *  BMJ 1999;319:155-8). */
+/** The safe-operating occupancy line, as a percentage.
+ *
+ *  Bagust, Place & Posnett, "Dynamics of bed use in accommodating emergency
+ *  admissions: stochastic simulation model", BMJ 1999;319:155-8: the risk of a
+ *  bed crisis rises slowly up to about 85% average occupancy and steeply above
+ *  it. It is a published operating threshold, not a house rule, which is why it
+ *  is worth stating once.
+ *
+ *  Exported because it is BOTH a band boundary here and a line drawn on the
+ *  ward chart. Two copies would let the line and the colour under it drift a
+ *  point apart, and the drawn line is the only thing that says what the colour
+ *  means. One constant, both jobs. */
+export const SAFE_OCCUPANCY = 85
+
+/** Occupancy against the safe-operating line. */
 export function sevOccupancy(pct: number | null): Sev {
   if (pct == null) return 0
-  if (pct < 85) return 0
+  if (pct < SAFE_OCCUPANCY) return 0
   if (pct < 95) return 1
   if (pct < 100) return 3
   return 4

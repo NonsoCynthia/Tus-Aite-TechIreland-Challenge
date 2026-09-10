@@ -6,11 +6,24 @@ const fmt = (n: number) => n.toLocaleString('en-IE')
 
 /** The opener.
  *
- *  An empty waiting room, and two true sentences. A row of chairs IS a waiting
- *  list, which is also what the mark draws, so the photograph and the logo are
- *  saying the same thing before a single number appears.
+ *  An empty waiting room. A row of chairs IS a waiting list, which is also what
+ *  the mark draws, so the photograph and the logo are saying the same thing
+ *  before a single number appears.
  *
  *  Both figures are counted from the live cohort, not written down.
+ *
+ *  WORDING. The photograph is documentary -- a real waiting room, real people's
+ *  chairs -- and it lends whatever sits over it the authority of a photograph.
+ *  "308 people are waiting" therefore read as a headcount of that room, and
+ *  this screen is in no position to assert one: it can see a list, not a
+ *  population. It says what it can actually see instead. A referral is a row on
+ *  this list; the count of rows is a fact about the list, and the sentence now
+ *  claims exactly that and no more.
+ *
+ *  This is NOT a hedge and must not become one. The synthetic-data label was
+ *  removed at the client's explicit instruction and does not come back, and no
+ *  disclaimer replaces it. The fix is in the noun, which costs the screen
+ *  nothing: the number is as large, as immediate and as true as it was.
  */
 export function Landing({ hospital, date, name, hospitals, onHospital, onEnter }: {
   hospital: string; date: string; name: string
@@ -39,8 +52,8 @@ export function Landing({ hospital, date, name, hospitals, onHospital, onEnter }
         <p className="landing-lead">
           {ready ? (
             <>
-              <strong className="num">{fmt(rows.length)}</strong> people are waiting at{' '}
-              {name}. The longest has waited{' '}
+              <strong className="num">{fmt(rows.length)}</strong> referrals are on this
+              list at {name}. The longest has waited{' '}
               <strong className="num">{fmt(longest)}</strong> days.
             </>
           ) : (
