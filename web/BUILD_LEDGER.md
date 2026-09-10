@@ -341,6 +341,62 @@ screenshot. A claim is not evidence.
   is 87.5px and clears the rule ID by 2.5px. Raising its type would overlap by 1.6px
 - **`Mark.tsx:18-19`** holds 2 hex literals as SVG fills, outside the eight audited stylesheets
 
+## Review gates — round 2, and the adjudication
+
+Three gates (data truth, clinical safety with a veto, design), then an adjudicator whose standing
+instruction was to **assume a seventh ramp inversion until its own arithmetic said otherwise**.
+
+| | finding | state |
+|---|---|---|
+| **VETO** | `<Limits>` was passed no refusal flag, so a specialty-0601 child's page drew an `--ink` bar on the adult NEWS2 histogram and the sentence **"this referral scores 4"**, one screen below six struck-through chips reading "refused". The round-1 veto verbatim, in a component the fix never reached | closed at 3 sites |
+| **VETO-class** | Sweeping for it found a **third** escape: the evidence expander, reachable from every tab, receiving no refusal at all. And a **fourth**: the NEWS2 *sort key* ranked refused rows on the score the product refuses to display — ordering is a channel | closed; both now derive from the SPECIALTY at the point of use, so the per-tab grouping is no longer load-bearing. 18 render sites and 6 orderings proven gated at runtime on a day `/api/decision` 404s |
+| **HIGH** | The past-target sentence named the **wrong** referral on four patient pages: a comparison against a string `tier()` can never return, so it always resolved backwards. The breached patient has the *lower* priority in both boundary pairs, so the side was never inferable from a score | closed |
+| **HIGH** | Every patient page showed a ward holding more people than beds. `/api/context` carries one specialty's allocation where `/api/operations` carries the ward total. Reading ops would **not** have fixed it — W-9001-02 is 91 occupied against an establishment of 90 — only the census (occupied+free) reconciles | closed |
+| **HIGH** | The clinic evidence line printed five-session totals beside one session's pressure: **"15 free slots at a pressure of 1.000"** | closed |
+| **HIGH** | **THE SIXTH INVERSION.** `.sevbar-m` was `--text` at 0.7 painted over the fill, so the threshold marker fell **5.54 / 4.42 / 3.22 / 2.00 / 1.50 / 1.26** as severity rose. The 85% safe line and the cohort-median line vanished on exactly the wards and patients past them — 4 of 7 wards, 48 of 308 pages, under the 3:1 floor at steps 3-4 | closed: **5.07 / 5.86 / 8.67 / 11.07** light, **5.86 / 5.86 / 7.43 / 11.05** dark |
+| **MUST-FIX** | **The threshold line was absent, not faint.** `left: 100%` inside a box that clips at 100%, with the `translateX(-1px)` applied only on the fill side. That is every referral still *inside* its target — 35 of the 165 — including **`PW-DEMO-02` at 88 of 91**, the planted fixture whose stated purpose is to demonstrate the 13-week timeframe. Neither gate saw it: one measured the marker's colour against six grounds correctly, the other confirmed `of` was the right number. Nobody asked what happens when that number is 1 | closed |
+| **MUST-FIX** | The patient page showed a ward snapshot **six days in the future** and clinic sessions four days ahead, unlabelled, while its sibling surface flags exactly this at `SEV_INTEGRITY` | closed, borrowing Overview's sentence word for word |
+
+**No seventh inversion.** Every channel recomputed from raw tokens on both grounds — chip fill, chip
+text, SevBar fill, the threshold marker, and the Journey axis, which no table had ever measured.
+
+## Five wrong published figures, all from one habit
+
+Every one came from copying a number instead of recomputing it, or from naming no ground.
+
+| published | actual | what it really was |
+|---|---|---|
+| chip step 1 vs track `1.78` | **1.00** | the chip's *edge*, not its fill — step 1 was indistinguishable from its own track |
+| chip step 2 vs track `1.90` | **1.26** | a figure a neighbouring file had already withdrawn |
+| overflow vs track `3.41` | **4.30** | measured against the step's own fill, not the track it sits on |
+| dark marker step 0 `9.19` | **9.13** | against no ground that exists |
+| "71 of the 130 at step 2" | **43** | 71 is steps 1 **and** 2 |
+
+Every prose figure now names its ground.
+
+## The browser walk — three defects no static check could find
+
+Nothing in this round had been looked at; every agent reported "no browser, nothing was seen".
+
+- **The page scrolled sideways 189px on the screen the demo opens on**, caused by a fix from this
+  round. `.sev-sr`, added so a chip names its step to a screen reader, is `position: absolute` and
+  `.sev` established no containing block — so its containing block was the viewport. Its
+  `width: 1px; overflow: hidden` clips its *text*; it never clipped its *position*. The comment
+  above it claimed it "cannot push a scrollbar"
+- **Point 13 was not closed.** In compact, `.cell` and `.ovbadge` are siblings with no flex parent,
+  so neither could shrink: a 208px badge started 290px into a 304px column and painted **194px**
+  over the wait bar. The compact rule written for this was scoped to `.c-ref .cell`, and the badge
+  is not inside `.cell`, so it had never applied
+- **A regression of mine**, caught in the same pass: `overflow: visible` on `.sub.is-split` freed
+  step 4's outline and let the row spill 44px sideways. The clip is restored and the outline is
+  given padding to be drawn into
+
+**Verified in a browser at 1280 / 1440 / 1715 / 1716 / 1920, both densities:** the breakpoint turns
+exactly where computed (1715 → 7 columns, 1716 → 9, inner 1414 = scrollWidth 1414, **zero spare, no
+scrollbar**); **no column is starved** at any width, which was the original point 13; zero visible
+cell spills in either density; `PW-DEMO-02` draws its 91-day line; and the legend keys the quiet
+mark each surface actually draws.
+
 ## Still needs the client
 
 - **Clearing `agent.*`** — 43+ stacked decisions. Classifier-blocked
