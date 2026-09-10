@@ -423,7 +423,21 @@
    readings over two years old, up to 871 days. Truncation is unaffected --
    `.sub-t` below carries its own ellipsis, which is what actually shortens the
    prose while the graded block stays. */
-.lst-table .sub.is-split { display: flex; align-items: baseline; gap: 4px; overflow: visible; }
+.lst-table .sub.is-split {
+  display: flex; align-items: baseline; gap: 4px;
+  /* Step 4's escalation over step 3 is `outline: 2px solid` grown OUTWARD
+     (severity.css) -- the fix for the fifth inversion, where an inset ring in
+     the step's own foreground made the most severe step 1.7-1.9x LESS present
+     than the one below it. An outline is clipped by an ancestor's
+     `overflow: hidden`, so on the 12 readings over two years old, up to 871
+     days, step 4 drew identically to step 3.
+     `overflow: visible` fixed that and cost more than it bought: it also let
+     this row spill 44px into the next COLUMN, measured at 1280 in compact.
+     So the clip stays and the outline is given room instead -- 2px of padding
+     it can be drawn into, cancelled by an equal negative margin so no cell
+     resizes and the measured column arithmetic is untouched. */
+  padding: 2px; margin: -2px; overflow: hidden;
+}
 .lst-table .sub.is-split > .sev, .lst-table .sub.is-split > .sub-age { flex: none; }
 .sub-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The block keeps its fill and loses only the vertical padding, so a graded
@@ -877,8 +891,26 @@
 .lst-vp.is-tight .c-ref .cell {
   display: inline-flex; flex-wrap: nowrap; vertical-align: middle; max-width: 100%;
 }
+/* min-width:0 is what makes the truncation actually happen. .ovbadge-t already
+   carried the ellipsis, but the BADGE is the flex item, and a flex item will
+   not shrink below its content unless min-width is cleared -- so in compact,
+   where .pw-line is nowrap and the badge cannot drop to a second line, a
+   208px badge sat in a 304px cell and painted 194px into the Waited column,
+   straight over the wait bar and its multiple. Measured in a browser at 1280
+   on PW-9001-000191. The pathway number keeps its width and the phrase gives
+   way, which is the order the comment above already intended. */
+.lst-vp.is-tight .ref-wrap {
+  display: flex; align-items: center; flex-wrap: nowrap; min-width: 0; gap: var(--d2);
+}
+/* min-width:0 twice, and both are load-bearing. .ovbadge-t already carried the
+   ellipsis, but a flex item will not shrink below its content unless min-width
+   is cleared -- and before the wrapper above there was no flex parent at all,
+   so neither box could shrink and the badge simply painted into the next
+   column. The pathway number keeps its width; the phrase gives way. */
+.lst-vp.is-tight .ref-wrap > .cell { min-width: 0; flex: 1 1 auto; }
 .lst-vp.is-tight .ovbadge {
-  margin-top: 0; margin-left: var(--d2); vertical-align: middle;
+  margin-top: 0; margin-left: 0; vertical-align: middle;
+  min-width: 0; flex: 0 1 auto;
 }
 .lst-vp.is-tight .c-ref { white-space: nowrap; }
 

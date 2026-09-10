@@ -1451,6 +1451,14 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
 
       {/* referral */}
       <td className="c-ref">
+        {/* .cell and .ovbadge are SIBLINGS, and compact lays them on one line.
+            Without a flex parent they are inline boxes in a table-cell: neither
+            can shrink, so a 208px badge started 290px into a 304px column and
+            painted 194px over the wait bar next door -- the overlap the client
+            reported in compact. The wrapper makes them real flex items, and the
+            two min-width:0 rules in list.css are what let the phrase give way
+            while the pathway number keeps its width. */}
+        <div className="ref-wrap">
         <div className="cell">
           <span className="pw-line">
             <button type="button" className="pw num pw-open"
@@ -1494,6 +1502,7 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
             </span>
           </span>
         )}
+        </div>
       </td>
 
       {/* Waited, drawn against target. The multiple past target is the graded

@@ -6,6 +6,15 @@
    why the two solid steps also flip their text to paper. */
 
 .sev {
+  /* `position: relative` is load-bearing, not decoration. .sev-sr below is
+     absolutely positioned, and without a positioned ancestor its containing
+     block is the INITIAL one -- the viewport -- so it sits at its static
+     position with nothing clipping it. Inside a table scrolled out to x=1776
+     that put a 1px box at x=1629 and gave the page 189px of real sideways
+     scroll, measured in a browser at 1440. Its own width:1px/overflow:hidden
+     clips its TEXT; it never clipped its POSITION. `relative` changes no
+     layout on an inline-flex box and contains the span. */
+  position: relative;
   display: inline-flex; align-items: baseline; gap: 4px;
   padding: 1px var(--d2); border-radius: var(--radius);
   border: 1px solid transparent; white-space: nowrap;
@@ -78,9 +87,11 @@
 .sev-quiet.sev-4 { color: var(--sev-4-bg); background: var(--sev-2-bg); border-color: var(--sev-4-bg); }
 
 /* The step word, for assistive technology only.
-   Absolutely positioned with no offsets, so it stays at its static position and
-   cannot push a scrollbar; an absolutely positioned child of a flex container
-   is not a flex item, so it also takes none of .sev's 4px gap. */
+   Absolutely positioned with no offsets, so it stays at its static position;
+   an absolutely positioned child of a flex container is not a flex item, so it
+   also takes none of .sev's 4px gap. It DOES push a scrollbar unless .sev is a
+   containing block -- see the note there. An earlier version of this comment
+   claimed it could not, which a browser disproved. */
 .sev-sr {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip-path: inset(50%); white-space: nowrap;
