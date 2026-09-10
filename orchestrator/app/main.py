@@ -555,7 +555,13 @@ def cohort_graph(run_id: str, limit: int = 0) -> dict[str, Any]:
     return {
         "run_id": run_id, "graph": graph,
         "nodes": list(nodes.values()), "edges": edges,
-        "placements": placements, "citations": sum(1 for e in edges if e["label"] != "hasPlacement"),
+        "placements": placements,
+        # NOT a citation count. A placement's six cited vitals arrive as ONE
+        # role-tagged edge to its urgency score node, and the timeframe role
+        # covers rule and referral-state links which are not evidence at all.
+        # The recorded citation count behind 305 placements is 2,440; this is
+        # 1,386 lines. Named for what it is.
+        "evidence_links": sum(1 for e in edges if e["label"] != "hasPlacement"),
         # Honest about what this graph can and cannot say.
         "inputs_graph_loaded": bool(sparql(
             f"SELECT ?s WHERE {{ GRAPH <{_GRAPH_BASE}graph/inputs> {{ ?s ?p ?o }} }} LIMIT 1")),

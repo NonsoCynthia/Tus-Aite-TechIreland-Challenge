@@ -203,7 +203,10 @@ export interface CohortGraph {
   nodes: GraphNode[]
   edges: GraphEdge[]
   placements: number
-  citations: number
+  /** Role-tagged edges from placements. NOT a citation count: six cited vitals
+   *  arrive as one link to the urgency score, and timeframe links cover rules
+   *  and referral states, which are not evidence. */
+  evidence_links: number
   /** False on this machine: the batch KG was never loaded, so a cited node has
    *  an identity and a type but no resolved property values. Say so on screen
    *  rather than implying the graph knows more than it does. */

@@ -213,7 +213,7 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
         </div>
       </header>
 
-      {flash && <div className="flash">{flash}</div>}
+      {flash && <div className="flash" role="status" aria-live="polite" aria-atomic="true">{flash}</div>}
 
       {ovr && placed && dec.data && (
         <Override patient={placed} decision={dec.data}

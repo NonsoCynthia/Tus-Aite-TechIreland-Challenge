@@ -4,7 +4,7 @@ import {
   Stethoscope, TrendingUp, TriangleAlert, Users,
 } from 'lucide-react'
 import { api, BANDS, bandOf } from '../lib/api'
-import { crtDays, failed, ruleStatement, specialtyFull, specialtyName } from '../lib/ref'
+import { breachPhrase, crtDays, failed, ruleStatement, specialtyFull, specialtyName } from '../lib/ref'
 import type { CohortReferral, Decision, Reference } from '../lib/types'
 import './overview.css'
 
@@ -634,7 +634,7 @@ function RulePanel({ d, noRun, reference, onOpenList }: {
 
   return (
     <Panel icon={Activity} title="Rules"
-           note={`${fmt([...tally.values()].reduce((a, b) => a + b.tested, 0))} checks · ${fmt(d.rankings.length)} placements`}
+           note={`${fmt([...tally.entries()].filter(([id]) => !WHOLE_LIST.has(id)).reduce((a, [, b]) => a + b.tested, 0))} per-referral checks · ${fmt(d.rankings.length)} placements`}
            cite="A summary. The full board, with every statement and threshold, is on the Decision record.">
       <div className="ov-rules">
         {ids.map((id) => {
@@ -651,7 +651,7 @@ function RulePanel({ d, noRun, reference, onOpenList }: {
                   {held
                     ? <><Check size={12} strokeWidth={2.5} aria-hidden />holds</>
                     : <><TriangleAlert size={12} strokeWidth={2.25} aria-hidden />
-                        {whole ? 'violated' : `${fmt(t.failed)} past target`}</>}
+                        {whole ? 'violated' : breachPhrase(id, t.failed)}</>}
                 </span>
               </div>
               <div className="ov-rule-st">{ruleStatement(reference, id)}</div>

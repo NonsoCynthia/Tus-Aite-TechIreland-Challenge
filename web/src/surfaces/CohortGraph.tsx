@@ -123,7 +123,7 @@ export function CohortGraphSurface({ hospital, date, onOpenPatient }: {
           <>
             <div className="cg-nums num">
               <span><strong>{g.data.placements}</strong> placements</span>
-              <span><strong>{g.data.citations.toLocaleString('en-IE')}</strong> citations</span>
+              <span><strong>{g.data.evidence_links.toLocaleString('en-IE')}</strong> evidence links</span>
               <span><strong>{g.data.nodes.length}</strong> nodes</span>
             </div>
             <div className="cg-src num">{g.data.run_id}</div>
@@ -148,6 +148,14 @@ export function CohortGraphSurface({ hospital, date, onOpenPatient }: {
           })}
         </ul>
         {/* the finding the picture makes, said once */}
+        {g.data && (
+          <p className="cg-note">
+            An <strong>evidence link</strong> is one role-tagged edge from a
+            placement. A placement's six cited vitals arrive as one link to its
+            urgency score, so the recorded citation count is higher than the
+            count of lines here.{' '}
+          </p>
+        )}
         {g.data && (
           <p className="cg-note">
             <strong className="num">{g.data.placements}</strong> placements and{' '}
@@ -182,7 +190,7 @@ export function CohortGraphSurface({ hospital, date, onOpenPatient }: {
           {chosen.kind === 'placement' && chosen.pathway && (
             <>
               <div className="cg-sel-m num">
-                position {chosen.position} · cites {chosen.cites} records
+                position {chosen.position} · {chosen.cites} evidence links
               </div>
               <button className="cg-open" onClick={() => onOpenPatient(chosen.pathway!)}>
                 Open {chosen.pathway} &rarr;

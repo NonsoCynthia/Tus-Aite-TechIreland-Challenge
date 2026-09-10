@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Check, TriangleAlert } from 'lucide-react'
 import { api } from '../lib/api'
-import { ruleStatement } from '../lib/ref'
+import { breachPhrase, ruleStatement } from '../lib/ref'
 import type { Decision, Overrides, Reference } from '../lib/types'
 import './record.css'
 
@@ -131,8 +131,11 @@ export function DecisionRecord({ hospital, date, reference }: {
         <h2 className="sec-h">
           Rules tested
           <span className="sec-note">
-            core.ref_rules · {fmt([...tally.values()].reduce((a, b) => a + b.tested, 0))} checks
-            across {fmt(d.rankings.length)} placements
+            core.ref_rules ·{' '}
+            {fmt([...tally.entries()]
+              .filter(([id]) => !WHOLE_LIST.has(id))
+              .reduce((a, [, b]) => a + b.tested, 0))} per-referral checks
+            across {fmt(d.rankings.length)} placements, plus 2 whole-list
           </span>
         </h2>
         <div className="scroll-x">
@@ -164,7 +167,7 @@ export function DecisionRecord({ hospital, date, reference }: {
                         ? <span className="verdict is-ok"><Check size={13} strokeWidth={2.5} />holds</span>
                         : <span className="verdict is-bad">
                             <TriangleAlert size={13} strokeWidth={2.25} />
-                            {whole ? 'violated' : `${fmt(t?.failed ?? 0)} past target`}
+                            {whole ? 'violated' : breachPhrase(r.rule_id, t?.failed ?? 0)}
                           </span>}
                     </td>
                   </tr>

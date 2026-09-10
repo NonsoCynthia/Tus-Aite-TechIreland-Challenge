@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Building2, CalendarDays, Gauge, ListOrdered, Play, ScrollText, Waypoints,
+  Building2, CalendarDays, Gauge, ListOrdered, Lock, Play, ScrollText, Waypoints,
 } from 'lucide-react'
 import { api } from './lib/api'
 import { Overview } from './surfaces/Overview'
@@ -155,12 +155,23 @@ export function App() {
 
           <div className="topbar-right">
             {dec.data && <RunPill decision={dec.data} />}
-            <button className="cta" onClick={() => setRunOpen(true)} disabled={!rankable}
-                    title={rankable ? undefined
-                      : 'Evidence is date-blind, so only the newest day holding data can be ranked'}>
-              <Play size={14} strokeWidth={2.25} fill="currentColor" aria-hidden />
-              {dec.data ? 'Run again' : 'Run the agents'}
-            </button>
+            {rankable ? (
+              <button className="cta" onClick={() => setRunOpen(true)}>
+                <Play size={14} strokeWidth={2.25} fill="currentColor" aria-hidden />
+                {dec.data ? 'Run again' : 'Run the agents'}
+              </button>
+            ) : (
+              // Not a disabled button. A disabled control cannot be focused and
+              // its title never shows, so the reason has to be on the surface.
+              <span className="cta-locked">
+                <Lock size={13} strokeWidth={2} aria-hidden />
+                Read only —{' '}
+                {runnable && <>scoring happens on{' '}
+                  {new Date(runnable).toLocaleDateString('en-IE',
+                    { day: 'numeric', month: 'long' })}</>}
+                <button className="cta-why" onClick={() => setRunOpen(true)}>why?</button>
+              </span>
+            )}
           </div>
         </header>
 
@@ -228,9 +239,15 @@ function SystemStatus({ health }: { health: Awaited<ReturnType<typeof api.health
   ]
   return (
     <div className="sysstat">
+      {/* The state used to be carried ONLY by a 5px dot going from green to
+          red, and the dot was aria-hidden -- so the one indicator telling a
+          clinician whether the numbers on screen are current failed WCAG 2.2
+          SC 1.4.1 outright. The word travels now, and the hues are off the
+          reserved triage set. */}
       {parts.map(([k, up]) => (
         <span key={k} className={'sysstat-i' + (up ? ' is-up' : '')}>
           <i aria-hidden />{k}
+          <b>{up ? 'ok' : 'down'}</b>
         </span>
       ))}
     </div>

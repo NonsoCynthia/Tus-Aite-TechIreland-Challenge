@@ -145,6 +145,19 @@ function useList(hospital: string, date: string) {
     return m
   }, [decision.data, overrides.data])
 
+  /** The displayed order as a list, so the override dialog can decide whether a
+   *  move crosses a category boundary IN THE LIST THE CLINICIAN IS LOOKING AT.
+   *  Computed against decision.rankings it was answering about a different list:
+   *  after one override, displayed position N is a different person, so the
+   *  warning could stay silent for a move that visibly crosses a boundary —
+   *  and rule_warning_accepted would then be stored false for a crossing that
+   *  did happen. */
+  const displayedOrder = useMemo(() => {
+    const arr: string[] = []
+    for (const [pw, i] of seqOf) arr[i] = pw
+    return arr.filter(Boolean)
+  }, [seqOf])
+
   const rows = useMemo<Row[]>(() => {
     if (!cohort.data) return []
     const clinical = ops.data?.clinical ?? {}
@@ -173,6 +186,7 @@ function useList(hospital: string, date: string) {
     opsFailed: ops.isError,
     loading: cohort.isPending,
     error: cohort.error,
+    displayedOrder,
   }
 }
 
@@ -256,7 +270,7 @@ export function List({ hospital, date, reference, onOpen }: {
   reference: Reference | undefined
   onOpen: (pw: string) => void
 }) {
-  const { rows, decision, ops, opsFailed, loading, error } = useList(hospital, date)
+  const { rows, decision, ops, opsFailed, loading, error, displayedOrder } = useList(hospital, date)
 
   const [tab, setTab] = useState('Urgent')
   const [q, setQ] = useState('')
@@ -332,7 +346,7 @@ export function List({ hospital, date, reference, onOpen }: {
 
   return (
     <div className="pad lst">
-      {flash && <div className="flash">{flash}</div>}
+      {flash && <div className="flash" role="status" aria-live="polite" aria-atomic="true">{flash}</div>}
 
       <header className="lst-top">
         <div className="lst-title">
@@ -509,7 +523,8 @@ export function List({ hospital, date, reference, onOpen }: {
         <Override
           patient={moving} decision={decision}
           onClose={() => setMoving(null)}
-          onDone={(m) => { setFlash(m); setMoving(null) }} />
+          onDone={(m) => { setFlash(m); setMoving(null) }}
+          displayedOrder={displayedOrder} />
       )}
     </div>
   )
@@ -948,8 +963,13 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
       className={'lst-row is-clickable'
         + (expanded ? ' is-open' : '')
         + (r.ovr && r.ovrLive ? ' is-overridden' : '')}
-      tabIndex={0} role="button"
-      aria-label={`Open ${r.pathway_number}, ${specialtyName(reference, r.specialty_hipe)}`}
+      // NOT role="button". ARIA gives button "children presentational", so
+      // every <td> was stripped from the accessibility tree -- position, days
+      // waited, ratio to target, NEWS2 and CRITICALLY the reading's age were
+      // all unreachable, and a screen-reader user heard only the pathway
+      // number. Age must travel with the reading for every reader. The row
+      // stays a row; the pathway link in the first cell is the named control,
+      // and the click handler is a convenience on top of it.
       initial={still ? false : { opacity: 0, y: 3 }}
       animate={{ opacity: 1, y: 0 }}
       transition={still ? { duration: 0 } : {
@@ -957,10 +977,7 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
         // as slow, not as considered.
         delay: Math.min(i, 18) * 0.012, duration: 0.22, ease: [0.2, 0, 0, 1],
       }}
-      onClick={() => onOpen(r.pathway_number)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(r.pathway_number) }
-      }}>
+      onClick={() => onOpen(r.pathway_number)}>
 
       {/* order */}
       <td className="c-pos">
@@ -988,7 +1005,10 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
       {/* referral */}
       <td className="c-ref">
         <div className="cell">
-          <span className="pw num">{r.pathway_number}</span>
+          <button type="button" className="pw num pw-open"
+                  onClick={(e) => { e.stopPropagation(); onOpen(r.pathway_number) }}>
+            {r.pathway_number}
+          </button>
           <span className="sub" title={specialtyName(reference, r.specialty_hipe)}>
             {specialtyName(reference, r.specialty_hipe)}
             <span className="sub-code num"> · {r.specialty_hipe}</span>
@@ -1239,6 +1259,18 @@ function Evidence({ r, hospital, reference, ops, decision, onMove, onOpen }: {
           {r.rank ? (
             <>
               <p className="ev-p">{r.rank.rationale_summary ?? 'No rationale was recorded.'}</p>
+              {/* The sentence names a capacity score, which pairs it with the
+                  urgency score as if both placed this person. They did not:
+                  capacity is specialty-level and sets alpha only. And the
+                  patient page states this text is template output while this
+                  panel did not, so a reader could take it for a model's
+                  opinion. Both said here, next to it. */}
+              <p className="ev-p ev-p-meta">
+                Deterministic template text, written by the coordinator from the
+                numbers above — no model wrote this sentence. The capacity score
+                it names belongs to the whole specialty and set{' '}
+                <span className="num">α</span>; it did not move this referral.
+              </p>
               <dl className="ev-terms">
                 <div><dt>how unwell</dt>
                   <dd className="num">{r.rank.urgency_score.toFixed(3)} × α {r.rank.alpha.toFixed(3)}

@@ -642,3 +642,24 @@
 @media (max-width: 1439px) {
   .lst-table .c-ctx, .lst-table th.c-ctx { display: none; }
 }
+
+/* The row is not a button. ARIA's "children presentational" on role=button was
+   stripping every cell from the accessibility tree, so a screen-reader user got
+   the pathway number and nothing else -- not the wait, not the rule, and not the
+   reading's age, which must travel with the reading for every reader. The
+   pathway number is the named control instead. */
+.pw-open {
+  background: none; border: 0; padding: 0; margin: 0; font: inherit;
+  font-size: var(--t-body); color: var(--text); cursor: pointer; text-align: left;
+}
+.pw-open:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* The coordinator's note names a capacity score, which reads as if capacity
+   placed this person. It did not: capacity is specialty-level and sets alpha.
+   The note is also template output, which the patient page said and this panel
+   did not. Both stated beside it rather than left to be inferred. */
+.ev-p-meta {
+  margin-top: var(--d2); padding-top: var(--d2);
+  border-top: 1px solid var(--rule);
+  font-size: var(--t-micro); color: var(--text-3); line-height: 1.5;
+}

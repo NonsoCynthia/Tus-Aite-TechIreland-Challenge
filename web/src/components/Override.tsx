@@ -39,9 +39,14 @@ const REASONS = [
   'Other (described below)',
 ]
 
-export function Override({ patient, decision, onClose, onDone }: {
+export function Override({ patient, decision, displayedOrder, onClose, onDone }: {
   patient: Ranking
   decision: Decision
+  /** Pathway numbers in the order actually ON SCREEN — the coordinator's, with
+   *  every live override already spliced in. The boundary check must ask about
+   *  this list, not about decision.rankings: after one override, position N in
+   *  what the clinician sees is a different person. */
+  displayedOrder?: string[]
   onClose: () => void
   onDone: (msg: string) => void
 }) {
@@ -57,7 +62,13 @@ export function Override({ patient, decision, onClose, onDone }: {
 
   useEffect(() => { ref.current?.showModal() }, [])
 
-  const target = decision.rankings.find((r) => r.position === Number(to))
+  const byPathway = new Map(decision.rankings.map((r) => [r.pathway_number, r]))
+  // position N in the DISPLAYED list, falling back to the coordinator's own
+  // order when no displayed order was supplied
+  const targetPw = displayedOrder?.[Number(to) - 1]
+  const target = targetPw
+    ? byPathway.get(targetPw)
+    : decision.rankings.find((r) => r.position === Number(to))
   const fromBand = bandOf(patient.cpc)
   const movingTo = target ? bandOf(target.cpc) : fromBand
   const crosses = !!target && bandOf(target.cpc) !== fromBand

@@ -236,7 +236,7 @@ check("occupancy_pct is computed on the recorded census, not on nominal",
 print("\n13. the whole decision as a graph (A7)")
 g = get(f"/api/graph/cohort/{run_id}")
 check("every placement is a node", g["placements"] == len(rows), f"{g['placements']} vs {len(rows)}")
-check("citations came back in bulk", g["citations"] > 1000, f"{g['citations']}")
+check("evidence links came back in bulk", g["evidence_links"] > 1000, f"{g['evidence_links']}")
 kinds = {}
 for n in g["nodes"]:
     kinds[n["kind"]] = kinds.get(n["kind"], 0) + 1

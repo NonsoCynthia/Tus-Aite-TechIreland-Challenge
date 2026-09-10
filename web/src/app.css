@@ -77,9 +77,13 @@
 }
 .sysstat-i i {
   width: 5px; height: 5px; border-radius: 50%;
-  background: var(--cat-urgent); display: inline-block;
+  /* off the reserved triage hues: a service being down is not a clinical
+     category, and the word beside it carries the state anyway */
+  background: var(--clay); display: inline-block;
 }
-.sysstat-i.is-up i { background: var(--cat-routine); }
+.sysstat-i.is-up i { background: var(--text-3); }
+.sysstat-i b { font-weight: 600; color: var(--text-2); }
+.sysstat-i:not(.is-up) b { color: var(--text); }
 .sysstat-i.is-up { color: var(--text-2); }
 
 /* --- top bar ------------------------------------------------------------- */
@@ -670,4 +674,32 @@
     border-radius: var(--radius); white-space: nowrap; order: 1;
   }
   .pad { padding: var(--d4) var(--d4) var(--d7); }
+}
+
+/* The landing states a figure about people waiting, over a photograph of a real
+   waiting room, and it is the screen the demo opens on. The synthetic marker
+   cannot wait for the rail to mount. */
+.landing-synth {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  margin: 0 0 var(--d4); padding: var(--d2) var(--d3);
+  font-size: var(--t-micro); letter-spacing: 0.04em; color: var(--text-2);
+  border: 1px dashed var(--rule-firm); border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.55);
+}
+.landing-synth span { width: 6px; height: 6px; border-radius: 50%; background: var(--clay); }
+
+/* A day that can be read but not scored. Evidence is date-blind, so ranking an
+   older day would cite readings taken after it -- a real limit, and one that has
+   to be visible rather than hidden in a disabled control's tooltip. */
+.cta-locked {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  padding: 0 var(--d3); min-height: 34px;
+  border: 1px dashed var(--rule-firm); border-radius: var(--radius);
+  font-size: var(--t-small); color: var(--text-2); white-space: nowrap;
+}
+.cta-locked svg { color: var(--text-3); flex: none; }
+.cta-why {
+  background: none; border: 0; padding: 0 0 0 var(--d1); font: inherit;
+  font-size: var(--t-small); color: var(--text); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
 }

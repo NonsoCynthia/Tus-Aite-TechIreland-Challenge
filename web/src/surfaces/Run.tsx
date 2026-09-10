@@ -142,7 +142,7 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
               <Readout k="direction" v={health.data?.capacity_direction ?? "…"} u="ADR-007" />
             </div>
 
-            <ol className="lanes">
+            <ol className="lanes" aria-label="Agent progress">
               {AGENTS.map((p, i) => {
                 const state = done || phaseIdx > i ? 'done' : phaseIdx === i ? 'live' : 'todo'
                 const c = committed(p.key)
@@ -187,7 +187,7 @@ export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }
                   <motion.i animate={{ width: `${pct}%` }}
                     transition={still ? { duration: 0 } : { duration: 0.2, ease: 'linear' }} />
                 </div>
-                <div className="run-total-t num">
+                <div className="run-total-t num" role="status" aria-live="polite">
                   <motion.span key={run.scored} className="run-n"
                     initial={still ? false : { opacity: 0.5 }} animate={{ opacity: 1 }}
                     transition={{ duration: 0.14 }}>{fmt(run.scored)}</motion.span>

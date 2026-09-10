@@ -49,3 +49,12 @@ export const checkLabel = (c: RuleCheck): string =>
 
 export const failed = (checks: RuleCheck[] | undefined): RuleCheck[] =>
   (checks ?? []).filter((c) => !c.passed)
+
+/** How a failed rule reads. A CRT rule is a target; the triage-turnaround rule
+ *  is a window on how long a referral may sit untriaged, and the referral it
+ *  fires on here has no CPC and no target at all — so calling it "past target"
+ *  contradicts every other statement on the page about what can be late. */
+export const breachPhrase = (ruleId: string, n: number): string =>
+  ruleId.startsWith('RULE-CRT-')
+    ? `${n.toLocaleString('en-IE')} past target`
+    : `${n.toLocaleString('en-IE')} breached`
