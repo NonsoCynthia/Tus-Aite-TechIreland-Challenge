@@ -8,6 +8,7 @@ import {
 import { api, bandOf, BANDS } from '../lib/api'
 import { useNarrow } from '../lib/useNarrow'
 import { crtDays, ruleStatement, specialtyName } from '../lib/ref'
+import { plantedCase } from '../lib/planted'
 import { Override } from '../components/Override'
 import type {
   CohortReferral, Citation, Decision, Observation, OverrideRecord, Overrides,
@@ -1005,10 +1006,20 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, expanded,
       {/* referral */}
       <td className="c-ref">
         <div className="cell">
-          <button type="button" className="pw num pw-open"
-                  onClick={(e) => { e.stopPropagation(); onOpen(r.pathway_number) }}>
-            {r.pathway_number}
-          </button>
+          <span className="pw-line">
+            <button type="button" className="pw num pw-open"
+                    onClick={(e) => { e.stopPropagation(); onOpen(r.pathway_number) }}>
+              {r.pathway_number}
+            </button>
+            {/* Eight of the 308 are planted fixtures the dataset track keeps at
+                fixed pathway numbers because the demo depends on them. Unlabelled
+                they read as leftover test data in a clinical list. */}
+            {plantedCase(r.pathway_number) && (
+              <span className="planted" title={plantedCase(r.pathway_number)!.why}>
+                planted · {plantedCase(r.pathway_number)!.what}
+              </span>
+            )}
+          </span>
           <span className="sub" title={specialtyName(reference, r.specialty_hipe)}>
             {specialtyName(reference, r.specialty_hipe)}
             <span className="sub-code num"> · {r.specialty_hipe}</span>

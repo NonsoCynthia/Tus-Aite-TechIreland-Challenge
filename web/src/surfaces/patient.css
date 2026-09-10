@@ -462,3 +462,14 @@
     transition: none;
   }
 }
+
+/* A planted fixture, named. These eight are deliberate — the dataset track keeps
+   them at fixed pathway numbers because the demo depends on them — and saying so
+   is the difference between a demonstration asset and apparent test debris. */
+.pt-planted {
+  display: grid; gap: var(--d2); margin: var(--d4) 0;
+  padding: var(--d3) var(--d4);
+  border: 1px dashed var(--rule-firm); background: var(--surface-2);
+}
+.pt-planted p { margin: 0; font-size: var(--t-small); color: var(--text-2); line-height: 1.55; max-width: 88ch; }
+.pt-planted code { font-size: var(--t-micro); color: var(--text-3); word-break: break-all; }

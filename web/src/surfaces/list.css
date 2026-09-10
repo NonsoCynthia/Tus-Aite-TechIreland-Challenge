@@ -663,3 +663,11 @@
   border-top: 1px solid var(--rule);
   font-size: var(--t-micro); color: var(--text-3); line-height: 1.5;
 }
+
+/* Planted-fixture marker. Dashed, like every other "recorded but not a clinical
+   claim" register in the product, and never in a triage hue. */
+.pw-line { display: flex; align-items: baseline; gap: var(--d2); flex-wrap: wrap; min-width: 0; }
+.planted {
+  font-size: var(--t-micro); color: var(--text-3); white-space: nowrap;
+  padding: 1px var(--d2); border: 1px dashed var(--rule-firm); border-radius: var(--radius);
+}

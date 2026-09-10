@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Info } from 'lucide-react'
 import { api, bandOf } from '../lib/api'
 import { checkLabel, crtDays, failed, ruleStatement, specialtyFull } from '../lib/ref'
+import { plantedCase } from '../lib/planted'
 import { Journey, type Event } from '../components/Journey'
 import { Provenance } from '../components/Provenance'
 import { Override } from '../components/Override'
@@ -214,6 +215,19 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
       </header>
 
       {flash && <div className="flash" role="status" aria-live="polite" aria-atomic="true">{flash}</div>}
+
+      {/* Eight of the 308 are fixtures the dataset track plants at fixed pathway
+          numbers because the demo depends on them existing. Saying what each one
+          is for turns the most obvious challenge — "why is there test data in
+          your clinical list?" — into the answer: each is a claim the system can
+          be tested against, and the test that plants it is named. */}
+      {plantedCase(pathway) && (
+        <aside className="pt-planted">
+          <span className="lab">Planted case · {plantedCase(pathway)!.what}</span>
+          <p>{plantedCase(pathway)!.why}</p>
+          <code className="num">{plantedCase(pathway)!.source}</code>
+        </aside>
+      )}
 
       {ovr && placed && dec.data && (
         <Override patient={placed} decision={dec.data}
