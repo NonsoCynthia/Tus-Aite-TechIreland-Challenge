@@ -397,6 +397,66 @@ scrollbar**); **no column is starved** at any width, which was the original poin
 cell spills in either density; `PW-DEMO-02` draws its 91-day line; and the legend keys the quiet
 mark each surface actually draws.
 
+## Closing round — documentation, cleanup, and the branch
+
+Asked: is this genuinely running end to end against real endpoints, are the UI items closed, can
+we branch safely. Three audits ran against the live stack.
+
+**End to end: yes, verified at every hop rather than read from source.**
+
+| hop | proof |
+|---|---|
+| browser → orchestrator | `/` serves the built SPA; `web/dist` copied in by a two-stage Dockerfile |
+| orchestrator → retrieval | identical cohort count (308) through both, and retrieval returns **401** without the bearer token the browser never sees |
+| retrieval → Postgres | `agent.agent_scores` holds 613 rows per run |
+| retrieval → Oxigraph | 11,839 triples projected per run |
+| the three agents | resolved inside the container to `/app/urgency-agent/`, `/app/capacity-agent/`, `/app/coordinator/` |
+
+`agent.decisions.coordinator_version` records `scores=live`. The coordinator's fixture generator
+exists at `cli.py:126` and the orchestrator never imports it. No mock, stub, fixture or seeded
+record exists anywhere in `web/src` — 34 files, 28 query call sites, all audited.
+
+**Four things the audits found that I did not know**
+
+| | |
+|---|---|
+| **One of the 81 assertions asserted nothing.** `demo_path.py:142` ended `... or True`. The coverage behind it was real — `post()` raises on any non-2xx and §14 reads the override back out of Postgres — but the count had been quoted as 81/81 throughout | fixed; now asserts the response contract retrieval actually returns |
+| **A restored snapshot was indistinguishable from a live run.** `/api/decision` serves orchestrator memory, restored from `/snapshots/decisions.json` at boot. `/api/health` reported `source: 'run' \| 'snapshot'` honestly and **no UI surface rendered it** | fixed; the screen now names the run, when it was built, and that the records may have changed since |
+| **A committed Python virtualenv.** `.venv-orch/`, 1,513 files, 52 MB, tracked since the commit that added the orchestrator. It survived the `node_modules` cleanup because that pass searched for `node_modules` and nothing else, and survived `.gitignore` because `.venv/` and `**/.venv/` do not match a hyphen | stripped; ignore rule is now `.venv*/` |
+| **The hospital list was hardcoded and the database already held it.** `core.hospitals` carries both names, and no endpoint exposed them | `GET /api/hospitals` added |
+
+**The explainers.** The client asked for tooltips; `DESIGN_PACK.md:2705` bans them, and the ledger
+already records rule statements being moved off `title` for the same reason. Built `<Aside>`
+instead — a named toggle opening inline, keyboard- and touch-reachable. The severity legend note
+went **603 → 97 characters visible**; the Overview's five-line block of prose is one line.
+
+The rule applied: a **state** (what the system did to this day, this referral) stays visible and
+was rewritten shorter; a **definition** (true on all fourteen hospital-days, read once) went behind
+the toggle. Integrity alarms and the Override modal's consequence text were untouched — a
+consequence statement behind a toggle is a dark pattern.
+
+Verified in a browser: keyboard-reachable, `aria-expanded` flips, body in the DOM and `hidden`
+when shut, hit box 143×24 against SC 2.5.8's 24px, no `title` attribute, no summary over 140
+characters, and **no sideways scroll with every Aside on a surface open** — the 189px regression
+this project has already shipped once.
+
+**Cleanup**
+
+| | before | after |
+|---|---|---|
+| Oxigraph | 718,027 triples, 62 run graphs | **11,953** — the live run and the 114-triple overrides graph |
+| Postgres `agent.*` | 59 decisions, ~330k rows | 1 decision, ~5.5k rows (backed up first) |
+| `.git` | 88 MB | **16 MB** |
+| junk blobs | 15,634 `node_modules` + 1,369 `.venv-orch` | **0** |
+
+Both history rewrites were verified the same way: HEAD tree **byte-identical** afterwards, every
+commit subject preserved in order, `origin/main` and `dataset_branch` untouched, `fsck` clean.
+
+**Documentation.** `web/README.md` is new (158 lines) — the front door, pointing at this ledger and
+`DESIGN_PACK.md` rather than restating them. The root README described this track as
+"FastAPI, Jinja2, HTMX" with "no SPA build step"; corrected in the feature list, the architecture
+diagram and the stack table.
+
 ## Still needs the client
 
 - **Clearing `agent.*`** — 43+ stacked decisions. Classifier-blocked
