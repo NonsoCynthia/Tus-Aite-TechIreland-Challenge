@@ -1,55 +1,150 @@
 /* Component styles. Every colour comes from tokens.css; none is a literal. */
 
-.app { min-height: 100%; display: flex; flex-direction: column; }
-.app > main { flex: 1 1 auto; }
+/* --- the shell -----------------------------------------------------------
+   Rail plus content, side by side, filling the viewport. The old shell capped
+   everything at 1248px and centred it, which left a third of a wide screen
+   empty and made a dense operational product read as a document. The rail is
+   the fixed element now; the content area takes whatever is left. */
+.app {
+  min-height: 100%;
+  display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr);
+}
+.main { display: flex; flex-direction: column; min-width: 0; }
+.content { flex: 1 1 auto; min-width: 0; }
+
+.boot {
+  height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--d4);
+  background: var(--bg); color: var(--text-2); font-size: var(--t-small);
+}
+
+/* --- rail ---------------------------------------------------------------- */
+.rail {
+  background: var(--bg); color: var(--text);
+  border-right: 1px solid var(--rule);
+  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh;
+}
+.rail-brand {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--d1);
+  padding: var(--d5) var(--d5) var(--d4);
+  background: none; border: 0; cursor: pointer; text-align: left; width: 100%;
+}
+.rail-brand img { height: 22px; width: auto; }
+.rail-descriptor {
+  font-family: var(--font-brand); font-size: 10px; font-weight: 300;
+  letter-spacing: 0.1em; color: var(--text-2);
+  padding-top: var(--d1); border-top: 1px solid var(--rule); width: 100%;
+}
+
+.rail-nav { flex: 1 1 auto; padding: var(--d3) var(--d3) 0; overflow-y: auto; }
+.rail-group + .rail-group { margin-top: var(--d5); }
+.rail-lab { padding: 0 var(--d3) var(--d2); color: var(--text-3); }
+.rail-item {
+  display: flex; align-items: center; gap: var(--d3); width: 100%;
+  padding: var(--d2) var(--d3); border: 0; border-radius: var(--radius);
+  background: none; color: var(--text-2); font: inherit; font-size: var(--t-body);
+  cursor: pointer; text-align: left;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.rail-item:hover { background: var(--surface); color: var(--text); }
+/* taupe, not clay: on dark the kit's accent is taupe, and clay is spent once
+   per composition on the content side */
+.rail-item.is-on {
+  background: var(--surface); color: var(--text);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.rail-item svg { flex: 0 0 auto; opacity: 0.9; }
+
+.rail-foot { padding: var(--d4) var(--d5) var(--d5); display: grid; gap: var(--d3); }
+/* README feature 1 promises this label in the graph AND the UI. It is a
+   compliance statement in front of a clinical audience, so it is permanent
+   chrome rather than a dismissible banner. */
+.synthetic {
+  display: flex; align-items: center; gap: var(--d2);
+  font-size: var(--t-micro); letter-spacing: 0.04em; color: var(--text-2);
+  padding: var(--d2) var(--d3);
+  border: 1px dashed var(--rule-firm); border-radius: var(--radius);
+}
+.synthetic-dot {
+  width: 6px; height: 6px; flex: 0 0 auto;
+  border-radius: 50%; background: var(--accent);
+}
+.sysstat { display: flex; flex-wrap: wrap; gap: var(--d3); }
+.sysstat-i {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--t-micro); color: var(--text-3);
+}
+.sysstat-i i {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--cat-urgent); display: inline-block;
+}
+.sysstat-i.is-up i { background: var(--cat-routine); }
+.sysstat-i.is-up { color: var(--text-2); }
 
 /* --- top bar ------------------------------------------------------------- */
 .topbar {
-  display: flex; align-items: center; gap: var(--gap);
-  padding: 12px 24px; border-bottom: 1px solid var(--rule);
-  background: var(--surface);
+  display: flex; align-items: center; gap: var(--d4);
+  min-height: var(--topbar-h); padding: var(--d2) var(--d6);
+  border-bottom: 1px solid var(--rule); background: var(--surface);
+  position: sticky; top: 0; z-index: 20;
 }
-.brand-lockup {
-  display: flex; align-items: center; gap: 11px;
-  padding: 0 18px 0 0; border: 0; border-right: 1px solid var(--rule);
-  background: none; cursor: pointer; font: inherit; text-align: left;
+.scope { display: flex; gap: var(--d2); min-width: 0; }
+.picker-wrap {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  padding: 0 var(--d3); min-height: 34px;
+  background: var(--bg); border: 1px solid var(--rule-firm);
+  border-radius: var(--radius); color: var(--text-3);
 }
-.brand-text { display: flex; flex-direction: column; gap: 1px; }
-/* Jost ExtraLight at 0.14em, per the kit */
-.brand-word {
-  font-family: var(--font-brand); font-weight: 200;
-  letter-spacing: var(--track-wide); font-size: 17px; line-height: 1.05;
-  color: var(--ink); white-space: nowrap;
-}
-/* the kit requires "decision support" to travel with the mark in any
-   clinical setting, so it is part of the lockup and not optional chrome */
-.brand-sub {
-  font-family: var(--font-brand); font-size: 10px; font-weight: 300;
-  color: var(--text-2); letter-spacing: 0.1em; white-space: nowrap;
-}
-.scope { display: flex; gap: 8px; margin-left: 20px; }
+.picker-wrap:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
 .picker {
   font: inherit; font-size: var(--t-small); color: var(--text);
-  background: var(--bg); border: 1px solid var(--rule-firm);
-  border-radius: var(--radius); padding: 6px 10px; min-height: 32px;
+  background: none; border: 0; padding: 6px 0; max-width: 30ch;
 }
-.status { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.status-txt { font-size: var(--t-small); color: var(--text-2); }
-.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); }
-.dot.ok  { background: var(--cat-routine); }
-.dot.bad { background: var(--cat-urgent); }
+.picker:focus { outline: none; }
 
-/* --- layout -------------------------------------------------------------- */
-.pad { padding: 28px 24px 56px; max-width: 1248px; margin: 0 auto; width: 100%; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: var(--d3); }
+
+/* the only durable display of alpha: agent.decision_rankings stores no alpha,
+   scarcity, priority or band, so the number that produced the order on screen
+   exists nowhere else once this process ends */
+.runpill {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  padding: 5px var(--d3); border: 1px solid var(--rule);
+  border-radius: var(--radius-pill); background: var(--bg-sunk);
+  font-size: var(--t-micro); color: var(--text-2); white-space: nowrap;
+}
+.runpill-id { color: var(--text); letter-spacing: 0.02em; }
+.runpill-a strong { color: var(--text); }
+.runpill-sep { width: 1px; height: 11px; background: var(--rule-firm); }
+
+.cta {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  padding: 0 var(--d4); min-height: 34px;
+  background: var(--ink); color: var(--paper);
+  border: 1px solid var(--ink); border-radius: var(--radius);
+  font: inherit; font-size: var(--t-small); font-weight: 550; cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
+}
+.cta:hover:not(:disabled) { background: var(--ink-deep); }
+.cta:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --- layout --------------------------------------------------------------
+   .pad fills its column. A reading measure is applied to PROSE only, via
+   .measure, so a paragraph stays readable without the grid collapsing around
+   it. */
+.pad { padding: var(--d6) var(--d6) var(--d8); width: 100%; }
+.measure { max-width: 68ch; }
 .muted { color: var(--text-2); }
 .num { font-variant-numeric: tabular-nums; }
 .err {
-  padding: 14px 16px; border: 1px solid var(--rule-firm);
+  padding: var(--d3) var(--d4); border: 1px solid var(--rule-firm);
   border-left: 3px solid var(--cat-urgent); background: var(--surface);
 }
 
 /* --- lede ---------------------------------------------------------------- */
-.lede { max-width: 68ch; margin-bottom: 26px; }
+.lede { margin-bottom: var(--d5); }
+.lede .lede-p { max-width: 68ch; }
 .lede h1 { margin-bottom: 8px; }
 .lede-p { margin: 0; font-size: var(--t-body); line-height: 1.6; color: var(--text-2); }
 .lede-p strong { color: var(--text); font-size: var(--t-data); }
@@ -665,4 +760,15 @@
 .cmp-verdict {
   margin: 12px 0 0; font-size: var(--t-body); line-height: 1.6; max-width: 76ch;
   border-left: 3px solid var(--clay); padding-left: 14px;
+}
+
+/* --- landing: the hospital selector belongs on this screen ---------------
+   Both figures above it are counted from whichever hospital is chosen, and
+   with no control here they always read the default. */
+.landing-pick { display: flex; align-items: flex-end; gap: var(--d3); flex-wrap: wrap; }
+.landing-sel { display: grid; gap: 5px; }
+.landing-sel select {
+  font: inherit; font-size: var(--t-small); color: var(--text);
+  background: rgba(255, 255, 255, 0.7); border: 1px solid var(--rule-firm);
+  border-radius: var(--radius); padding: 0 var(--d3); min-height: 42px; max-width: 34ch;
 }

@@ -1,25 +1,48 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Play, Waypoints, ListOrdered, X } from 'lucide-react'
 import { api } from '../lib/api'
 import type { Run as RunT } from '../lib/types'
+import './run.css'
 
 const fmt = (n: number) => n.toLocaleString('en-IE')
 
-const PHASES = [
-  { key: 'scoring_urgency',  agent: 'Urgency agent',  reads: 'six vital signs, per referral' },
-  { key: 'scoring_capacity', agent: 'Capacity agent', reads: 'ward pressure and clinic booking' },
-  { key: 'ranking',          agent: 'Coordinator',    reads: 'both scores, one ordered list' },
+/** What each agent reads, stated as inputs rather than description.
+ *  `reads` is the evidence it will cite; `cites` is how many rows per referral,
+ *  which is the number the counter is climbing towards. */
+const AGENTS = [
+  {
+    key: 'scoring_urgency', name: 'Urgency', method: 'NEWS2, scale 1',
+    reads: 'resp · SpO₂ · systolic · pulse · AVPU · temp',
+    cites: '6 rows per referral, zeros included',
+  },
+  {
+    key: 'scoring_capacity', name: 'Capacity', method: 'ward + clinic pressure',
+    reads: 'primary ward bed status · latest clinic session',
+    cites: '2 rows per referral, shared across the specialty',
+  },
+  {
+    key: 'ranking', name: 'Coordinator', method: 'α·urgency + (1−α)·wait',
+    reads: 'both scores · CPC band · target breach · referral date',
+    cites: 'one ordered list, 5 rules tested per referral',
+  },
 ] as const
 
-/** The run, shown honestly.
+/** The run, as an overlay rather than a destination.
+ *
+ *  It used to be a nav item -- a verb sitting between two nouns -- on a page
+ *  that was 80% empty until someone pressed the one button on it. Running is an
+ *  action, so it is a top-bar CTA that opens this, and the surface it resolves
+ *  into is the graph it just built.
  *
  *  The bar counts rows committed to agent.agent_scores, polled from the same
  *  endpoint the coordinator reads. It cannot advance unless work happened, and
  *  it never interpolates between polls: it steps when data arrives.
  */
-export function Run({ hospital, date, runnable, onDone }: {
-  hospital: string; date: string; runnable: string | null; onDone: () => void
+export function Run({ hospital, date, runnable, onClose, onSeeGraph, onSeeList }: {
+  hospital: string; date: string; runnable: string | null
+  onClose: () => void; onSeeGraph: () => void; onSeeList: () => void
 }) {
   // Evidence is date-blind: GET /referrals/{h}/{pw}/context takes no date and
   // returns the most recent observation whichever day is asked about. Scoring
@@ -33,7 +56,17 @@ export function Run({ hospital, date, runnable, onDone }: {
   const still = useReducedMotion()
   const qc = useQueryClient()
 
+  const cohort = useQuery({
+    queryKey: ['cohort', hospital, date], queryFn: () => api.cohort(hospital, date),
+  })
+  const n = cohort.data?.referrals.length ?? 0
+
   useEffect(() => () => { if (timer.current) window.clearInterval(timer.current) }, [])
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [busy, onClose])
 
   async function start() {
     setErr(null); setBusy(true); setRun(null)
@@ -48,6 +81,8 @@ export function Run({ hospital, date, runnable, onDone }: {
             setBusy(false)
             if (r.status === 'done') {
               qc.invalidateQueries({ queryKey: ['decision', hospital, date] })
+              qc.invalidateQueries({ queryKey: ['overrides', hospital, date] })
+              qc.invalidateQueries({ queryKey: ['health'] })
             }
           }
         } catch { /* a dropped poll is not a failed run */ }
@@ -58,35 +93,30 @@ export function Run({ hospital, date, runnable, onDone }: {
   }
 
   const pct = run && run.total ? (run.scored / run.total) * 100 : 0
-  const phaseIdx = run ? PHASES.findIndex((p) => p.key === run.status) : -1
+  const phaseIdx = run ? AGENTS.findIndex((p) => p.key === run.status) : -1
   const done = run?.status === 'done'
+  const committed = (k: string) =>
+    k === 'scoring_urgency' ? run?.urgency_scored ?? 0
+      : k === 'scoring_capacity' ? run?.capacity_scored ?? 0
+        : run?.ranked ?? 0
 
   return (
-    <div className="run-dark" data-surface="dark">
-    <div className="pad">
-      <div className="lede">
-        <h1>Run the agents</h1>
-        <p className="lede-p">
-          Two agents score every referral, then the coordinator orders them. Nothing is
-          precomputed: the bar below counts rows as they are committed, so it cannot move
-          unless work is happening.
-        </p>
+    <div className="runlay" data-surface="dark" role="dialog" aria-modal="true"
+         aria-label="Run the agents">
+      <div className="runlay-head">
+        <div className="runlay-t">
+          <span className="lab">Agent run</span>
+          <h1>{hospital} · {new Date(date).toLocaleDateString('en-IE',
+            { day: 'numeric', month: 'long', year: 'numeric' })}</h1>
+        </div>
+        <button className="runlay-x" onClick={onClose} disabled={busy}
+                aria-label="Close">
+          <X size={18} strokeWidth={1.75} />
+        </button>
       </div>
 
-      <div className="run-panel">
-        <div className="run-top">
-          <button className="run-btn" onClick={start} disabled={busy || !rankable}>
-            {busy ? 'Running…' : done ? 'Run again' : 'Run for this hospital-day'}
-          </button>
-          <div className="run-meta">
-            <span className="num">{hospital}</span> ·{' '}
-            <span className="num">{new Date(date).toLocaleDateString('en-IE',
-              { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-            {run && <> · <span className="num run-id">{run.run_id}</span></>}
-          </div>
-        </div>
-
-        {!rankable && (
+      <div className={"runlay-body" + (run ? "" : " is-idle")}>
+        {!rankable ? (
           <div className="run-locked">
             <strong>This day can be read, but not scored.</strong>
             <p>
@@ -98,71 +128,117 @@ export function Run({ hospital, date, runnable, onDone }: {
                 { day: 'numeric', month: 'long', year: 'numeric' })}, the newest day holding data.
             </p>
           </div>
-        )}
-
-        {err && <div className="err">{err}</div>}
-
-        {run && (
+        ) : (
           <>
-            <div className="run-bar">
-              <motion.i
-                animate={{ width: `${pct}%` }}
-                transition={still ? { duration: 0 } : { duration: 0.2, ease: 'linear' }}
-              />
-            </div>
-            <div className="run-count">
-              <motion.span key={run.scored} className="num run-n"
-                initial={still ? false : { opacity: 0.55 }} animate={{ opacity: 1 }}
-                transition={{ duration: 0.14 }}>{fmt(run.scored)}</motion.span>
-              <span className="run-of num"> / {fmt(run.total)} scores committed</span>
-              {run.cohort_size > 0 && (
-                <span className="muted"> · {fmt(run.cohort_size)} referrals, each read twice</span>
-              )}
+            {/* Pre-run is a readout of what is about to happen on what data,
+                not a paragraph about agents. */}
+            <div className="run-plan">
+              <Readout k="cohort" v={fmt(n)} u="referrals" />
+              <Readout k="agents" v="2" u="per referral" />
+              <Readout k="scores" v={fmt(n * 2)} u="to commit" />
+              <Readout k="citations" v={fmt(n * 8)} u="at 8 per referral" />
+              <Readout k="alpha range" v="0.50–0.90" u="set by scarcity" />
+              <Readout k="direction" v="pressure" u="ADR-007" />
             </div>
 
             <ol className="lanes">
-              {PHASES.map((p, i) => {
-                const state = done || (phaseIdx > i) ? 'done' : phaseIdx === i ? 'live' : 'todo'
+              {AGENTS.map((p, i) => {
+                const state = done || phaseIdx > i ? 'done' : phaseIdx === i ? 'live' : 'todo'
+                const c = committed(p.key)
+                const denom = p.key === 'ranking' ? n : n
                 return (
                   <li key={p.key} className={'lane is-' + state}>
-                    <i className="lane-dot" />
-                    <span className="lane-a">{p.agent}</span>
-                    <span className="lane-r">{p.reads}</span>
-                    <span className="lane-s num">
-                      {p.key === 'scoring_urgency' && run.urgency_scored > 0 && `${fmt(run.urgency_scored)} scored`}
-                      {p.key === 'scoring_capacity' && run.capacity_scored > 0 && `${fmt(run.capacity_scored)} scored`}
-                      {p.key === 'ranking' && run.ranked > 0 && `${fmt(run.ranked)} placed`}
-                      {state === 'live' && !run.urgency_scored && 'working'}
-                    </span>
+                    <div className="lane-bar">
+                      <motion.i
+                        animate={{ width: `${denom ? Math.min(100, (c / denom) * 100) : 0}%` }}
+                        transition={still ? { duration: 0 } : { duration: 0.2, ease: 'linear' }} />
+                    </div>
+                    <div className="lane-id">
+                      <span className="lane-n">{p.name}</span>
+                      <span className="lane-m num">{p.method}</span>
+                    </div>
+                    <div className="lane-reads">
+                      <span className="lane-r">{p.reads}</span>
+                      <span className="lane-c">{p.cites}</span>
+                    </div>
+                    <div className="lane-count num">
+                      {state === 'todo' ? <span className="lane-idle">queued</span>
+                        : <><strong>{fmt(c)}</strong><span className="lane-of">
+                          /{fmt(denom)} {p.key === 'ranking' ? 'placed' : 'committed'}</span></>}
+                    </div>
                   </li>
                 )
               })}
             </ol>
 
-            {done && (
-              <div className="run-done">
-                <div className="run-done-h">
-                  <span className="num">{fmt(run.ranked)}</span> placed ·{' '}
-                  <span className="num">{fmt(run.refused_paediatric)}</span> outside the ranking ·{' '}
-                  urgency weighted <span className="num">{Math.round((run.alpha ?? 0) * 100)}%</span>
+            {run && (
+              <div className="run-total">
+                <div className="run-bar">
+                  <motion.i animate={{ width: `${pct}%` }}
+                    transition={still ? { duration: 0 } : { duration: 0.2, ease: 'linear' }} />
                 </div>
-                <p className="run-done-p">
-                  The <span className="num">{fmt(run.refused_paediatric)}</span> outside are
-                  paediatric referrals. NEWS2 is validated in adults, so the agent refuses them
-                  rather than scoring a child on an adult scale. That is a statement about
-                  coverage, not a low position.
-                </p>
-                <button className="run-go" onClick={onDone}>See the order &rarr;</button>
+                <div className="run-total-t num">
+                  <motion.span key={run.scored} className="run-n"
+                    initial={still ? false : { opacity: 0.5 }} animate={{ opacity: 1 }}
+                    transition={{ duration: 0.14 }}>{fmt(run.scored)}</motion.span>
+                  <span className="run-of"> / {fmt(run.total)} rows in agent.agent_scores</span>
+                  <span className="run-id">{run.run_id}</span>
+                </div>
               </div>
             )}
 
-            {run.status === 'failed' && (
-              <div className="err"><strong>The run failed.</strong> <span className="muted">{run.error}</span></div>
+            {err && <div className="err">{err}</div>}
+            {run?.status === 'failed' && (
+              <div className="err"><strong>The run failed.</strong>{' '}
+                <span className="muted">{run.error}</span></div>
+            )}
+
+            {done && run && (
+              <div className="run-done">
+                <div className="run-done-nums">
+                  <Readout k="placed" v={fmt(run.ranked)} u="in the order" big />
+                  <Readout k="outside" v={fmt(run.refused_paediatric)} u="paediatric, not scored" />
+                  <Readout k="alpha" v={(run.alpha ?? 0).toFixed(3)} u="weight on urgency" big />
+                  <Readout k="scarcity" v={(run.scarcity ?? 0).toFixed(3)} u="mean ward+clinic pressure" />
+                </div>
+                <p className="run-done-p measure">
+                  The <strong className="num">{fmt(run.refused_paediatric)}</strong> outside are
+                  paediatric referrals. NEWS2 is validated in adults, so the agent refuses them
+                  rather than scoring a child on an adult scale — a statement about coverage,
+                  not a low position.
+                </p>
+                <div className="run-go">
+                  <button className="cta" onClick={onSeeGraph}>
+                    <Waypoints size={14} strokeWidth={2} aria-hidden />
+                    See what it cited
+                  </button>
+                  <button className="cta is-ghost" onClick={onSeeList}>
+                    <ListOrdered size={14} strokeWidth={2} aria-hidden />
+                    See the order
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!run && (
+              <button className="run-start" onClick={start} disabled={busy}>
+                <Play size={16} strokeWidth={2.25} fill="currentColor" aria-hidden />
+                {busy ? 'Starting…' : `Score ${fmt(n)} referrals`}
+              </button>
             )}
           </>
         )}
       </div>
     </div>
+  )
+}
+
+function Readout({ k, v, u, big }: { k: string; v: string; u: string; big?: boolean }) {
+  return (
+    <div className={'readout' + (big ? ' is-big' : '')}>
+      <div className="lab">{k}</div>
+      <div className="readout-v num">{v}</div>
+      <div className="readout-u">{u}</div>
     </div>
   )
 }

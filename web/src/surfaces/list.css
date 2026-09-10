@@ -1,0 +1,607 @@
+/* The ranked list.
+ *
+ * Every colour is a token; there is not one literal in this file.
+ *
+ * Two rules govern the palette here:
+ *   - --cat-* is reserved for triage categories and appears in exactly one
+ *     place on this surface: the five tab swatches, each of which also carries
+ *     its word, so colour is never the only channel.
+ *   - clay is the composition's single accent and carries a single meaning:
+ *     THIS IS WHAT DID THE WORK. The past-target tier, the rule that fired, the
+ *     overflow past a target, the vitals the urgency agent actually cited. It
+ *     never marks anything else.
+ *
+ * Depth is hairlines and wells, never a gradient, a glow or a drop shadow. The
+ * inset box-shadows below are 1–3px rules, which is how the rest of the product
+ * draws an edge that has to be seen.
+ */
+
+.lst { display: block; }
+
+.lst-load { padding: var(--d6) 0; }
+.lst-p {
+  font-size: var(--t-small); color: var(--text-2); line-height: 1.6;
+  margin: var(--d3) 0 0; max-width: 78ch;
+}
+.lst-dash { font-size: var(--t-small); }
+.vh {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+/* --- the header: what this screen is, and the four figures ---------------- */
+.lst-top {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--d6); flex-wrap: wrap; margin-bottom: var(--d5);
+}
+.lst-title { min-width: 0; }
+.lst-title h1 { margin: 3px 0 6px; }
+.lst-sub {
+  margin: 0; font-size: var(--t-small); color: var(--text-2); line-height: 1.55;
+  max-width: 78ch;
+}
+.lst-sub strong { color: var(--text); font-weight: 600; }
+
+.lst-figs {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr);
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+}
+.fig { background: var(--surface); padding: var(--d3) var(--d4); min-width: 0; }
+/* clay marks the one figure that is a state rather than a count of records */
+.fig.is-accent { box-shadow: inset 3px 0 0 var(--clay); }
+.fig-n {
+  font-family: var(--font-brand); font-size: 26px; font-weight: 300;
+  line-height: 1.05; color: var(--text);
+}
+.fig-k { font-size: var(--t-small); color: var(--text); margin-top: 3px; }
+.fig-w {
+  font-size: var(--t-micro); color: var(--text-3); margin-top: 3px; line-height: 1.4;
+}
+
+.lst-warn {
+  display: flex; align-items: flex-start; gap: var(--d2);
+  border: 1px solid var(--rule-firm); border-left: 3px solid var(--clay);
+  background: var(--surface); padding: var(--d3) var(--d4);
+  font-size: var(--t-small); color: var(--text-2); line-height: 1.5;
+  margin-bottom: var(--d5); max-width: 96ch;
+}
+.lst-warn svg { flex: none; margin-top: 2px; color: var(--clay); }
+
+/* --- before any run ------------------------------------------------------
+   A flat statement rather than a photograph: what is on screen, and what claim
+   it does not make. */
+.lst-pre {
+  border: 1px solid var(--rule-firm); border-left: 3px solid var(--clay);
+  background: var(--surface); padding: var(--d3) var(--d4);
+  margin-bottom: var(--d5); max-width: 96ch; display: grid; gap: 4px;
+}
+.lst-pre strong { font-size: var(--t-body); }
+.lst-pre span { font-size: var(--t-small); color: var(--text-2); line-height: 1.55; }
+
+/* --- the sort key, drawn ------------------------------------------------- */
+.lst-key-sec { margin-bottom: var(--d5); }
+.key {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+}
+.key-s {
+  background: var(--surface); padding: var(--d3) var(--d3) var(--d4);
+  display: grid; align-content: start; gap: 3px; min-width: 0;
+  border-top: 2px solid transparent;
+}
+.key-n {
+  font-family: var(--font-brand); font-size: 20px; font-weight: 300;
+  line-height: 1; color: var(--text-3);
+}
+.key-k { font-size: var(--t-body); color: var(--text); font-weight: 550; }
+.key-w { font-size: var(--t-micro); color: var(--text-2); line-height: 1.45; }
+.key-r {
+  font-size: var(--t-micro); color: var(--text-3); letter-spacing: 0.01em;
+  margin-top: 3px; overflow-wrap: anywhere;
+}
+/* step 3 is the tier readers kept missing: it is the one accented element */
+.key-s.is-tier {
+  border-top-color: var(--clay); background: var(--surface-2);
+}
+.key-s.is-tier .key-n,
+.key-s.is-tier .key-k { color: var(--clay); }
+.key-s.is-tier .key-w { color: var(--text); }
+/* before a run, only step 1 has been applied to anybody */
+.key-s.is-off:not(:first-child) { opacity: 0.5; }
+
+/* --- reconciliation: four buckets, never summed --------------------------- */
+.lst-recon { margin-bottom: var(--d5); }
+.recon {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+}
+.recon-c { background: var(--surface); padding: var(--d3) var(--d4); min-width: 0; }
+.recon-n {
+  font-family: var(--font-brand); font-size: 24px; font-weight: 300; line-height: 1.05;
+}
+.recon-k { font-size: var(--t-small); font-weight: 600; margin-top: 2px; }
+.recon-w {
+  font-size: var(--t-micro); color: var(--text-2); line-height: 1.45; margin-top: 3px;
+}
+.recon-w em { color: var(--text-3); font-style: italic; }
+.recon-sum {
+  margin: var(--d2) 0 0; padding: var(--d2) var(--d4);
+  background: var(--bg-sunk); border: 1px solid var(--rule);
+  font-size: var(--t-small); color: var(--text-2); line-height: 1.6;
+}
+.recon-sum strong { color: var(--text); }
+.recon-sum.is-off { border-left: 3px solid var(--clay); }
+.recon-gap { color: var(--clay); }
+
+/* --- toolbar -------------------------------------------------------------- */
+.lst-tools {
+  display: flex; align-items: center; gap: var(--d3); flex-wrap: wrap;
+  margin-bottom: var(--d3);
+}
+.lst-find {
+  display: flex; align-items: center; gap: var(--d2);
+  border: 1px solid var(--rule-firm); background: var(--surface);
+  padding: 0 var(--d3); height: 32px; min-width: 300px; flex: 0 1 380px;
+}
+.lst-find:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+.lst-find svg { flex: none; color: var(--text-3); }
+.lst-find input {
+  font: inherit; font-size: var(--t-small); color: var(--text);
+  background: none; border: 0; outline: none; width: 100%; min-width: 0;
+}
+.lst-find input::placeholder { color: var(--text-3); }
+.lst-find-n { font-size: var(--t-micro); color: var(--text-3); white-space: nowrap; }
+
+.lst-seg { display: flex; border: 1px solid var(--rule-firm); background: var(--surface); }
+.seg {
+  font: inherit; font-size: var(--t-small); color: var(--text-2);
+  background: none; border: 0; padding: 0 var(--d3); height: 30px; cursor: pointer;
+}
+.seg + .seg { border-left: 1px solid var(--rule); }
+.seg:hover { color: var(--text); }
+.seg.is-on { color: var(--paper); background: var(--ink); }
+
+.lst-pick { display: flex; align-items: center; gap: var(--d2); }
+.lst-select {
+  font: inherit; font-size: var(--t-small); color: var(--text);
+  background: var(--surface); border: 1px solid var(--rule-firm);
+  height: 32px; padding: 0 var(--d2);
+}
+.lst-reset {
+  font: inherit; font-size: var(--t-small); color: var(--text-2);
+  background: var(--surface-2); border: 1px solid var(--rule-firm);
+  border-left: 3px solid var(--clay);
+  padding: 0 var(--d3); height: 32px; cursor: pointer; margin-left: auto;
+}
+.lst-reset strong { color: var(--text); }
+.lst-reset:hover { border-color: var(--text-3); border-left-color: var(--clay); }
+
+/* --- category tabs. the only place --cat-* appears on this surface. --------
+   Sticky BELOW the top bar, which is itself sticky at 0. Opaque, not glass:
+   tokens.css spends glass on five pieces of chrome floating over something
+   moving, and a tab bar over a table of numerals is not one of them. */
+.lst-tabs {
+  display: flex; flex-wrap: wrap; gap: 0;
+  border-bottom: 1px solid var(--rule-firm); margin-bottom: var(--d3);
+  position: sticky; top: var(--topbar-h); z-index: 6;
+  background: var(--bg);
+}
+.tb {
+  display: grid; gap: 2px; text-align: left;
+  font: inherit; color: var(--text-2);
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: var(--d2) var(--d4) 9px; cursor: pointer; margin-bottom: -1px;
+}
+.tb:hover { color: var(--text); }
+.tb[data-state="active"] { color: var(--text); border-bottom-color: var(--text); }
+.tb-top { display: flex; align-items: center; gap: var(--d2); }
+.tb-sw { width: 9px; height: 9px; flex: none; }
+.tb-k { font-size: var(--t-body); }
+.tb-n { font-size: var(--t-small); color: var(--text-3); }
+.tb[data-state="active"] .tb-n { color: var(--text-2); }
+.tb-x { font-size: var(--t-micro); color: var(--text-3); letter-spacing: 0.01em; }
+
+.lst-panel { display: block; }
+.lst-note {
+  font-size: var(--t-small); color: var(--text-2); line-height: 1.55;
+  margin: 0 0 var(--d3); max-width: 104ch;
+}
+.lst-note strong { color: var(--text); }
+.lst-empty { padding: var(--d5) 0; }
+
+/* --- the table -----------------------------------------------------------
+   The viewport is bounded so the header can stick to it. .scroll-x keeps wide
+   content inside this box; the page body never scrolls sideways. */
+.lst-vp {
+  max-height: min(calc(100vh - 230px), 1180px); overflow: auto;
+  border: 1px solid var(--rule); background: var(--surface);
+}
+.lst-table {
+  width: 100%; min-width: 1320px;
+  table-layout: fixed; border-collapse: separate; border-spacing: 0;
+}
+
+.lst-th {
+  position: sticky; top: 0; z-index: 2;
+  text-align: left; vertical-align: bottom; padding: 0;
+  background: var(--bg-sunk);
+  box-shadow: inset 0 -1px 0 var(--rule-firm);
+}
+.lst-th.is-r { text-align: right; }
+.lst-th-l {
+  display: flex; align-items: center; gap: 4px;
+  font-size: var(--t-micro); letter-spacing: var(--track-lab);
+  text-transform: uppercase; font-weight: 600; color: var(--text-2);
+}
+.lst-th.is-r .lst-th-l { justify-content: flex-end; }
+.lst-th-s {
+  display: block; font-size: var(--t-micro); letter-spacing: 0;
+  text-transform: none; font-weight: 400; color: var(--text-3);
+  margin-top: 2px; line-height: 1.3;
+}
+.lst-th > .lst-th-l, .lst-th > .lst-th-s { padding: 0 10px; }
+.lst-th > .lst-th-l { padding-top: var(--d2); }
+.lst-th > .lst-th-s { padding-bottom: var(--d2); }
+.lst-sortb {
+  display: block; width: 100%; text-align: inherit;
+  font: inherit; background: none; border: 0; cursor: pointer;
+  padding: var(--d2) 10px;
+}
+.lst-sortb:hover .lst-th-l { color: var(--text); }
+.lst-th.is-on { box-shadow: inset 0 -2px 0 var(--text); }
+.lst-th-l.is-key { color: var(--text); }
+
+/* two named sorts under one label: the column's value, and its qualifier */
+.lst-th-two {
+  display: flex; align-items: baseline; gap: 3px;
+  padding: 0 10px var(--d2); margin-top: -2px;
+}
+.lst-th.is-r .lst-th-two { justify-content: flex-end; }
+.subb { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.subb:hover .lst-th-s { color: var(--text-2); }
+.lst-th-s.is-key {
+  color: var(--text); font-weight: 600;
+  display: inline-flex; align-items: center; gap: 3px;
+}
+.lst-th-dot { font-size: var(--t-micro); color: var(--rule-firm); }
+.lst-th-l { min-height: 15px; }
+
+.lst-row { height: var(--row-h); }
+.lst-row td {
+  padding: 5px 10px; vertical-align: middle;
+  border-bottom: 1px solid var(--rule);
+}
+.lst-row.is-clickable { cursor: pointer; }
+.lst-row:hover td { background: var(--surface-2); }
+.lst-row.is-open td { background: var(--surface-2); }
+.lst-row.is-overridden td:first-child { box-shadow: inset 3px 0 0 var(--ink); }
+
+/* a cell is two stacked facts in comfortable density and two inline ones in
+   compact. Nothing is ever dropped -- a reading's age travels with the reading
+   in both states. */
+.cell { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cell.is-r { align-items: flex-end; }
+.lst-table .sub {
+  font-size: var(--t-micro); color: var(--text-2); margin: 0; line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.lst-table .sub b { color: var(--text); font-weight: 600; }
+.sub-code { color: var(--text-3); }
+.sub.is-over { color: var(--clay); }
+.sub.is-over b { color: var(--clay); }
+.sub.is-stale { color: var(--clay); }
+.sub.is-stale b { color: var(--clay); }
+
+.c-pos { text-align: right; }
+.pos {
+  display: inline-block;
+  font-family: var(--font-brand); font-size: 18px; font-weight: 400;
+  line-height: 1.15; color: var(--text);
+}
+.pos.is-moved { color: var(--ink); box-shadow: inset 0 -2px 0 var(--ink); }
+.pos-was {
+  display: block; line-height: 1.2;
+  /* .lab's uppercase + 0.08em tracking is wider than this column, so the word
+     overflowed left and clipped to "ONFIRMED". It keeps the label register but
+     drops the tracking and is allowed to wrap. */
+  letter-spacing: 0.02em; white-space: normal; text-transform: none;
+}
+
+.lst-table .pw { font-size: var(--t-body); color: var(--text); }
+.lst-table .wait-n, .lst-table .n2 {
+  font-size: var(--t-data); font-weight: 600; color: var(--text); line-height: 1.2;
+}
+.lst-table .of { font-weight: 400; color: var(--text-2); font-size: var(--t-micro); }
+.tri { font-size: var(--t-small); color: var(--text); }
+.susp { color: var(--clay); }
+.ctx-v { font-size: var(--t-small); color: var(--text-2); }
+.ctx-v b { color: var(--text); font-weight: 550; }
+
+/* --- the rank spine, from the mark ---------------------------------------
+   viewBox 0 0 52 70: a 5-wide stem with bars alternating left and right at
+   different heights. Here the high bar is how unwell and the low bar is how
+   long waited, both multiplied by their weight, both on one scale. */
+.spn { display: flex; align-items: center; gap: var(--d2); }
+.spn-g { position: relative; display: block; flex: 1 1 auto; height: 22px; min-width: 0; }
+.spn-stem {
+  position: absolute; left: 50%; top: 0; bottom: 0; width: var(--spine-w);
+  margin-left: calc(var(--spine-w) / -2); background: var(--rule-firm);
+}
+.spn-u {
+  position: absolute; right: 50%; top: 4px;
+  height: var(--spine-bar); background: var(--ink);
+}
+.spn-w {
+  position: absolute; left: 50%; bottom: 4px;
+  height: var(--spine-bar); background: var(--text-3);
+}
+.spn-n {
+  font-size: var(--t-micro); color: var(--text-2); flex: none;
+  width: 30px; text-align: right;
+}
+.spn.is-tight .spn-g { height: 16px; }
+.spn.is-tight .spn-u { top: 1px; }
+.spn.is-tight .spn-w { bottom: 1px; }
+
+/* --- waiting time against target ------------------------------------------
+   The target sits at a fixed mark at 62%. Everything past it is compressed, so
+   a 1.2x overrun and a 31x one share an axis without either disappearing. The
+   numeral above the bar always carries the true value. */
+.wb {
+  position: relative; display: block; width: 100%; height: 5px;
+  background: var(--bg-sunk); margin: 3px 0 2px;
+}
+.wb-in { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text-3); }
+.wb-over { position: absolute; top: 0; bottom: 0; background: var(--clay); }
+.wb-mark {
+  position: absolute; left: 62%; top: -2px; bottom: -2px; width: 1px;
+  background: var(--rule-firm);
+}
+/* a missing target is not a zero, so it is drawn as an open tick */
+.wb.is-none { background: none; }
+.wb-tick {
+  position: absolute; left: 0; top: 2px; width: 9px; height: 1px;
+  background: var(--rule-firm);
+}
+
+/* --- the rule that fired. No rule ID had ever reached a screen. ------------ */
+.rulez { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.rule-chip {
+  display: inline-flex; align-items: baseline; gap: 5px; flex-wrap: wrap;
+  max-width: 100%; padding: 3px var(--d2);
+  background: var(--surface-2); box-shadow: inset 2px 0 0 var(--clay);
+  color: var(--clay); font-size: var(--t-micro); line-height: 1.4;
+}
+.rule-chip svg { align-self: center; flex: none; }
+.rule-chip b { font-weight: 650; letter-spacing: 0.01em; }
+.rule-d { color: var(--text-2); }
+.rule-ok, .rule-pre {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--t-micro); color: var(--text-3);
+}
+.rule-pre { color: var(--text-2); }
+
+/* --- the override badge. Attribution, in the row. ------------------------- */
+.ovbadge {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+  margin-top: 3px; padding: 2px var(--d2);
+  border: 1px solid var(--rule-firm); background: var(--bg-sunk);
+  font-size: var(--t-micro); color: var(--text-2); line-height: 1.4;
+}
+.ovbadge svg { align-self: center; flex: none; color: var(--ink); }
+.ovbadge b { color: var(--text); font-weight: 600; }
+/* the whole phrase is ONE flex item, so it truncates as a sentence instead of
+   breaking into stacked fragments */
+.ovbadge-t {
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ovbadge.is-stale { border-style: dashed; }
+
+.c-exp { text-align: center; }
+.expb {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; cursor: pointer;
+  background: none; border: 1px solid transparent; color: var(--text-3);
+}
+.expb:hover { color: var(--text); border-color: var(--rule-firm); background: var(--surface); }
+
+/* --- the breach tier boundary, which the sort key has and copy kept losing - */
+.tier td {
+  padding: 0; background: var(--surface-2);
+  border-top: 2px solid var(--clay); border-bottom: 1px solid var(--rule);
+}
+.tier-t {
+  display: block; padding: var(--d2) 10px;
+  font-size: var(--t-micro); color: var(--text-2); line-height: 1.5;
+}
+.tier-t strong { color: var(--clay); }
+
+/* --- the inline evidence expander ----------------------------------------- */
+.ev-row td { padding: 0; border-bottom: 1px solid var(--rule-firm); background: var(--bg-sunk); }
+.ev { padding: var(--d3); }
+.ev-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+}
+.ev-b { background: var(--surface); padding: var(--d3) var(--d4) var(--d4); min-width: 0; }
+.ev-wide { grid-column: 1 / -1; }
+.ev-h {
+  display: flex; align-items: baseline; gap: var(--d2); flex-wrap: wrap;
+  font-family: var(--font-brand); font-size: var(--t-section); font-weight: 500;
+  margin: 0 0 var(--d2);
+}
+.ev-hn {
+  font-family: var(--font-data); font-size: var(--t-micro);
+  font-weight: 400; color: var(--text-3);
+}
+.ev-hn b { color: var(--text-2); font-weight: 600; }
+.ev-p {
+  margin: 0; font-size: var(--t-small); color: var(--text-2);
+  line-height: 1.6; max-width: 90ch;
+}
+.ev-cav {
+  margin: var(--d2) 0 0; font-size: var(--t-micro); color: var(--text-3);
+  line-height: 1.5; max-width: 96ch;
+}
+.ev-cav .num { color: var(--text-2); }
+.ev-stale {
+  margin: 0 0 var(--d2); padding: var(--d2) var(--d3);
+  border-left: 3px solid var(--clay); background: var(--surface-2);
+  font-size: var(--t-micro); color: var(--text-2); line-height: 1.5;
+}
+
+.ev-terms { margin: var(--d2) 0 0; display: grid; gap: 1px; background: var(--rule); }
+.ev-terms > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--d3);
+  background: var(--surface-2); padding: 5px var(--d3);
+}
+.ev-terms dt { font-size: var(--t-micro); color: var(--text-2); }
+.ev-terms dd { margin: 0; font-size: var(--t-small); color: var(--text-2); }
+.ev-terms dd b { color: var(--text); font-weight: 650; }
+.ev-tsum { box-shadow: inset 2px 0 0 var(--rule-firm); }
+
+.ev-rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.ev-rules li {
+  display: grid; grid-template-columns: 78px 172px 1fr; align-items: baseline;
+  gap: var(--d2) var(--d3); background: var(--surface-2); padding: 6px var(--d3);
+}
+.ev-rid { font-size: var(--t-micro); color: var(--text); font-weight: 600; }
+.ev-rst { font-size: var(--t-micro); color: var(--text-2); line-height: 1.45; }
+.ev-rd {
+  grid-column: 2 / -1; font-size: var(--t-micro); color: var(--text-2);
+}
+.ev-rules li.is-bad .ev-rd { color: var(--clay); }
+.ev-rw { grid-column: 2 / -1; font-size: var(--t-micro); color: var(--text-3); }
+.ev-vd {
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  font-size: var(--t-micro); padding: 2px var(--d2); border-radius: var(--radius-pill);
+}
+/* colour never travels alone: the word is in the chip */
+.ev-vd.is-ok { color: var(--text-2); background: var(--bg-sunk); }
+.ev-vd.is-bad { color: var(--clay); background: var(--surface); box-shadow: inset 0 0 0 1px var(--clay); }
+
+.ev-vitals {
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+}
+.ev-v { background: var(--surface-2); padding: var(--d2) var(--d3) 10px; min-width: 0; }
+/* clay marks the reading the agent actually used */
+.ev-v.is-cited { box-shadow: inset 0 -2px 0 var(--clay); }
+.ev-vk { font-size: var(--t-micro); color: var(--text-2); line-height: 1.3; }
+.ev-vv {
+  font-family: var(--font-brand); font-size: 20px; font-weight: 300;
+  margin-top: 3px; line-height: 1.1;
+}
+.ev-vu { font-size: var(--t-micro); color: var(--text-3); }
+
+.ev-cap { display: grid; gap: 1px; background: var(--rule); }
+.ev-cap-r {
+  display: grid; grid-template-columns: 96px 128px 1fr auto;
+  align-items: baseline; gap: var(--d3);
+  background: var(--surface-2); padding: var(--d2) var(--d3);
+}
+.ev-cap-k { font-size: var(--t-small); color: var(--text); }
+.ev-cap-v { font-size: var(--t-small); color: var(--text-2); }
+.ev-cap-v b { color: var(--text); font-weight: 650; }
+.ev-cap-d { font-size: var(--t-micro); color: var(--text-3); }
+.ev-cap-sum {
+  margin-top: var(--d2); font-size: var(--t-micro); color: var(--text-3);
+}
+
+.ev-ovr {
+  border: 1px solid var(--rule); background: var(--surface-2);
+  padding: var(--d2) var(--d3); display: grid; gap: 3px;
+}
+.ev-ovr-l { font-size: var(--t-small); color: var(--text-2); }
+.ev-ovr-l b { color: var(--text); }
+.ev-ovr-r { font-size: var(--t-micro); color: var(--text-2); line-height: 1.5; }
+.ev-ovr-n { font-size: var(--t-micro); color: var(--text-3); line-height: 1.5; }
+.ev-warn {
+  justify-self: start; padding: 2px var(--d2);
+  font-size: var(--t-micro); color: var(--clay);
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--clay);
+  border-radius: var(--radius-pill);
+}
+.ev-acts { display: flex; gap: var(--d2); flex-wrap: wrap; margin-top: var(--d3); }
+
+/* --- pagination ----------------------------------------------------------- */
+.lst-pager {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--d4); flex-wrap: wrap; padding: var(--d3) 2px 0;
+}
+.lst-pager-of { font-size: var(--t-small); color: var(--text-2); }
+.lst-pager-b { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
+.lst-gap { color: var(--text-3); padding: 0 2px; font-size: var(--t-small); }
+
+/* --- compact density ------------------------------------------------------
+   The rows get shorter by putting each cell's two facts side by side, not by
+   hiding one of them. A reading's age is never the thing that goes. */
+.lst-vp.is-tight .lst-row { height: var(--row-h-tight); }
+.lst-vp.is-tight .lst-row td { padding: 2px 10px; }
+.lst-vp.is-tight .cell { flex-direction: row; align-items: baseline; gap: 6px; }
+.lst-vp.is-tight .cell.is-r { flex-direction: row-reverse; }
+.lst-vp.is-tight .pos { font-size: 16px; }
+.lst-vp.is-tight .wb { width: 56px; flex: none; margin: 0; align-self: center; }
+.lst-vp.is-tight .rulez { flex-direction: row; flex-wrap: nowrap; overflow: hidden; }
+.lst-vp.is-tight .rule-chip { flex-wrap: nowrap; white-space: nowrap; }
+/* the override badge sits BESIDE the referral in compact, not under it, so a
+   moved row stays one line high like every other row */
+.lst-vp.is-tight .c-ref .cell {
+  display: inline-flex; flex-wrap: nowrap; vertical-align: middle; max-width: 100%;
+}
+.lst-vp.is-tight .ovbadge {
+  margin-top: 0; margin-left: var(--d2); vertical-align: middle;
+}
+.lst-vp.is-tight .c-ref { white-space: nowrap; }
+
+/* --- narrower screens ----------------------------------------------------- */
+@media (max-width: 1400px) {
+  .key { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lst-figs { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 1100px) {
+  .recon { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ev-grid { grid-template-columns: minmax(0, 1fr); }
+  .ev-vitals { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ev-cap-r { grid-template-columns: 96px 1fr; }
+  .ev-cap-d { grid-column: 1 / -1; }
+  .ev-rules li { grid-template-columns: 78px 1fr; }
+  .ev-rd, .ev-rw { grid-column: 1 / -1; }
+}
+@media (max-width: 780px) {
+  .key { grid-template-columns: minmax(0, 1fr); }
+  .lst-top { gap: var(--d4); }
+  .lst-reset { margin-left: 0; }
+}
+
+/* The one modal's closing line: what will actually happen to the row. Lives
+   here because the override is raised from this surface. */
+.ovr-after {
+  display: block; margin: calc(var(--d3) * -1) 0 var(--d4);
+  padding: var(--d2) var(--d3); background: var(--surface-2);
+  border-left: 3px solid var(--rule-firm);
+}
+.ovr-after .num { color: var(--text); }
+
+/* --- foldable reference blocks -------------------------------------------
+   The sort key and the reconciliation are read once and then known. Open by
+   default they cost ~430px above the table, which put the list itself off
+   screen on a 1080-tall display. */
+.lst-fold { border: 1px solid var(--rule); background: var(--surface); }
+.lst-fold + .lst-fold { border-top: 0; }
+.lst-fold > summary {
+  display: flex; align-items: baseline; gap: var(--d3); flex-wrap: wrap;
+  padding: var(--d3) var(--d4); cursor: pointer; list-style: none;
+}
+.lst-fold > summary::-webkit-details-marker { display: none; }
+.lst-fold > summary::before {
+  content: '▸'; color: var(--text-3); font-size: 11px;
+  transition: transform var(--t-fast) var(--ease);
+}
+.lst-fold[open] > summary::before { transform: rotate(90deg); }
+.lst-fold > summary:hover { background: var(--surface-2); }
+.lst-fold-t { font-family: var(--font-brand); font-size: var(--t-section); color: var(--text); }
+.lst-fold-s { font-size: var(--t-small); color: var(--text-2); min-width: 0; }
+.lst-fold-s .num { color: var(--text); }
+.lst-fold > *:not(summary) { padding: 0 var(--d4) var(--d4); }

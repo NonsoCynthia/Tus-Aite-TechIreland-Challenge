@@ -228,7 +228,12 @@ def operations(hospital_hipe: str, as_of_date: str) -> dict[str, Any]:
             if not bs:
                 continue
             row = wards.setdefault(w["ward_id"], {
-                "ward_id": w["ward_id"], "nominal_beds": w.get("nominal_beds"),
+                "ward_id": w["ward_id"],
+                # nominal_beds on a context ward is core.ward_specialty's figure:
+                # beds this ward allocates to THAT ONE specialty, not the ward's
+                # capacity. Taking the first one made a 92-bed ward report 45.
+                # Accumulated per specialty below and summed.
+                "allocations": {}, "nominal_beds": None,
                 "occupancy_pct": float(bs["occupancy_pct"]),
                 "occupied": bs.get("occupied"),
                 # DATASET_README: "the answer to how many beds are available",
@@ -248,6 +253,8 @@ def operations(hospital_hipe: str, as_of_date: str) -> dict[str, Any]:
             })
             if spec and spec not in row["specialties"]:
                 row["specialties"].append(spec)
+            if spec and w.get("nominal_beds") is not None:
+                row["allocations"][spec] = w["nominal_beds"]
             if spec and w.get("is_primary") and spec not in row["primary_for"]:
                 row["primary_for"].append(spec)
 
@@ -303,6 +310,15 @@ def operations(hospital_hipe: str, as_of_date: str) -> dict[str, Any]:
                 "triage_date": tri.get("triage_date"),
                 "turnaround_days": tri.get("turnaround_days"),
             }
+
+    # the ward's nominal capacity is the sum of what it allocates to each
+    # specialty; occupied + free is the census actually recorded against it
+    for row in wards.values():
+        allocs = row.pop("allocations", {})
+        row["allocations"] = allocs
+        row["nominal_beds"] = sum(allocs.values()) if allocs else None
+        occ, free = row.get("occupied"), row.get("free")
+        row["census"] = (occ + free) if isinstance(occ, int) and isinstance(free, int) else None
 
     ages.sort()
     age = None

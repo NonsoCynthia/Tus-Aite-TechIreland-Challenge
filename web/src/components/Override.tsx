@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { bandOf } from '../lib/api'
 import type { Decision, Ranking } from '../lib/types'
 
@@ -16,6 +17,19 @@ import type { Decision, Ranking } from '../lib/types'
  *  RULE-ORDER says every Urgent is seen before every Semi-Urgent. The system
  *  cannot cross that boundary; a clinician can, but only deliberately and on
  *  the record, which is what rule_warning_accepted stores.
+ *
+ *  Two things changed here.
+ *
+ *  The write used to end in a flash message that died on the next navigation,
+ *  because nothing could read an override back. GET /overrides exists now, so a
+ *  successful POST invalidates ['overrides', hospital, date] and the list
+ *  re-reads it: the row moves, keeps a badge naming who moved it and why, and
+ *  goes on showing the position the system gave it.
+ *
+ *  And rule_warning_accepted used to be sent as `crosses` -- the app's own
+ *  comparison of the two bands -- while the checkbox only gated the submit
+ *  button. The stored attestation was therefore the system's opinion of what
+ *  the clinician had done, not the clinician's. It now sends the checkbox.
  */
 const REASONS = [
   'Clinical information not in the record',
@@ -32,6 +46,7 @@ export function Override({ patient, decision, onClose, onDone }: {
   onDone: (msg: string) => void
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const qc = useQueryClient()
   const [to, setTo] = useState(String(patient.position))
   const [reason, setReason] = useState(REASONS[0])
   const [detail, setDetail] = useState('')
@@ -49,6 +64,11 @@ export function Override({ patient, decision, onClose, onDone }: {
   const isAccept = Number(to) === patient.position
   const needsAttest = crosses && !accepted
 
+  // An attestation belongs to the move it was made for. Editing the position
+  // back inside the band retires it, so a tick can never be carried over and
+  // stored against a move that never crossed anything.
+  useEffect(() => { if (!crosses) setAccepted(false) }, [crosses])
+
   async function submit() {
     setBusy(true); setErr(null)
     try {
@@ -65,13 +85,19 @@ export function Override({ patient, decision, onClose, onDone }: {
           reason: isAccept && reason === REASONS[3]
             ? `ACCEPTED: position confirmed. ${detail}`.trim()
             : `${reason}${detail ? `. ${detail}` : ''}`,
-          rule_warning_accepted: crosses,
+          // what the clinician actually attested, not what the app inferred
+          rule_warning_accepted: accepted,
         }),
       })
       if (!r.ok) throw new Error(`the service rejected it (${r.status})`)
+      // the list reads overrides from here; without this the row would keep
+      // showing the system's order until a full reload
+      await qc.invalidateQueries({
+        queryKey: ['overrides', decision.hospital_hipe, decision.as_of_date],
+      })
       onDone(isAccept
-        ? `Position ${patient.position} confirmed and recorded.`
-        : `Moved from ${patient.position} to ${to}, recorded.`)
+        ? `Position ${patient.position} confirmed and recorded. ${patient.pathway_number} keeps its place.`
+        : `${patient.pathway_number} moved from ${patient.position} to ${to}, recorded as ${clinician}. The system's position stays on the row.`)
       ref.current?.close(); onClose()
     } catch (e) {
       setErr(String(e)); setBusy(false)
@@ -128,6 +154,14 @@ export function Override({ patient, decision, onClose, onDone }: {
         <input className="ovr-in" value={clinician} onChange={(e) => setClinician(e.target.value)} />
         <span className="ovr-hint">Attribution, not authentication: this says who typed it, it does not verify them.</span>
       </label>
+
+      <p className="ovr-hint ovr-after">
+        {isAccept
+          ? <>Nothing moves. The list will show this position as confirmed by you.</>
+          : <>The row moves to position {to || '—'} in the list and carries your name and reason.
+            The position the system gave it — <span className="num">{patient.position}</span> —
+            stays on the row, so a colleague can see both.</>}
+      </p>
 
       {err && <div className="err ovr-err">{err}</div>}
 

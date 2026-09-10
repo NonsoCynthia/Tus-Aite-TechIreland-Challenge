@@ -1,0 +1,455 @@
+/* The patient page.
+   ------------------------------------------------------------------------
+   Every colour here comes from tokens.css. There are no hex literals, no
+   gradients that blend, no glows and no drop shadows: depth is a hairline and
+   a flat fill, which is the whole kit.
+
+   Two palette rules are load-bearing and are worth restating where they are
+   enforced rather than only where they were written:
+
+     --cat-* are the CPC triage categories. A NEWS2 sub-score is not a triage
+     category, an MTS colour is not a triage category and a ward's GAR status
+     is not a triage category, so none of the three touch those hues. They are
+     weighted in ink instead, and the magnitude always travels as a numeral and
+     as pips as well, so colour is never the only channel.
+
+     The one exception is a CRT breach. "Past target" IS a property of the
+     triage category's own target and the product already spends --cat-urgent
+     on it in the list and in the decision record, so the axis does the same.
+
+   clay marks one element per composition: the guard panel in the capacity
+   lane, the reader's own row in the neighbours table, the silence hatch on the
+   journey axis. It is never spent on a set of six. */
+
+/* --- 1 the header: where this person is ---------------------------------- */
+.pt-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--d6); flex-wrap: wrap;
+  padding-bottom: var(--d4); margin-bottom: var(--d5);
+  border-bottom: 1px solid var(--rule-firm);
+}
+.pt-head-l { min-width: 0; }
+.pt-head-l h1 { font-size: var(--t-hero); line-height: 1.1; margin-top: 2px; }
+.pt-head-facts {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--d2) var(--d3); margin-top: var(--d2);
+  font-size: var(--t-small); color: var(--text-2);
+}
+.pt-head-facts strong { color: var(--text); font-weight: 600; }
+.pt-spec { color: var(--text); }
+.pt-ovr {
+  border: 1px solid var(--clay); color: var(--clay);
+  padding: 2px var(--d2); font-size: var(--t-micro); letter-spacing: 0.02em;
+}
+.pt-head-r { display: flex; align-items: flex-end; gap: var(--d4); flex-wrap: wrap; }
+.pt-wait { text-align: right; min-width: 220px; }
+.pt-wait-n { font-family: var(--font-brand); font-size: 40px; font-weight: 300; line-height: 1; }
+.pt-wait-l { font-size: var(--t-small); color: var(--text-2); margin-top: 3px; }
+.pt-wait-l .num { color: var(--text); }
+/* wait against target, drawn: the tick is the target, the fill is the wait */
+.pt-wait-bar {
+  position: relative; height: 7px; margin-top: var(--d2);
+  background: var(--bg-sunk); border: 1px solid var(--rule);
+}
+.pt-wait-fill { position: absolute; inset: 0 auto 0 0; background: var(--text-3); }
+.pt-wait-tick {
+  position: absolute; top: -3px; bottom: -3px; width: 2px;
+  background: var(--ink); transform: translateX(-1px);
+}
+.pt-wait-x { font-size: var(--t-micro); color: var(--text-2); margin-top: 4px; }
+.pt-act { white-space: nowrap; }
+
+.pt-ovr-note {
+  display: flex; gap: var(--d2); align-items: flex-start;
+  border-left: 3px solid var(--clay); background: var(--surface-2);
+  padding: var(--d3) var(--d4); margin-bottom: var(--d5);
+  font-size: var(--t-small); line-height: 1.55; max-width: 88ch; color: var(--text-2);
+}
+.pt-ovr-note strong { color: var(--text); }
+.pt-ovr-note svg { flex: none; margin-top: 2px; color: var(--text-3); }
+
+/* a state worth naming, in words, in a neutral register */
+.pt-flag {
+  font-size: var(--t-micro); color: var(--text-3);
+  border: 1px dashed var(--rule-firm); padding: 1px var(--d2); white-space: nowrap;
+}
+
+.pt-mini {
+  font-size: var(--t-micro); color: var(--text-3);
+  line-height: 1.5; margin: var(--d1) 0 0; max-width: 80ch;
+}
+.pt-mini code, .pt-guard code, .pt-rationale code {
+  font-family: var(--font-data); font-size: var(--t-micro);
+  color: var(--text-2); background: var(--bg-sunk); padding: 0 3px;
+}
+
+/* --- 2 why this position: the recorded rule checks ------------------------ */
+.pt-checks { margin-top: var(--d4); border: 1px solid var(--rule); background: var(--surface); }
+.pt-checks-h {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--d3);
+  padding: var(--d2) var(--d4); background: var(--bg-sunk);
+  border-bottom: 1px solid var(--rule-firm);
+}
+.pt-checks-n { font-size: var(--t-micro); color: var(--text-2); }
+.pt-check {
+  display: grid; grid-template-columns: 176px 1fr 240px 84px;
+  gap: var(--d3); align-items: baseline;
+  padding: var(--d2) var(--d4); border-top: 1px solid var(--rule);
+  font-size: var(--t-small);
+}
+.pt-checks-h + .pt-check { border-top: 0; }
+.pt-check-id { color: var(--text); font-weight: 550; white-space: nowrap; }
+.pt-check-st { color: var(--text-2); line-height: 1.45; }
+.pt-check-d { color: var(--text-2); }
+.pt-check[data-passed="no"] .pt-check-id { color: var(--cat-urgent); }
+.pt-verdict {
+  justify-self: end; font-size: var(--t-micro); padding: 2px var(--d2);
+  border-radius: var(--radius-pill); white-space: nowrap;
+}
+.pt-verdict.is-ok  { color: var(--cat-routine); background: var(--cat-routine-wash); }
+.pt-verdict.is-bad { color: var(--cat-urgent);  background: var(--cat-urgent-wash); }
+
+.pt-rationale {
+  margin-top: var(--d4); border: 1px solid var(--rule);
+  background: var(--surface-2); padding: var(--d3) var(--d4); max-width: 88ch;
+}
+.pt-rationale p {
+  margin: var(--d1) 0 0; font-size: var(--t-body); line-height: 1.55; color: var(--text);
+}
+
+/* --- 3 what informed the agents ------------------------------------------ */
+.pt-lanes { display: grid; gap: var(--d5); }
+.pt-lane { border: 1px solid var(--rule-firm); background: var(--surface); }
+.pt-lane-h {
+  display: flex; align-items: center; gap: var(--d3); flex-wrap: wrap;
+  padding: var(--d3) var(--d4); background: var(--bg-sunk);
+  border-bottom: 1px solid var(--rule-firm);
+}
+.pt-lane-h svg { color: var(--text-2); flex: none; }
+.pt-lane-k { font-size: var(--t-body); font-weight: 600; }
+.pt-lane-s {
+  font-family: var(--font-brand); font-size: 20px; font-weight: 300; line-height: 1;
+  padding-left: var(--d3); border-left: 1px solid var(--rule-firm);
+}
+.pt-lane-x { font-size: var(--t-small); color: var(--text-2); margin-left: auto; text-align: right; }
+.pt-lane-b { padding: var(--d4); display: grid; gap: var(--d4); }
+
+/* the sentence that must never be got wrong, carrying its own counts */
+.pt-guard {
+  display: flex; gap: var(--d3); align-items: flex-start;
+  border-left: 3px solid var(--clay); background: var(--surface-2);
+  padding: var(--d3) var(--d4);
+}
+.pt-guard svg { flex: none; margin-top: 2px; color: var(--clay); }
+.pt-guard strong { font-size: var(--t-body); }
+.pt-guard-l {
+  margin: var(--d2) 0 0; padding-left: var(--d4);
+  font-size: var(--t-small); color: var(--text-2); line-height: 1.55;
+}
+.pt-guard-l li + li { margin-top: 3px; }
+.pt-guard-l .num { color: var(--text); font-weight: 600; }
+
+/* --- the one ward snapshot the capacity agent cited ---------------------- */
+.pt-ward { border: 1px solid var(--rule); background: var(--surface); }
+.pt-ward-h {
+  display: flex; align-items: center; gap: var(--d2); flex-wrap: wrap;
+  padding: var(--d2) var(--d3); border-bottom: 1px solid var(--rule);
+}
+.pt-ward-id { font-size: var(--t-body); font-weight: 600; }
+.pt-ward-t { margin-left: auto; font-size: var(--t-micro); color: var(--text-3); }
+.pt-tag {
+  font-size: var(--t-micro); color: var(--text-2);
+  border: 1px solid var(--rule-firm); padding: 1px var(--d2); white-space: nowrap;
+}
+.pt-tag.is-read { color: var(--text); border-color: var(--text-3); }
+.pt-ward-main {
+  display: grid; grid-template-columns: 120px 1fr; gap: var(--d4);
+  align-items: center; padding: var(--d3);
+}
+.pt-ward-pct { font-family: var(--font-brand); font-size: 30px; font-weight: 300; line-height: 1; }
+.pt-ward-meter {
+  position: relative; height: 12px; background: var(--bg-sunk); border: 1px solid var(--rule);
+}
+.pt-ward-meter i { position: absolute; inset: 0 auto 0 0; background: var(--text-3); }
+/* 100% is a line on this meter, not the end of it: occupancy passes it */
+.pt-ward-100 {
+  position: absolute; top: -3px; bottom: -3px; left: 100%; width: 2px;
+  background: var(--ink); transform: translateX(-2px);
+}
+.pt-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 1px; margin: 0; background: var(--rule); border-top: 1px solid var(--rule);
+}
+.pt-fact { background: var(--surface); padding: var(--d2) var(--d3); min-width: 0; }
+.pt-fact dt { margin: 0; }
+.pt-fact-v {
+  margin: 2px 0 0; font-size: var(--t-data); color: var(--text);
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+}
+.pt-fact-n { font-size: var(--t-micro); color: var(--text-3); }
+/* GAR is green/amber/red in its own vocabulary. Not here: ink weight and the
+   word, so the triage palette stays the triage palette. */
+.pt-gar { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-body); }
+.pt-gar[data-gar="G"] { color: var(--text-3); }
+.pt-gar[data-gar="A"] { color: var(--text-2); }
+.pt-gar[data-gar="R"] { color: var(--text); font-weight: 600; }
+
+.pt-others {
+  display: flex; align-items: center; gap: var(--d2) var(--d3); flex-wrap: wrap;
+  font-size: var(--t-small); color: var(--text-2);
+}
+.pt-other { border: 1px dashed var(--rule-firm); padding: 2px var(--d2); font-size: var(--t-micro); }
+
+/* --- the clinic series, with the one row that was read ------------------- */
+.pt-clinic { border: 1px solid var(--rule); background: var(--surface); padding: var(--d3); }
+.pt-clinic-h { display: flex; align-items: center; gap: var(--d2); flex-wrap: wrap; }
+.pt-clinic-h svg { color: var(--text-3); flex: none; }
+.pt-clinic-p { margin-left: auto; font-size: var(--t-micro); color: var(--text-2); }
+.pt-sessions { display: grid; gap: 3px; margin-top: var(--d2); }
+.pt-session {
+  display: grid; grid-template-columns: 58px 1fr 62px 116px;
+  gap: var(--d3); align-items: center; font-size: var(--t-small);
+  padding: 3px var(--d2); border-left: 2px solid transparent;
+}
+.pt-session-d { color: var(--text-2); font-size: var(--t-micro); }
+.pt-session-b { position: relative; display: block; height: 10px; background: var(--bg-sunk); }
+.pt-session-t { position: absolute; inset: 0 auto 0 0; background: var(--surface-2); border: 1px solid var(--rule); }
+.pt-session-f { position: absolute; inset: 0 auto 0 0; background: var(--rule-firm); }
+.pt-session-n { text-align: right; color: var(--text-2); font-size: var(--t-micro); }
+.pt-session-x { font-size: var(--t-micro); color: var(--text-3); }
+.pt-session.is-read {
+  background: var(--surface-2); border-left-color: var(--ink);
+}
+.pt-session.is-read .pt-session-d,
+.pt-session.is-read .pt-session-n,
+.pt-session.is-read .pt-session-x { color: var(--text); font-weight: 600; }
+.pt-session.is-read .pt-session-f { background: var(--text-3); }
+
+.pt-blend { display: flex; align-items: baseline; gap: var(--d3); flex-wrap: wrap; }
+.pt-blend-eq { font-size: var(--t-data); color: var(--text-2); }
+.pt-blend-eq strong { color: var(--text); }
+.pt-eq-op { color: var(--text-3); }
+
+/* --- the staleness meter: age travels with the reading, always ----------- */
+.pt-stale { border: 1px solid var(--rule); background: var(--surface-2); padding: var(--d3) var(--d4); }
+.pt-stale-head { display: flex; align-items: baseline; gap: var(--d3); flex-wrap: wrap; }
+.pt-stale-when { font-size: var(--t-data); color: var(--text); }
+.pt-stale-age { font-size: var(--t-data); color: var(--text); font-weight: 600; }
+.pt-stale-state {
+  font-size: var(--t-micro); letter-spacing: var(--track-lab); text-transform: uppercase;
+  border: 1px solid var(--rule-firm); padding: 1px var(--d2); color: var(--text-2);
+}
+.pt-stale-state[data-age="fresh"]  { color: var(--text-3); }
+.pt-stale-state[data-age="recent"] { color: var(--text-2); }
+.pt-stale-state[data-age="stale"]  { color: var(--text); border-color: var(--text-3); }
+.pt-stale-state[data-age="very"]   { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+.pt-stale-track {
+  position: relative; height: 8px; margin-top: var(--d3);
+  background: var(--surface); border: 1px solid var(--rule);
+}
+.pt-stale-fill { position: absolute; inset: 0 auto 0 0; background: var(--text-3); }
+.pt-stale-med {
+  position: absolute; top: -3px; bottom: -3px; width: 2px;
+  background: var(--ink); transform: translateX(-1px);
+}
+.pt-stale-scale {
+  display: flex; justify-content: space-between; gap: var(--d2);
+  margin-top: 3px; font-size: var(--t-micro); color: var(--text-3);
+}
+.pt-stale-med-l { color: var(--text-2); }
+
+/* --- the six instruments -------------------------------------------------- */
+.pt-vitals { display: grid; gap: var(--d3); }
+.pt-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+}
+.pt-card { background: var(--surface); padding: var(--d3); min-width: 0; }
+.pt-card-h { display: flex; align-items: center; gap: 6px; }
+.pt-card-h svg { color: var(--text-3); flex: none; }
+.pt-card-h .lab { min-width: 0; overflow-wrap: anywhere; }
+.pt-read {
+  font-family: var(--font-brand); font-size: 26px; font-weight: 300;
+  line-height: 1.1; margin-top: var(--d1);
+}
+.pt-unit { font-size: var(--t-small); color: var(--text-2); margin-left: 2px; }
+
+/* the sub-score: numeral, pips and ink weight — three channels, one value */
+.pt-sub {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  padding: 1px 5px 1px 6px; border: 1px solid var(--rule); border-radius: var(--radius);
+}
+.pt-sub-n { font-size: var(--t-body); font-weight: 600; line-height: 1.3; }
+.pt-sub[data-score="0"] { background: var(--surface-2); color: var(--text-3); border-color: var(--rule); }
+.pt-sub[data-score="1"] { background: var(--bg-sunk);   color: var(--text-2); border-color: var(--rule-firm); }
+.pt-sub[data-score="2"] { background: var(--surface);   color: var(--text);   border-color: var(--text-3); }
+.pt-sub[data-score="3"] { background: var(--ink);       color: var(--paper);  border-color: var(--ink); }
+.pt-sub[data-score="none"] { color: var(--text-3); border-style: dashed; }
+/* a band that was drawn but never applied — the paediatric refusal */
+.pt-sub[data-applied="no"] {
+  background: none; color: var(--text-3); border-color: var(--rule-firm); border-style: dashed;
+}
+.pt-pips { display: inline-flex; gap: 2px; align-items: center; }
+.pt-pips i { display: block; width: 3px; height: 9px; background: var(--rule-firm); }
+.pt-pips i.is-on { background: currentColor; }
+
+/* the meter: the band table drawn, not described */
+.pt-meter { position: relative; height: 17px; margin-top: var(--d3); }
+.pt-track { position: absolute; inset: 0 0 auto 0; height: 8px; }
+.pt-track i { position: absolute; top: 0; height: 8px; }
+.pt-track i[data-score="0"] { background: var(--bg-sunk); }
+.pt-track i[data-score="1"] { background: var(--rule); }
+.pt-track i[data-score="2"] { background: var(--rule-firm); }
+.pt-track i[data-score="3"] { background: var(--text-3); }
+/* where a well person sits, marked as the calm region */
+.pt-normal { position: absolute; top: 11px; height: 2px; background: var(--text-3); }
+.pt-pin {
+  position: absolute; top: -3px; width: 2px; height: 14px;
+  background: var(--ink); transform: translateX(-1px);
+}
+.pt-pin.is-off { width: 3px; background: var(--clay); }
+.pt-axis {
+  display: flex; justify-content: space-between; gap: var(--d2);
+  margin-top: 3px; font-size: var(--t-micro); color: var(--text-3);
+}
+.pt-normal-l { color: var(--text-2); }
+.pt-caption {
+  margin-top: var(--d2); font-size: var(--t-micro); color: var(--text-2); line-height: 1.5;
+  display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline;
+}
+.pt-caption .num { color: var(--text); }
+.pt-flag-cite { border-style: solid; border-color: var(--clay); color: var(--clay); }
+
+/* AVPU is categorical: two states, no axis between them */
+.pt-card.is-cat .pt-read { font-size: 22px; }
+.pt-states { display: grid; gap: 3px; margin-top: var(--d3); }
+.pt-state {
+  display: flex; justify-content: space-between; gap: var(--d2);
+  font-size: var(--t-micro); color: var(--text-3);
+  border: 1px solid var(--rule); padding: 3px var(--d2);
+}
+.pt-state.is-on { color: var(--text); border-color: var(--text-3); background: var(--surface-2); font-weight: 600; }
+
+/* the six, summed on screen and checked against the record */
+.pt-sum {
+  display: flex; align-items: baseline; gap: var(--d3); flex-wrap: wrap;
+  border: 1px solid var(--rule-firm); background: var(--bg-sunk);
+  padding: var(--d2) var(--d4);
+}
+.pt-eq { font-size: var(--t-data); color: var(--text-2); }
+.pt-eq-t { color: var(--text); font-weight: 600; }
+.pt-total { font-family: var(--font-brand); font-size: 26px; font-weight: 300; line-height: 1; }
+.pt-of { font-size: var(--t-small); color: var(--text-2); }
+.pt-sum-note { font-size: var(--t-micro); color: var(--text-3); margin-left: auto; }
+.pt-sum[data-applied="no"] .pt-total { color: var(--text-3); }
+/* the six sub-scores disagreeing with the record is a data-integrity alarm, not
+   a clinical one, so it wears clay and never the triage red: a reader must not
+   be able to mistake "these numbers do not reconcile" for "this person is ill" */
+.pt-disc {
+  display: flex; gap: var(--d2); align-items: flex-start;
+  border-left: 3px solid var(--clay); background: var(--surface-2);
+  padding: var(--d2) var(--d3); margin: 0; font-size: var(--t-small); line-height: 1.55;
+  color: var(--text-2);
+}
+.pt-disc svg { flex: none; margin-top: 2px; color: var(--clay); }
+.pt-disc strong { color: var(--text); }
+.pt-disc .num { color: var(--text); }
+
+.pt-novitals {
+  display: flex; gap: var(--d3); align-items: flex-start;
+  border: 1px solid var(--rule-firm); background: var(--surface-2); padding: var(--d4);
+}
+.pt-novitals svg { flex: none; margin-top: 2px; color: var(--clay); }
+.pt-novitals p { margin: var(--d1) 0 0; font-size: var(--t-small); color: var(--text-2); line-height: 1.55; max-width: 76ch; }
+
+/* --- 4 the journey ------------------------------------------------------- */
+.pt-journey { margin: 0; }
+/* past target, recoloured on the axis itself. --cat-urgent is the triage
+   category's own target being missed, which is the one thing outside the
+   category chips that is allowed to wear it. */
+.j-overdue {
+  position: absolute; top: 12px; height: var(--spine-w);
+  background: var(--cat-urgent);
+}
+.j-legend {
+  list-style: none; display: flex; flex-wrap: wrap; gap: var(--d2) var(--d4);
+  margin: var(--d2) 0 0; padding: 0;
+}
+.j-leg {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--t-micro); color: var(--text-2);
+}
+.j-leg i { width: 14px; height: 5px; flex: none; background: var(--rule-firm); }
+.j-leg.is-overdue i { background: var(--cat-urgent); }
+.j-leg.is-overdue strong { color: var(--cat-urgent); }
+.j-leg.is-silent i { background: var(--clay); }
+.j-leg.is-silent strong { color: var(--clay); }
+
+/* --- 6 what the instrument could not see --------------------------------- */
+.pt-chips {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+}
+.pt-chip { background: var(--surface); padding: var(--d3) var(--d4); min-width: 0; }
+.pt-chip-h { display: flex; align-items: baseline; gap: var(--d2); flex-wrap: wrap; }
+.pt-chip-tag {
+  font-size: var(--t-micro); color: var(--text-3);
+  border: 1px solid var(--rule); padding: 1px 5px; white-space: nowrap;
+}
+/* MTS keeps its word and nothing else: no red, orange, yellow, green or blue
+   enters this product's vocabulary through a chip. */
+.pt-chip-v { font-size: var(--t-data); color: var(--text); margin-top: var(--d1); }
+
+.pt-dist { margin-top: var(--d5); border: 1px solid var(--rule); background: var(--surface); padding: var(--d4); }
+.pt-dist-h { display: flex; align-items: baseline; justify-content: space-between; gap: var(--d3); }
+.pt-dist-n { font-size: var(--t-micro); color: var(--text-3); }
+.pt-hist { display: flex; align-items: stretch; gap: var(--d2); height: 116px; margin-top: var(--d3); }
+.pt-bar {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+/* the bar's own box owns the baseline, so the value labels sit BELOW the rule
+   rather than on top of it */
+.pt-bar-box {
+  position: relative; flex: 1 1 auto; width: 100%; min-height: 0;
+  border-bottom: 1px solid var(--rule-firm);
+}
+.pt-bar i {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: var(--rule-firm); min-height: 1px;
+}
+.pt-bar.is-low i { background: var(--text-3); }
+.pt-bar.is-mine i { background: var(--ink); }
+.pt-bar-n { font-size: var(--t-micro); color: var(--text-3); }
+.pt-bar-v { font-size: var(--t-micro); color: var(--text-2); margin-top: 3px; }
+.pt-bar.is-mine .pt-bar-n, .pt-bar.is-mine .pt-bar-v { color: var(--text); font-weight: 600; }
+.pt-dist-facts {
+  display: flex; flex-wrap: wrap; gap: var(--d2) var(--d5);
+  margin-top: var(--d5); font-size: var(--t-small); color: var(--text-2);
+}
+.pt-stat strong { font-family: var(--font-brand); font-size: 20px; font-weight: 300; color: var(--text); }
+.pt-stat-pct { color: var(--text-3); }
+.pt-stat.is-mine { margin-left: auto; }
+
+/* --- narrow ------------------------------------------------------------- */
+@media (max-width: 1000px) {
+  .pt-check { grid-template-columns: 150px 1fr; }
+  .pt-check-d, .pt-verdict { grid-column: 1 / -1; justify-self: start; }
+  .pt-session { grid-template-columns: 52px 1fr 56px; }
+  .pt-session-x { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .pt-head-r { width: 100%; }
+  .pt-wait { text-align: left; min-width: 0; flex: 1 1 220px; }
+  .pt-ward-main { grid-template-columns: 1fr; }
+  .pt-lane-x { margin-left: 0; text-align: left; width: 100%; }
+  .pt-dist-facts { flex-direction: column; }
+  .pt-stat.is-mine { margin-left: 0; }
+}
+
+/* --- motion: there is none to remove, and it stays that way --------------- */
+@media (prefers-reduced-motion: reduce) {
+  .pt-wait-fill, .pt-stale-fill, .pt-track i, .pt-bar i, .pt-session-f, .pt-ward-meter i {
+    transition: none;
+  }
+}

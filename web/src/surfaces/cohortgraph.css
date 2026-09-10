@@ -1,0 +1,106 @@
+/* The cohort graph. Full-bleed, panels floating over it.
+
+   This is the one surface where glass earns itself: a panel here has to be
+   readable AND let the graph show through, which is what translucency is for.
+   No number a clinician acts on appears on this surface. */
+
+.cg {
+  position: relative; height: calc(100vh - var(--topbar-h));
+  background: var(--bg-sunk); overflow: hidden;
+}
+.cg-stage { position: absolute; inset: 0; }
+.cg-stage canvas { display: block; }
+.cg-boot, .cg-lost {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--text-3); font-size: var(--t-small); background: var(--bg-sunk);
+}
+.cg-lost { background: rgba(7, 15, 42, 0.9); gap: var(--d3); }
+.cg-lost button {
+  margin-left: var(--d2); background: var(--accent); color: var(--ink-deep);
+  border: 0; border-radius: var(--radius); padding: 6px var(--d3);
+  font: inherit; font-size: var(--t-small); cursor: pointer;
+}
+
+/* --- floating panels ----------------------------------------------------- */
+.cg-panel {
+  position: absolute; z-index: 5;
+  padding: var(--d4); border-radius: var(--radius);
+  display: grid; gap: var(--d2); align-content: start;
+  color: var(--text);
+}
+.cg-tl { top: var(--d5); left: var(--d5); width: 320px; }
+.cg-tr { top: var(--d5); right: var(--d5); width: 296px; }
+.cg-bl { bottom: var(--d5); left: var(--d5); gap: var(--d3); }
+.cg-br { bottom: var(--d5); right: var(--d5); width: 296px; }
+
+.cg-tl h1 { font-size: var(--t-title); }
+.cg-nums {
+  display: flex; flex-wrap: wrap; gap: var(--d3);
+  font-size: var(--t-small); color: var(--text-2);
+}
+.cg-nums strong { color: var(--text); font-size: var(--t-data); }
+.cg-src { font-size: var(--t-micro); color: var(--text-3); }
+.cg-load { font-size: var(--t-small); color: var(--text-3); }
+
+/* --- legend: classes with their share, the analysis-panel pattern --------- */
+.cg-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.cg-legend li {
+  display: grid; grid-template-columns: 9px 1fr 52px 30px;
+  align-items: center; gap: var(--d2); font-size: var(--t-small);
+}
+.cg-legend i { width: 9px; height: 9px; border-radius: 2px; }
+.cg-lg-n { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cg-lg-bar { height: 3px; background: rgba(196, 182, 166, 0.14); }
+.cg-lg-bar b { display: block; height: 100%; }
+.cg-lg-c { text-align: right; color: var(--text-3); font-size: var(--t-micro); }
+.cg-note {
+  margin: var(--d2) 0 0; padding-top: var(--d3);
+  border-top: 1px solid var(--rule);
+  font-size: var(--t-micro); line-height: 1.55; color: var(--text-2);
+}
+
+/* --- segmented controls -------------------------------------------------- */
+.cg-seg { display: flex; border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; }
+.cg-seg button {
+  background: none; border: 0; color: var(--text-3);
+  padding: 6px var(--d3); font: inherit; font-size: var(--t-micro); cursor: pointer;
+  border-right: 1px solid var(--rule);
+}
+.cg-seg button:last-child { border-right: 0; }
+.cg-seg button:hover { color: var(--text); }
+.cg-seg button.is-on { background: var(--accent); color: var(--ink-deep); }
+
+/* --- selection ----------------------------------------------------------- */
+.cg-sel { font-size: var(--t-data); color: var(--text); word-break: break-word; }
+.cg-sel-m { font-size: var(--t-small); color: var(--text-2); }
+.cg-open {
+  justify-self: start; margin-top: var(--d1);
+  background: var(--accent); color: var(--ink-deep); border: 0;
+  border-radius: var(--radius); padding: 7px var(--d3);
+  font: inherit; font-size: var(--t-small); font-weight: 550; cursor: pointer;
+}
+/* the inputs graph is not loaded here, so a cited node has identity and role
+   but no readings. Said where it matters rather than hidden. */
+.cg-caveat {
+  display: flex; gap: var(--d2); margin: var(--d1) 0 0;
+  font-size: var(--t-micro); line-height: 1.5; color: var(--text-2);
+}
+.cg-caveat svg { flex: 0 0 auto; margin-top: 1px; color: var(--accent); }
+
+/* --- camera ------------------------------------------------------------- */
+.cg-ctrl {
+  position: absolute; z-index: 5; top: var(--d5); left: 50%; transform: translateX(-50%);
+  display: flex; border-radius: var(--radius); overflow: hidden;
+}
+.cg-ctrl button {
+  background: none; border: 0; border-right: 1px solid var(--rule);
+  color: var(--text-2); width: 34px; height: 32px;
+  display: grid; place-items: center; cursor: pointer;
+}
+.cg-ctrl button:last-child { border-right: 0; }
+.cg-ctrl button:hover { color: var(--text); background: rgba(196, 182, 166, 0.10); }
+
+@media (max-width: 1180px) {
+  .cg-tr, .cg-br { display: none; }
+  .cg-tl { width: 260px; }
+}

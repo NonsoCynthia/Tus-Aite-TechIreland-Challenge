@@ -8,6 +8,13 @@
  *  The single clinical reading sits at the end of the list and the start of the
  *  axis, so the eye lands on the one measurement and then travels the whole
  *  empty line that follows it.
+ *
+ *  Revised for the patient page's new order. The axis now draws the two spans
+ *  that the copy used to assert: the stretch past the CRT target, and the
+ *  stretch since anyone measured this person. Both are lengths on the same
+ *  scale, so they can be compared by eye instead of by reading two sentences.
+ *  The staleness READING lives with the vitals, one section above; what is left
+ *  here is its length, which is the part an axis can say better than a note.
  */
 export interface Event {
   key: string; date: string; label: string
@@ -20,7 +27,9 @@ const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })
 const fmtN = (n: number) => n.toLocaleString('en-IE')
 
-export function Journey({ events, today }: { events: Event[]; today: string }) {
+export function Journey({ events, today, className = '' }: {
+  events: Event[]; today: string; className?: string
+}) {
   const ev = events.filter((e) => e.date).sort((a, b) => a.date.localeCompare(b.date))
   if (!ev.length) return null
 
@@ -33,8 +42,16 @@ export function Journey({ events, today }: { events: Event[]; today: string }) {
   const silentDays = clinical ? days(clinical.date, today) : 0
   const pct = (d: string) => Math.max(0, Math.min(100, (days(last.date, d) / waitDays) * 100))
 
+  // The span past the target, drawn rather than described. A target still in the
+  // future shades nothing: there is no overdue length to draw.
+  const overdueDays = target ? days(target.date, today) : 0
+  const overdue = !!target && overdueDays > 0
+  const overdueFrom = target ? pct(target.date) : 0
+  const silent = !!clinical && silentDays > 30
+  const silentFrom = clinical ? pct(clinical.date) : 0
+
   return (
-    <div className="journey">
+    <div className={`journey ${className}`.trim()}>
       <div className="j-cols">
         <div className="j-intake">
           <div className="j-h">Getting on the list <span className="num">{fmtN(intakeDays)} days</span></div>
@@ -54,8 +71,14 @@ export function Journey({ events, today }: { events: Event[]; today: string }) {
             Waiting since <span className="num">{fmtN(waitDays)} days</span>, to scale
           </div>
           <div className="j-axis">
-            {clinical && silentDays > 30 && <div className="j-silence" />}
+            {silent && <div className="j-silence" style={{ left: `${silentFrom}%`, right: 0 }} />}
             <div className="j-line" />
+            {/* drawn AFTER the line so it recolours that stretch of the axis
+                itself: the part of the wait that is past target. */}
+            {overdue && (
+              <div className="j-overdue" style={{ left: `${overdueFrom}%`, right: 0 }}
+                   role="img" aria-label={`past target by ${fmtN(overdueDays)} days`} />
+            )}
             {target && (
               <div className={'j-mark is-target' + (pct(target.date) < 12 ? ' is-early' : '')}
                    style={{ left: `${pct(target.date)}%` }}>
@@ -70,12 +93,25 @@ export function Journey({ events, today }: { events: Event[]; today: string }) {
               <span className="j-md num">{fmtDate(today)}</span>
             </div>
           </div>
-          {clinical && silentDays > 30 && (
-            <p className="j-silence-note">
-              <strong className="num">{fmtN(silentDays)} days</strong> since anyone measured
-              this person. The shaded length is that wait, drawn to scale.
-            </p>
-          )}
+
+          <ul className="j-legend">
+            {overdue && (
+              <li className="j-leg is-overdue">
+                <i aria-hidden />past target by <strong className="num">{fmtN(overdueDays)} days</strong>
+              </li>
+            )}
+            {target && !overdue && (
+              <li className="j-leg">
+                <i aria-hidden />
+                <strong className="num">{fmtN(Math.abs(overdueDays))} days</strong> until the target
+              </li>
+            )}
+            {silent && (
+              <li className="j-leg is-silent">
+                <i aria-hidden />unmeasured for <strong className="num">{fmtN(silentDays)} days</strong>
+              </li>
+            )}
+          </ul>
         </div>
       </div>
     </div>

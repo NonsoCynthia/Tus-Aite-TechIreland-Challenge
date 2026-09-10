@@ -194,6 +194,23 @@ check("both citation lists ride along on every row",
       all(len(r.get("urgency_citations", [])) == 6 for r in rows)
       and all(1 <= len(r.get("capacity_citations", [])) <= 2 for r in rows))
 
+# Everyone on the list is in exactly one of four states -- but the states
+# OVERLAP, so they reconcile on the union and never on the sum. The three
+# paediatric referrals are refused by the urgency agent AND then recorded by the
+# coordinator as missing_urgency_score, so adding the buckets gives 311 of 308.
+placed_set = {r["pathway_number"] for r in rows}
+paed_set = set(d["refused_paediatric"])
+skip_set = set(d["skipped"])
+exc_set = {e["pathway_number"] for e in d["excluded"]}
+union = placed_set | paed_set | skip_set | exc_set
+cohort_n = len(get(f"/api/cohort/{HOSP}/{DATE}")["referrals"])
+check("every referral is accounted for exactly once, on the union",
+      len(union) == cohort_n, f"union {len(union)} vs cohort {cohort_n}")
+check("the buckets really do overlap, so a sum would be wrong",
+      len(paed_set & exc_set) > 0,
+      "if this ever becomes 0 the reconciliation copy must change")
+check("nobody placed is also excluded", not (placed_set & exc_set))
+
 print("\n12. the clinic half of the capacity score (A8)")
 ops = get(f"/api/operations/{HOSP}/{DATE}")
 check("clinics are reported at all", len(ops.get("clinics", [])) > 0, "was dropped entirely before")
@@ -205,6 +222,16 @@ check("wards say which specialty they back",
       any(w.get("primary_for") for w in ops["wards"]), "was dropped in de-duplication")
 check("free beds are reported", any(w.get("free") is not None for w in ops["wards"]),
       "DATASET_README calls this the answer to how many beds are available")
+# nominal_beds on a context ward is core.ward_specialty's per-SPECIALTY
+# allocation, not the ward's capacity. Taking the first one made a 92-bed ward
+# report 45, so it is summed across the specialties the ward serves.
+w0 = ops["wards"][0]
+check("a ward's nominal capacity sums its specialty allocations",
+      w0["nominal_beds"] == sum(w0["allocations"].values()),
+      f"{w0['nominal_beds']} vs {w0['allocations']}")
+check("occupancy_pct is computed on the recorded census, not on nominal",
+      abs(round(w0["occupied"] / w0["census"] * 100, 2) - w0["occupancy_pct"]) < 0.02,
+      f"occ {w0['occupied']} census {w0['census']} pct {w0['occupancy_pct']}")
 
 print("\n13. the whole decision as a graph (A7)")
 g = get(f"/api/graph/cohort/{run_id}")

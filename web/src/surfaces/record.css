@@ -1,0 +1,101 @@
+/* The decision record. A reviewer's surface: dense, tabular, every rule keeping
+   its ID so it can be found in core.ref_rules. */
+
+.rec .lede { margin-bottom: var(--d5); }
+.rec-sec { margin-top: var(--d7); }
+
+.rec-meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+}
+.field { background: var(--surface); padding: var(--d3) var(--d4); min-width: 0; }
+.field-v {
+  font-size: var(--t-data); margin-top: 3px; color: var(--text);
+  overflow-wrap: anywhere;
+}
+.field.is-big .field-v { font-size: 24px; line-height: 1.1; }
+.field-n { font-size: var(--t-micro); color: var(--text-3); margin-top: 2px; }
+
+.sec-h {
+  font-size: var(--t-section); display: flex; flex-wrap: wrap;
+  align-items: baseline; gap: var(--d3); margin-bottom: var(--d3);
+}
+.sec-note { font-family: var(--font-data); font-size: var(--t-small); color: var(--text-3); font-weight: 400; }
+
+/* --- rule board ---------------------------------------------------------- */
+.rules { width: 100%; border-collapse: collapse; background: var(--surface); }
+.rules th {
+  text-align: left; font-size: var(--t-micro); letter-spacing: var(--track-lab);
+  text-transform: uppercase; color: var(--text-3); font-weight: 600;
+  padding: var(--d2) var(--d3); border-bottom: 1px solid var(--rule-firm);
+  background: var(--bg-sunk); white-space: nowrap;
+}
+.rules td {
+  padding: var(--d3); border-bottom: 1px solid var(--rule);
+  font-size: var(--t-small); vertical-align: top;
+}
+.rules tr:last-child td { border-bottom: 0; }
+.rules .c-n { text-align: right; white-space: nowrap; }
+.rules th.c-n { text-align: right; }
+.c-rid { color: var(--text); font-weight: 550; white-space: nowrap; }
+.c-st { color: var(--text-2); }
+.rules tr.is-breached .c-rid { color: var(--cat-urgent); }
+
+.verdict {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  font-size: var(--t-micro); padding: 3px var(--d2);
+  border-radius: var(--radius-pill);
+}
+/* colour is never the only channel: the word travels with it, always */
+.verdict.is-ok  { color: var(--cat-routine); background: var(--cat-routine-wash); }
+.verdict.is-bad { color: var(--cat-urgent);  background: var(--cat-urgent-wash); }
+
+/* --- the reconciliation ledger ------------------------------------------
+   Four buckets, separately labelled, never summed into one figure. */
+.ledger { border: 1px solid var(--rule); background: var(--surface); }
+.ledger-row {
+  display: grid; grid-template-columns: 84px 200px 1fr;
+  align-items: baseline; gap: var(--d3);
+  padding: var(--d3) var(--d4); border-bottom: 1px solid var(--rule);
+}
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-n { font-size: 22px; text-align: right; }
+.ledger-k { font-size: var(--t-body); font-weight: 550; }
+.ledger-w { font-size: var(--t-small); color: var(--text-2); line-height: 1.5; }
+.ledger-w em { color: var(--text-3); font-style: italic; }
+.ledger-sum {
+  margin-top: var(--d2); padding: var(--d2) var(--d4);
+  font-size: var(--t-small); color: var(--text-2);
+  background: var(--bg-sunk); border: 1px solid var(--rule);
+}
+.ledger-sum.is-off { border-left: 3px solid var(--cat-urgent); }
+.ledger-sum strong { color: var(--cat-urgent); }
+
+.warn-chip {
+  display: inline-block; margin-left: var(--d2); padding: 2px var(--d2);
+  font-size: var(--t-micro); color: var(--cat-semi);
+  background: var(--cat-semi-wash); border-radius: var(--radius-pill);
+}
+.ovr-log td { white-space: nowrap; }
+.ovr-log td:nth-child(5) { white-space: normal; min-width: 260px; }
+
+.p-note {
+  font-size: var(--t-small); color: var(--text-2);
+  line-height: 1.55; margin: var(--d3) 0 0;
+}
+
+@media (max-width: 760px) {
+  .ledger-row { grid-template-columns: 64px 1fr; }
+  .ledger-w { grid-column: 1 / -1; }
+}
+
+.ledger-sum strong { color: var(--text); }
+.ledger-gap { color: var(--cat-urgent); font-weight: 550; }
+/* the buckets overlap; saying so IS the panel */
+.ledger-overlap {
+  margin-top: var(--d2); padding-top: var(--d2);
+  border-top: 1px solid var(--rule);
+  font-size: var(--t-small); line-height: 1.55; color: var(--text-2);
+  max-width: 92ch;
+}
+.ledger-overlap .num { color: var(--text); }

@@ -28,16 +28,25 @@ Gates: **D** data truth · **C** clinical safety (veto) · **S** design
 | A9 | `types.ts` declares what already arrives | D | PASS | `web/src/lib/types.ts` + `api.ts` — Citation, RuleCheck, Reference, Overrides, CohortGraph |
 | A10 | `demo_path.py` covers every new endpoint | D | PASS | `orchestrator/tests/demo_path.py` §10–15 — **66 passed, 0 failed** (was 35) |
 
-## B · Design system
+## B · Design system — **CLOSED**
 
 | ID | Task | Gate | Status | Evidence |
 |---|---|---|---|---|
-| B1 | Token rewrite — full-bleed grid, density, elevation by role, icons | S | TODO | |
-| B2 | App shell — left rail, top bar, Run CTA, run pill | S | TODO | |
-| B3 | Brand lockup asset; `lockup-white`; descriptor behind a hairline | S | TODO | |
-| B4 | Glass recipe scoped to five uses, never behind a number | C | TODO | |
-| B5 | Motion vocabulary; nothing animates across a category boundary | C | TODO | |
-| B6 | Synthetic-data label (`README.md:36`) | C | TODO | |
+| B1 | Token rewrite — full-bleed grid, density, elevation by role, icons | S | PASS | `tokens.css` rewritten — density scale `--d1..--d8`, `--lift-0/1/2` by role, `--icon`, `--rail-w`; `.pad` no longer caps at 1248px |
+| B2 | App shell — left rail, top bar, Run CTA, run pill | S | PASS | `App.tsx` rail + top bar; screenshot `10-shell.png` — grouped nav, run pill (α 81%), Run CTA, 3-service status |
+| B3 | Brand lockup asset; `lockup-white`; descriptor behind a hairline | S | PASS | `tus-aite-lockup-white.png` copied to public/brand and used in the rail; descriptor behind a hairline per the kit |
+| B4 | Glass recipe scoped to five uses, never behind a number | C | PASS | one `.glass` recipe; used only on cohort-graph panels + camera controls, never behind a number — `cohortgraph.css` |
+| B5 | Motion vocabulary; nothing animates across a category boundary | C | PASS | `--ease`/`--t-*` tokens; `useReducedMotion` honoured in Run and List; no cross-boundary animation |
+| B6 | Synthetic-data label (`README.md:36`) | C | PASS | `.synthetic` in the rail foot — 'Synthetic data · no real patient', permanent chrome (README.md:36, previously absent everywhere) |
+
+## X · Built directly (not in the original list)
+
+| ID | Task | Gate | Status | Evidence |
+|---|---|---|---|---|
+| X1 | `DecisionRecord` surface — rule board with all 5 rule IDs, reconciliation, override log | C | PASS | `surfaces/DecisionRecord.tsx`; screenshot `12-record.png` — 776 checks, RULE-TRIAGE-TURNAROUND 1 breached |
+| X2 | **Reconciliation bug found and fixed**: buckets overlap, so a sum reads 311 of 308 | D | PASS | 3 paediatric referrals are in `refused_paediatric` AND `excluded` (`missing_urgency_score`). Union = 308. demo_path §11 asserts it |
+| X3 | `lib/news2.ts` — NEWS2 band table for per-vital sub-scores | D | PASS | **verified against all 308 referrals, 0 mismatches** vs the agent's stored `news2` |
+| X4 | `lib/ref.ts` — reference lookups so nothing is hardcoded | D | PASS | `specialtyFull`, `crtDays`, `ruleStatement`, `checkLabel`, `failed` |
 
 ## C · Overview → operational dashboard
 

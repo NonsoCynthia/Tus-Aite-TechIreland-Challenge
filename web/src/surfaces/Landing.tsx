@@ -12,8 +12,11 @@ const fmt = (n: number) => n.toLocaleString('en-IE')
  *
  *  Both figures are counted from the live cohort, not written down.
  */
-export function Landing({ hospital, date, name, onEnter }: {
-  hospital: string; date: string; name: string; onEnter: () => void
+export function Landing({ hospital, date, name, hospitals, onHospital, onEnter }: {
+  hospital: string; date: string; name: string
+  hospitals: Array<{ hipe: string; name: string }>
+  onHospital: (h: string) => void
+  onEnter: () => void
 }) {
   const q = useQuery({ queryKey: ['cohort', hospital, date], queryFn: () => api.cohort(hospital, date) })
   const rows = q.data?.referrals ?? []
@@ -51,9 +54,20 @@ export function Landing({ hospital, date, name, onEnter }: {
           evidence it used.
         </p>
 
-        <button className="landing-go" onClick={onEnter} disabled={!ready}>
-          See the hospital &rarr;
-        </button>
+        {/* The selector belongs here, not only behind the door: the two
+            figures above are counted from whichever hospital is chosen, and
+            with no control on this screen they always read 9001. */}
+        <div className="landing-pick">
+          <label className="landing-sel">
+            <span className="lab">Hospital</span>
+            <select value={hospital} onChange={(e) => onHospital(e.target.value)}>
+              {hospitals.map((h) => <option key={h.hipe} value={h.hipe}>{h.name}</option>)}
+            </select>
+          </label>
+          <button className="landing-go" onClick={onEnter} disabled={!ready}>
+            See the hospital &rarr;
+          </button>
+        </div>
       </div>
     </div>
   )

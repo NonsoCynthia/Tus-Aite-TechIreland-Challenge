@@ -43,7 +43,17 @@ export const api = {
     get<{
       cohort: number
       wards: Array<{
-        ward_id: string; nominal_beds: number | null; occupancy_pct: number
+        ward_id: string
+        /** The ward's nominal capacity: the SUM of what core.ward_specialty
+            allocates to each specialty it serves. A single context row carries
+            only one specialty's allocation, which is why a 92-bed ward used to
+            report 45. `allocations` keeps the split. */
+        nominal_beds: number | null
+        allocations: Record<string, number>
+        /** occupied + free — the census actually recorded against the ward,
+            which is the denominator occupancy_pct uses. */
+        census: number | null
+        occupancy_pct: number
         /** DATASET_README calls `free` "the answer to how many beds are
             available". It was never fetched until now. */
         occupied: number | null; free: number | null; outliers: number
