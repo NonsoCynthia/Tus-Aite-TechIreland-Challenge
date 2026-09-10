@@ -91,7 +91,16 @@ export function DecisionRecord({ hospital, date, reference }: {
       </div>
     )
   }
-  if (!dec.data) return <div className="pad"><p className="muted">Reading the decision…</p></div>
+  // BOTH, not just the decision. /api/decision returns in 9-22ms and
+  // /api/cohort in 19-55ms, so the decision ALWAYS wins the race -- and for that
+  // window `total` was 0 while the union held 308, which rendered
+  // "308 distinct referrals accounted for, of 0 on the list · 308 unexplained"
+  // under the loudest severity step the product owns, on the one surface whose
+  // whole job is to say the counts close. One keystroke on the date picker was
+  // enough to fire it.
+  if (!dec.data || cohort.isPending) {
+    return <div className="pad"><p className="muted">Reading the decision…</p></div>
+  }
   const d = dec.data
   // A 404 from /api/overrides is normal: it means nobody has acted yet.
   const ovrRows = ovr.data?.overrides ?? []
@@ -309,7 +318,7 @@ export function DecisionRecord({ hospital, date, reference }: {
 
       <section className="rec-sec">
         <h2 className="sec-h">
-          Clinician actions
+          Recorded actions
           <span className="sec-note">
             agent.overrides · {fmt(ovrRows.length)}{' '}
             {ovrRows.length === 1 ? 'action' : 'actions'}, newest first

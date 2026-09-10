@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { api, bandOf, BANDS } from '../lib/api'
 import { useNarrow } from '../lib/useNarrow'
-import { crtDays, ruleStatement, specialtyName } from '../lib/ref'
+import { crtDays, isRefusedPaediatric, ruleStatement, specialtyName } from '../lib/ref'
 import { plantedCase } from '../lib/planted'
 import { sevBreach, sevReadingAge, sevWaitRatio } from '../lib/severity'
 import type { Sev } from '../lib/severity'
@@ -240,6 +240,7 @@ function useList(hospital: string, date: string) {
     decision: decision.data,
     ops: ops.data,
     opsFailed: ops.isError,
+    opsPending: ops.isPending,
     loading: cohort.isPending,
     error: cohort.error,
     displayedOrder,
@@ -402,7 +403,7 @@ export function List({ hospital, date, reference, onOpen }: {
   reference: Reference | undefined
   onOpen: (pw: string) => void
 }) {
-  const { rows, decision, ops, opsFailed, loading, error, displayedOrder } = useList(hospital, date)
+  const { rows, decision, ops, opsFailed, opsPending, loading, error, displayedOrder } = useList(hospital, date)
 
   const [tab, setTab] = useState('Urgent')
   const [q, setQ] = useState('')
@@ -424,7 +425,16 @@ export function List({ hospital, date, reference, onOpen }: {
       || specialtyName(reference, r.specialty_hipe).toLowerCase().includes(needle))
   }, [rows, needle, reference])
 
-  const refused = useMemo(() => new Set(decision?.refused_paediatric ?? []), [decision])
+  // Union of what the decision refused and what the SPECIALTY refuses. ADR-007
+  // refuses 0601 unconditionally (urgency-agent scoring.py:88), so this must hold
+  // on the 13 days that have no decision at all -- otherwise the Outside tab is
+  // empty and a child's adult NEWS2 renders under "How unwell" on every one of
+  // them, which is exactly the pre-ranking view this round built.
+  const refused = useMemo(() => {
+    const set = new Set(decision?.refused_paediatric ?? [])
+    for (const r of rows) if (isRefusedPaediatric(r.specialty_hipe)) set.add(r.pathway_number)
+    return set
+  }, [decision, rows])
 
   const groups = useMemo(() => {
     const g: Record<string, Row[]> = {
@@ -587,7 +597,15 @@ export function List({ hospital, date, reference, onOpen }: {
                 </SevChip>
               )}
             </PreFig>
-            <PreFig k={pre.n2max == null
+            {/* /api/operations takes 3.255s cold and 0.003s warm. Until it
+                lands, r.clin is undefined on all 308 rows and `pre` is computed
+                from nulls -- so this panel used to assert "No observation has
+                been read on this hospital-day", an absolute, for three seconds,
+                on the panel the client asked for by name. It is 308 of 308 on
+                the real data. */}
+            <PreFig k={opsPending
+              ? 'carry a NEWS2. Reading the observations…'
+              : pre.n2max == null
               ? 'carry a NEWS2. No observation has been read on this hospital-day.'
               : `carry a NEWS2. ${fmt(pre.n2zero)} of those are 0 and the highest is `
                 + `${pre.n2max} of 17, which is why NEWS2 total is never the thing that ranks.`}>
@@ -712,6 +730,7 @@ export function List({ hospital, date, reference, onOpen }: {
           <Tabs.Content key={k} value={k} className="lst-panel">
             <Band
               rows={groups[k] ?? []}
+              onList={figures.onList}
               bandKey={k}
               ranked={ranked}
               outside={k === 'Outside'}
@@ -936,6 +955,9 @@ function Reconciliation({ decision, total }: { decision: Decision; total: number
 
 type BandProps = {
   rows: Row[]
+  /** The whole cohort, so the Outside tab can reconcile its counts against
+   *  the Overview's without hardcoding a number that is wrong on 9002. */
+  onList: number
   bandKey: string
   ranked: boolean
   outside: boolean
@@ -1031,7 +1053,7 @@ function Band(p: BandProps) {
                     const b = bandOf(r.cpc); a[b] = (a[b] ?? 0) + 1; return a
                   }, {})).map(([b, n]) => `${n} ${b}`).join(' · ')
                 }</strong> ), so the tab counts above are of the ranking, while the
-                Overview bands all 308 by category.</>
+                Overview bands all {fmt(p.onList)} by category.</>
             )}
           </>
         ) : target == null ? (
@@ -1246,7 +1268,17 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
   const ageSev = sevReadingAge(age)
 
   const moved = !!r.ovr && r.ovrLive && r.ovr.to_position !== r.ovr.from_position
-  const shownPos = moved ? r.ovr!.to_position : r.rank?.position
+  // The ORDINAL is the row's place in the displayed order, not the coordinator's
+  // stored position. Printing the stored position meant that the moment a
+  // clinician moved anyone, the column stopped enumerating: with one override
+  // the Urgent tab read 1, 1, 2, 3 ... 20, 22, 23 -- position 1 printed twice
+  // and 21 absent, with every row between the old and new slot one place away
+  // from the number beside it. `seq` is the index in the spliced order, so it is
+  // always a true 1..n enumeration of what is on screen.
+  const shownPos = r.seq < UNPLACED ? r.seq + 1 : r.rank?.position
+  // the system's own number is kept whenever it differs from where the row now sits
+  const systemPos = r.rank?.position
+  const displaced = systemPos != null && shownPos != null && systemPos !== shownPos
 
   // The rule ID has never appeared in this product. It is the first thing a
   // reviewer looks for, and the coordinator has always computed it.
@@ -1289,13 +1321,14 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
           {/* 76px of column is 56px of content, and "system said 12" wrapped to
               three lines in it. The phrase moves to the tooltip, where the
               expander repeats it in full. */}
-          {moved
+          {displaced
             ? <span className="pos-was lab"
-                    title={`the system placed this referral at ${r.ovr!.from_position ?? '—'}`}>
-                was {r.ovr!.from_position ?? '—'}
+                    title={`the system placed this referral at ${systemPos}`}>
+                was {systemPos}
               </span>
             : r.ovr && r.ovrLive
-              ? <span className="pos-was lab" title="a clinician confirmed this position">confirmed</span>
+              ? <span className="pos-was lab"
+                      title="recorded as confirmed at this position">confirmed</span>
               : null}
         </div>
       </td>
@@ -1374,10 +1407,14 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
             {target == null ? 'no target for this category'
               : over ? (
                 <>
-                  <SevChip sev={waitSev}
-                           title={`${fmt(wait)} days against a ${target}-day target`}>
-                    <b className="num">{ratioText(ratio!)}×</b>
-                  </SevChip>
+                  {/* No chip here. The bar immediately above carries the graded
+                      channel for this exact fact, and drawing it twice 2mm apart
+                      was 20 of the 77 severity marks on the first screen. The
+                      numeral stays, so the value is never colour-only. */}
+                  <b className="num wait-x"
+                     title={`${fmt(wait)} days against a ${target}-day target`}>
+                    {ratioText(ratio!)}×
+                  </b>
                   <span className="sub-t">over a {target}-day target</span>
                 </>
               )
@@ -1386,15 +1423,19 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
         </div>
       </td>
 
-      {/* The rule that fired. Every chip here is a failed check, so every one of
-          them is sevBreach(false): a solid block, which is what carries across
-          a room. The detail stays outside the block, in the reading register. */}
+      {/* The rule that fired. sevBreach has only two values, so every chip here
+          would be the SAME solid block -- on 130 of the 165 rows that can breach.
+          That is a field, not an accent, and it was the largest single
+          contributor to the table's saturation. Quiet keeps the escalation in
+          hue and withholds the fill; the wait bar beside it still carries the
+          graded channel, because THAT one varies row to row. */}
       <td className="c-rule">
         {fired.length > 0 ? (
           <div className="rulez">
             {shownRules.map((c) => (
               <span className="rule-chip" key={c.rule_id}>
-                <SevChip sev={sevBreach(c.passed)} title={ruleStatement(reference, c.rule_id)}>
+                <SevChip sev={sevBreach(c.passed)} tone="quiet"
+                         title={ruleStatement(reference, c.rule_id)}>
                   <TriangleAlert className="ico-sig" strokeWidth={1.75} aria-hidden="true" />
                   <b className="num">{c.rule_id}</b>
                 </SevChip>
@@ -1935,7 +1976,7 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
         {/* what a clinician did, and what they can do */}
         <section className="ev-b">
           <h3 className="ev-h">
-            Clinician action
+            Recorded action
             <span className="ev-hn">agent.overrides</span>
           </h3>
           {r.ovr ? (
@@ -1949,7 +1990,7 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
               </div>
               <div className="ev-ovr-r">{r.ovr.reason}</div>
               {r.ovr.rule_warning_accepted && (
-                <div className="ev-warn">category boundary crossed, attested</div>
+                <div className="ev-warn">category boundary crossed, accepted on the record</div>
               )}
               {!r.ovrLive && (
                 <div className="ev-ovr-n">

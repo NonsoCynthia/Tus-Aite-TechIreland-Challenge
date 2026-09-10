@@ -137,7 +137,7 @@ export function Override({ patient, decision, displayedOrder, onClose, onDone }:
           <strong>This crosses a clinical category boundary.</strong>
           <p>
             {fromBand} referrals are seen before {movingTo} ones. The system will not make
-            this move; you can, and it is recorded as your decision, not the system's.
+            this move; you can, and it is recorded as recorded against the name above, not made by the system.
           </p>
           <label className="ovr-attest">
             <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
@@ -161,14 +161,14 @@ export function Override({ patient, decision, displayedOrder, onClose, onDone }:
       </label>
 
       <label className="ovr-f">
-        <span className="ovr-l">Recorded as</span>
+        <span className="ovr-l">Record this against</span>
         <input className="ovr-in" value={clinician} onChange={(e) => setClinician(e.target.value)} />
       </label>
 
       <p className="ovr-hint ovr-after">
         {isAccept
-          ? <>Nothing moves. The list will show this position as confirmed by you.</>
-          : <>The row moves to position {to || '—'} in the list and carries your name and reason.
+          ? <>Nothing moves. The list will show this position as confirmed, against the name above.</>
+          : <>The row moves to position {to || '—'} in the list and carries the name typed above and reason.
             The position the system gave it (<span className="num">{patient.position}</span>)
             stays on the row, so a colleague can see both.</>}
       </p>

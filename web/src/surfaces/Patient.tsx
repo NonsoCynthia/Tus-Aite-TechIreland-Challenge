@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Check, Info, TriangleAlert } from 'lucide-react'
 import { api, bandOf } from '../lib/api'
-import { checkLabel, crtDays, failed, ruleStatement, specialtyFull } from '../lib/ref'
+import { checkLabel, crtDays, failed, isRefusedPaediatric, ruleStatement, specialtyFull } from '../lib/ref'
 import { plantedCase } from '../lib/planted'
 import { sevBreach, sevWaitRatio } from '../lib/severity'
 import { SevBar, SevChip } from '../components/Severity'
@@ -78,7 +78,14 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
   const c = ops.data?.clinical?.[pathway]
   const row = cohort.data?.referrals.find((r) => r.pathway_number === pathway)
   const placed = dec.data?.rankings.find((r) => r.pathway_number === pathway)
-  const refused = dec.data?.refused_paediatric.includes(pathway) ?? false
+  // ADR-007 refuses specialty 0601 on the SPECIALTY, not on a run. Reading this
+  // out of the decision alone made a standing clinical guarantee conditional on
+  // a run artifact, and /api/decision 404s on 13 of the 14 days -- so a child was
+  // scored on the adult scale on every unscored day. The decision's list is
+  // unioned on top rather than replaced, so a refusal it records for any other
+  // reason still counts.
+  const refused = isRefusedPaediatric(row?.specialty_hipe)
+    || (dec.data?.refused_paediatric.includes(pathway) ?? false)
   const skipped = dec.data?.skipped.includes(pathway) ?? false
 
   const scores = useQuery({
@@ -269,7 +276,7 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
         <div className="pt-ovr-note">
           <Info size={ICON_SM_PX} strokeWidth={STROKE} aria-hidden />
           <span>
-            A clinician moved this referral on{' '}
+            This referral was moved on{' '}
             <span className="num">{new Date(ovrRec.created_at).toLocaleString('en-IE')}</span>:{' '}
             <strong>{ovrRec.reason}</strong>
             {ovrRec.rule_warning_accepted && ' (a category-boundary warning was accepted on the record)'}

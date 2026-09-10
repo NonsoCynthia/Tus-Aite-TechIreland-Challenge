@@ -58,3 +58,23 @@ export const breachPhrase = (ruleId: string, n: number): string =>
   ruleId.startsWith('RULE-CRT-')
     ? `${n.toLocaleString('en-IE')} past target`
     : `${n.toLocaleString('en-IE')} breached`
+
+
+/** The paediatric specialty, refused by the urgency agent.
+ *
+ *  `urgency-agent/urgency_agent/scoring.py:88` — `PAEDIATRIC_SPECIALTY = "0601"`,
+ *  tested at `:207` against the referral's OWN specialty. ADR-007 refuses it
+ *  unconditionally: NEWS2 is validated in adults, so the agent will not score a
+ *  child on an adult scale. That is a standing property of the specialty.
+ *
+ *  It is NOT a property of a run. The UI used to read the refusal out of
+ *  `decision.refused_paediatric`, which only exists once a run has produced a
+ *  decision — and /api/decision 404s on 13 of the 14 hospital-days. So on any
+ *  unscored day, and on every day before the Run button is pressed, a child was
+ *  rendered with a full adult NEWS2 total under a column headed "How unwell".
+ *  Derive it from the specialty and union the decision's list on top.
+ */
+export const PAEDIATRIC_SPECIALTY = '0601'
+
+export const isRefusedPaediatric = (specialtyHipe: string | null | undefined): boolean =>
+  specialtyHipe === PAEDIATRIC_SPECIALTY

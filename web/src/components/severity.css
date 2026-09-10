@@ -17,9 +17,18 @@
 .sev-3 { color: var(--sev-3-fg); background: var(--sev-3-bg); border-color: var(--sev-3-edge); }
 .sev-4 { color: var(--sev-4-fg); background: var(--sev-4-bg); border-color: var(--sev-4-edge); }
 
-/* 3 and 4 are the two that must read at distance, so they get weight as well
-   as fill -- two channels, not one. */
+/* 3 and 4 both read at distance. Separating THEM from each other is the harder
+   problem: they have the same fill area, the same weight and the same geometry,
+   so the only thing between "high" and "severe" was 1.46:1 of lightness on a
+   brown -- below the 3:1 non-text threshold and invisible past about a metre.
+   At distance the four-step scale resolved to two.
+
+   Hue is not available (the triage set is reserved). Area is, and area is this
+   file's own stated principle, so sev-4 takes a doubled inset ring: it reads as
+   a heavier block at any distance, and it is still a rule rather than a shadow,
+   which the brand kit forbids. */
 .sev-3, .sev-4 { font-weight: 600; }
+.sev-4 { box-shadow: inset 0 0 0 2px var(--sev-4-fg); padding: 2px var(--d3); }
 
 /* `quiet` keeps the tinted register at the top two steps, for a surface that
    already has something louder to say. The hue still escalates; only the fill
@@ -33,9 +42,25 @@
   background: var(--bg-sunk); border: 1px solid var(--rule);
   overflow: hidden;
 }
-.sevbar-f { position: absolute; inset: 0 auto 0 0; background: var(--text-3); }
-.sevbar[data-sev="1"] .sevbar-f { background: var(--sev-1-edge); }
-.sevbar[data-sev="2"] .sevbar-f { background: var(--sev-2-edge); }
+/* The bar's own ramp, which is NOT the chip's.
+
+   The chip's steps 1 and 2 are a hairline and a tint because they sit BEHIND
+   text and must not fight it. A bar has no text to protect, so borrowing those
+   two fills made the escalation run backwards: step 0 fell through to --text-3
+   at 3.41:1 against the track while steps 1 and 2 came in at 1.55 and 1.90, so
+   going from NO severity to step 1 made the bar 2.2x LESS visible and it did
+   not recover until step 3. That is the exact fault this scale exists to end,
+   and it was measured, not noticed.
+
+   Contrast against the track (--bg-sunk), now strictly rising:
+     step 0  --rule-firm  1.55   the quietest, correctly
+     step 1  sev-2 edge   1.90
+     step 2  clay         3.60
+     step 3  sev-3 fill   6.50
+     step 4  sev-4 fill  10.23                                              */
+.sevbar-f { position: absolute; inset: 0 auto 0 0; background: var(--rule-firm); }
+.sevbar[data-sev="1"] .sevbar-f { background: var(--sev-2-edge); }
+.sevbar[data-sev="2"] .sevbar-f { background: var(--clay); }
 .sevbar[data-sev="3"] .sevbar-f { background: var(--sev-3-bg); }
 .sevbar[data-sev="4"] .sevbar-f { background: var(--sev-4-bg); }
 /* the threshold, drawn over the fill so it is legible at every step */

@@ -839,3 +839,8 @@
   text-decoration: underline; text-underline-offset: 3px;
 }
 .lst-jump:hover { color: var(--clay); }
+
+/* The ratio, in the reading register. The wait bar above it carries the graded
+   severity channel for the same fact; drawing it twice was 20 of the 77 marks
+   on the first screen. */
+.wait-x { color: var(--text); font-weight: 600; }

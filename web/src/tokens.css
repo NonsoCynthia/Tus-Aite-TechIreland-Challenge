@@ -61,11 +61,17 @@
      NEWS2 ladder they replace, whose most severe step was LESS contrasty than
      the one below it:
 
-        step   text on its own fill     fill against the page
-        sev-1        6.27:1                   1.08:1
-        sev-2        6.67:1                   1.18:1
-        sev-3        7.04:1                   7.35:1
-        sev-4       11.07:1                  11.57:1
+        step   text on its own fill     fill against the page (--bg)
+        sev-1        5.97:1                   1.09:1
+        sev-2        6.67:1                   1.13:1
+        sev-3        7.60:1                   7.60:1
+        sev-4       11.07:1                  11.07:1
+
+     The first published version of this table measured the fill column against
+     --surface (white panels) while calling it "the page", which is --bg. It was
+     wrong by a step, and self-evidently so: sev-3 and sev-4 have --paper as
+     their fg, so text-on-fill and fill-on-page are arithmetically the SAME
+     number and cannot differ. Recomputed against --bg.
 
      One honest limitation. --sev-3's fill sits within 1.1:1 of --cat-urgent in
      LUMINANCE, because clay and the triage red are naturally close in
@@ -80,19 +86,19 @@
 
      Every use pairs the step with its number or its word. Colour is never the
      only channel. */
-  --sev-1-fg:   #545B6E;   /* noted      text 6.27  fill-vs-page  1.08  hairline */
-  --sev-1-bg:   #F7F6F2;
-  --sev-1-edge: #C9C3B7;
+  --sev-1-fg:   #545B6E;   /* noted      text 5.97  fill-vs-page  1.09  hairline */
+  --sev-1-bg:   #F5F0E6;   /* NOT --surface-2: step 1 was byte-identical to it, */
+  --sev-1-edge: #BFB6A4;   /* so it vanished the moment a row was hovered       */
 
-  --sev-2-fg:   #664C40;   /* attention  text 6.67  fill-vs-page  1.18  tinted   */
+  --sev-2-fg:   #664C40;   /* attention  text 6.67  fill-vs-page  1.13  tinted   */
   --sev-2-bg:   #F3EBE6;
   --sev-2-edge: #C9AB9B;
 
-  --sev-3-fg:   #FAFAF8;   /* high       text 7.04  fill-vs-page  7.35  SOLID    */
-  --sev-3-bg:   #6B5044;
-  --sev-3-edge: #6B5044;
+  --sev-3-fg:   #FAFAF8;   /* high       text 7.60  fill-vs-page  7.60  SOLID    */
+  --sev-3-bg:   #794235;   /* moved off #6B5044: see the colour-vision note     */
+  --sev-3-edge: #794235;
 
-  --sev-4-fg:   #FAFAF8;   /* severe     text 11.07 fill-vs-page 11.57  SOLID    */
+  --sev-4-fg:   #FAFAF8;   /* severe     text 11.07 fill-vs-page 11.07  SOLID+ring */
   --sev-4-bg:   #47352D;
   --sev-4-edge: #47352D;
 
@@ -190,7 +196,9 @@
   --sev-1-bg:   #1C2758;
   --sev-1-edge: rgba(196, 182, 166, 0.32);
 
-  --sev-2-fg:   #C9AE9F;   /* text 6.90  fill-vs-ground  1.33 */
+  /* was #C9AE9F, published as 6.90 and actually 6.47 -- which put step 2 BELOW
+     step 1 (6.56) and broke the monotonicity this whole file claims. */
+  --sev-2-fg:   #CFB6A7;   /* text 7.03  fill-vs-ground  1.33 */
   --sev-2-bg:   #3A2A2E;
   --sev-2-edge: #7A5B4D;
 
