@@ -188,6 +188,46 @@ export function App() {
   // screen of the product, so the boot screen waits for it rather than showing
   // a HIPE code that turns into a name a moment later. It settles either way:
   // isPending goes false on success AND on error.
+  // A hospital can hold NO waiting list at all and still be a real hospital: the
+  // full dataset carries six, of which two are private sites that are capacity
+  // only and carry no referrals by design. For those, /api/hospital-days returns
+  // days: [] and runnable: null, so `date` is never set -- and the guard below
+  // used to test `!date`, which meant selecting one left the boot splash on
+  // screen for ever, with "Reading the waiting lists..." under it and nothing
+  // ever arriving. The wait and the absence are now two different sentences.
+  const noDays = !!days.data && days.data.days.length === 0
+
+  if (noDays && !roster.isPending) {
+    const here = picks.find((h) => h.hipe === hospital)?.name ?? hospital
+    return (
+      <div className="boot" data-surface="dark">
+        <div className="boot-brand">
+          <img className="boot-mark" src="/brand/tus-aite-lockup-white.png" alt="Tús Áite" />
+          <span className="boot-descriptor">decision support</span>
+        </div>
+        <span>
+          <b>{here}</b> holds no waiting list on this service. Some sites carry capacity
+          only and no referrals, so there is nothing here to rank.
+        </span>
+        {picks.length > 1 && (
+          <label className="boot-pick">
+            <span className="lab">Hospital</span>
+            <select value={hospital} onChange={(e) => setHospital(e.target.value)}>
+              {picks.map((h) => <option key={h.hipe} value={h.hipe}>{h.name}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+    )
+  }
+
+  const bootSays = days.error
+    ? 'Cannot reach the service.'
+    : noDays
+      ? `${picks.find((h) => h.hipe === hospital)?.name ?? hospital} holds no waiting list on this service. `
+        + 'Some sites carry capacity only and no referrals. Choose another hospital above.'
+      : 'Reading the waiting lists…'
+
   if (!date || !days.data || roster.isPending) {
     return (
       <div className="boot" data-surface="dark">
@@ -199,7 +239,7 @@ export function App() {
           <img className="boot-mark" src="/brand/tus-aite-lockup-white.png" alt="Tús Áite" />
           <span className="boot-descriptor">decision support</span>
         </div>
-        <span>{days.error ? 'Cannot reach the service.' : 'Reading the waiting lists…'}</span>
+        <span>{bootSays}</span>
       </div>
     )
   }

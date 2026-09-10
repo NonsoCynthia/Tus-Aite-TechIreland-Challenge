@@ -100,6 +100,34 @@ breaks, no test fails, the figure on screen is simply wrong.
 | `DAILY_ROWS = 70_022` | `src/surfaces/Overview.tsx:101` | The row count of the intake file. Load a different data profile and it changes with nothing to notice |
 | The category-code to name map | `src/lib/api.ts:171-178` | Code 3 ranks above code 2, so sorting on the raw number puts Routine above Semi-Urgent. Always go through `bandOf()` |
 
+## Which slice of the data you loaded
+
+`make load` fetches the **sample** by default: 2 hospitals and 609 referrals, about 1.3 MB.
+The full set is 6 hospitals and 5,200 referrals, about 11 MB.
+
+```bash
+make load FETCH_PROFILE=full
+```
+
+The dataset track's own advice is to **use `full` for anything you show people**, because
+the sample holds only the two largest hospitals and so leaves out the contrast between a
+640-bed teaching hospital and a 110-bed district one, which is part of what the data
+exists to show. See `dataset/docs/GETTING_THE_DATA.md`.
+
+Two things to know before you switch:
+
+- **The 81 checks in `demo_path.py` are pinned to the sample's exact numbers**: 308
+  referrals, 165 with a target, 305 ranked, 7 wards, and so on. On the full set they fail
+  on the counts. That is the tripwire working as intended, not a broken system, but the
+  numbers have to be updated before the checks mean anything again.
+- **`DAILY_ROWS` in `src/surfaces/Overview.tsx:101` is the sample's row count** and is
+  typed in, so it will be quietly wrong until someone changes it.
+
+Everything else follows the data. The hospital list, the days that hold a list, the target
+days and the specialty names are all read at runtime, so six hospitals appear without any
+code change. Two of the six are private sites that carry capacity and no referrals by
+design: picking one shows a short screen saying so, rather than an empty list.
+
 ## Layout
 
 ```

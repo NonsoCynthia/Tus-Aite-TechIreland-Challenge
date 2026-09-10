@@ -21,6 +21,15 @@
    height, and the kit's floor is 13px. 40px puts it at 15.7px. */
 .boot-brand { display: grid; justify-items: center; gap: var(--d2); }
 .boot-mark { display: block; height: 40px; width: auto; }
+/* The boot screen is normally a dead end that resolves itself. It is not, for a
+   hospital that holds no waiting list: nothing is loading and nothing will
+   arrive, so that screen needs a way out of it. */
+.boot-pick { display: flex; align-items: center; gap: var(--d3); margin-top: var(--d4); }
+.boot-pick select {
+  background: var(--surface); color: var(--text); border: 1px solid var(--rule-firm);
+  border-radius: var(--radius); padding: var(--d2) var(--d3); font: inherit;
+}
+
 .boot-descriptor {
   font-family: var(--font-brand); font-size: var(--t-micro); font-weight: 300;
   letter-spacing: 0.1em; color: var(--text-2);
