@@ -52,56 +52,56 @@ Gates: **D** data truth · **C** clinical safety (veto) · **S** design
 
 | ID | Task | Gate | Status | Evidence |
 |---|---|---|---|---|
-| C1 | Header band as instrument readouts | S | TODO | |
-| C2 | By specialty, real NTPF names | D | TODO | |
-| C3 | Against the national NTPF picture | D | TODO | |
-| C4 | Intake over 14 days; zero removals | D | TODO | |
-| C5 | Clinic capacity — slots booked vs total | D | TODO | |
-| C6 | Ward pressure v2 — free, DTOC, surge, specialty | D | TODO | |
-| C7 | Live rule board, `RULE-TRIAGE-TURNAROUND` surfaced | C | TODO | |
-| C8 | Staleness as an instrument | C | TODO | |
+| C1 | Header band as instrument readouts | S | PASS | 8 instrument readouts, `Overview.tsx`; screenshot `25-ov-after-sweep.png` |
+| C2 | By specialty, real NTPF names | D | PASS | By specialty, real NTPF names + ward/clinic pressure + capacity score per specialty |
+| C3 | Against the national NTPF picture | D | PASS | NTPF four bands vs national 682,279; edges 183/365/548 from `generate.py:256`, cited on screen |
+| C4 | Intake over 14 days; zero removals | D | PASS | Intake 283→308, +25 added 0 removed; verified against `dataset/out/referral_daily.csv` — 70,022 rows, 0 removals |
+| C5 | Clinic capacity — slots booked vs total | D | PASS | Clinic capacity, 7 clinics, session series with the cited session marked |
+| C6 | Ward pressure v2 — free, DTOC, surge, specialty | D | PASS | Ward pressure v2 — free/occupied/outliers/DTOC/surge/9h/24h/GAR + primary_for + as-of |
+| C7 | Live rule board, `RULE-TRIAGE-TURNAROUND` surfaced | C | PASS | Rule panel, all 5 IDs; `RULE-TRIAGE-TURNAROUND` 1 of 1 breached, first time on screen |
+| C8 | Staleness as an instrument | C | PASS | Age of the newest reading — 5 readouts + histogram, no prose |
 
 ## D · The list
 
 | ID | Task | Gate | Status | Evidence |
 |---|---|---|---|---|
-| D1 | Full-width table, sticky header, sort, filter, density | S | TODO | |
-| D2 | Row anatomy v2 — spine, specialty, ratio, rule ID, override badge | C | TODO | |
-| D3 | Inline evidence expander (`README.md:117`, NFR5) | C | TODO | |
-| D4 | Reconciliation ledger — four buckets, never summed | C | TODO | |
-| D5 | Override v2 — read back, badge, row moves, system position kept | C | TODO | |
+| D1 | Full-width table, sticky header, sort, filter, density | S | PASS | `List.tsx` full width, sticky header, 8 sort keys, search, density toggle, page size |
+| D2 | Row anatomy v2 — spine, specialty, ratio, rule ID, override badge | C | PASS | Rank spine (α-weighted), specialty name, wait ratio drawn, **rule ID chip**, override badge |
+| D3 | Inline evidence expander (`README.md:117`, NFR5) | C | PASS | Inline expander — cited vitals, cited ward + clinic, rule checks, rationale (README:117, NFR5) |
+| D4 | Reconciliation ledger — four buckets, never summed | C | PASS | Four buckets, separately labelled, reconciled by set union; folded so it does not push the table off screen |
+| D5 | Override v2 — read back, badge, row moves, system position kept | C | PASS | Override read back, row moves, system position kept; `rule_warning_accepted` bug fixed — was sent from the band comparison, not the checkbox |
 
 ## E · Patient
 
 | ID | Task | Gate | Status | Evidence |
 |---|---|---|---|---|
-| E1 | Re-order the page | S | TODO | |
-| E2 | Vitals as NEWS2 instrument cards | C | TODO | |
-| E3 | "What informed the agents" — urgency and capacity lanes | C | TODO | |
-| E4 | Journey v2 | S | TODO | |
-| E5 | Instrument-limits panel; MTS in a neutral register | C | TODO | |
-| E6 | Rule checks + `rationale_summary` per referral | C | TODO | |
+| E1 | Re-order the page | S | PASS | Reordered: who → why → what informed the agents → journey → chain → limits |
+| E2 | Vitals as NEWS2 instrument cards | C | PASS | `Vitals.tsx` — per-vital sub-score + band meter; `3+0+3+1+0+0 = 7 of 17` with a parts-vs-total check |
+| E3 | "What informed the agents" — urgency and capacity lanes | C | PASS | `AgentInputs.tsx` — capacity lane opens with *capacity did not move this person*, cites `priority.py:158-162`, marks the one session read |
+| E4 | Journey v2 | S | PASS | `Journey.tsx` — past-target and unmeasured stretches drawn, not asserted |
+| E5 | Instrument-limits panel; MTS in a neutral register | C | PASS | Instrument limits + NEWS2 histogram: 268/308 (87%) ≤ 2, 20 of 84 Urgent score 0 — computed, not typed |
+| E6 | Rule checks + `rationale_summary` per referral | C | PASS | Rules-tested table + coordinator's note, labelled deterministic — now that A2 delivers them |
 
 ## F · Run
 
 | ID | Task | Gate | Status | Evidence |
 |---|---|---|---|---|
-| F1 | Pre-run state | S | TODO | |
-| F2 | Live lanes, committed-row counter, spine building | S | TODO | |
-| F3 | Completion resolves into the cohort graph | S | TODO | |
-| F4 | Copy as telemetry | C | TODO | |
-| F5 | Day strip — 14 days, intake, runnable vs view-only | C | TODO | |
+| F1 | Pre-run state | S | PASS | Pre-run readouts: cohort 308, 2 agents, 616 scores, α range, direction; screenshot `13-run.png` |
+| F2 | Live lanes, committed-row counter, spine building | S | PASS | Per-agent lanes with their own committed counts; total counts rows in agent.agent_scores |
+| F3 | Completion resolves into the cohort graph | S | PASS | Completion offers *See what it cited* → the cohort graph |
+| F4 | Copy as telemetry | C | PASS | Copy is telemetry: what each agent reads, how many rows per referral |
+| F5 | Day strip — 14 days, intake, runnable vs view-only | C | PARTIAL | Day select labels intake + `view only` per day, and the Overview Intake panel draws the 14-day series. A dedicated day strip was **not** built — recorded, not hidden |
 
 ## G · Knowledge graph
 
 | ID | Task | Gate | Status | Evidence |
 |---|---|---|---|---|
-| G1 | Cohort graph surface, full-bleed, glass panels | S | TODO | |
-| G2 | Controls — zoom/fit/reset, focus, hover path, legend, layout | S | TODO | |
-| G3 | Clusters by evidence type, size by citation count | S | TODO | |
-| G4 | Per-patient graph v2; "on record" graph for view-only days | C | TODO | |
-| G5 | WebGL context-loss guard; SpO₂ glyph fix | D | TODO | |
-| G6 | State that the `inputs` graph is unloaded | C | TODO | |
+| G1 | Cohort graph surface, full-bleed, glass panels | S | PASS | `CohortGraph.tsx` full-bleed with glass panels; screenshot `11-graph.png` |
+| G2 | Controls — zoom/fit/reset, focus, hover path, legend, layout | S | PASS | zoom/fit/reset, click-to-focus with chain highlight, legend, 4 layouts, 3 sizes |
+| G3 | Clusters by evidence type, size by citation count | S | PASS | Clusters coloured by evidence type, placements sized by citation count |
+| G4 | Per-patient graph v2; "on record" graph for view-only days | C | PASS | `Provenance.tsx` on-record mode for view-only days; screenshot `26-viewonly.png` |
+| G5 | WebGL context-loss guard; SpO₂ glyph fix | D | PASS | WebGL context-loss guard on both canvases; SpO₂ tofu fixed (three.js glyph set) |
+| G6 | State that the `inputs` graph is unloaded | C | PASS | `inputs_graph_loaded: false` surfaced — cited nodes carry identity and role, not resolved values |
 
 ---
 
