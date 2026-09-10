@@ -283,6 +283,24 @@ Response shape:
 }
 ```
 
+Example clinician response text:
+
+```text
+Referral PW-9001-000007 is shown for clinician review. This is decision support; clinician sign-off is required.
+The recorded urgency score is 0.225 on a 0 to 1 scale, which is in the lower range. It is supported by the cited oxygen saturation observation.
+Capacity evidence reports the relevant ward was 83.52 percent occupied, with 15 beds free; and 1800 outpatients on 2026-08-28 had 12 of 25 slots available.
+CPC/CRT evidence records the referral state was triaged from 2026-08-25 and did not record high clinical or social needs; and the applicable timeframe rule states: A semi-urgent referral should be seen within 13 weeks.
+```
+
+Example technical response text:
+
+```text
+Ranked placement. Referral PW-9001-000007. This is decision support; clinician sign-off is required.
+Urgency evidence: Score score/run-9001-rationale-001/9001/PW-9001-000007/urgency: scoreValue=0.22499999999999998, method=urgency-news2-v1, agentVersion=urgency-agent-0.1.0, cites=obs/9001/PW-9001-000007/2026-08-16%2009%3A16%3A00/spo2, prov:wasGeneratedBy=activity/run-9001-rationale-001/urgency, scored=referral/9001/PW-9001-000007.
+Capacity evidence: BedStatus bed-status/9001/W-9001-04/2026-08-30%2020%3A00%3A00: occupancyPct=83.52, surgeCapacityInUse=0, delayedTransfersOfCare=2, awaitingAdmissionOver24h=0, awaitingAdmissionOver9h=0, freeBeds=15. ClinicSession clinic-session/9001/CL-9001-1800/2026-08-28: slotsTotal=25, slotsBooked=13, slotsAvailable=12, clinicName=1800 outpatients, sessionDate=2026-08-28, sessionOf=service/9001/1800.
+CPC/CRT evidence: ReferralState referral-state/9001/PW-9001-000007/2026-08-25: triageStatus=triaged, hasHighClinicalOrSocialNeeds=false, referredToService=service/9001/1800, stateOf=referral/9001/PW-9001-000007, validFrom=2026-08-25. Rule rule/RULE-CRT-SEMI: appliesTo=triaged_semi_urgent, statement=A semi-urgent referral should be seen within 13 weeks, thresholdDays=91.
+```
+
 Stop it with:
 
 ```bash
