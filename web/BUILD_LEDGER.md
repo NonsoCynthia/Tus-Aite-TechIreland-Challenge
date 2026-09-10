@@ -202,3 +202,96 @@ constant the agent normalises against, so changing it here would desync the two.
 
 Final state: **50 planned tasks — 49 PASS, 1 PARTIAL (F5, day strip).
 42 review findings — 41 fixed, 1 upstream.** demo_path.py 71/71.
+
+---
+
+# Round 2 — the thirteen points
+
+Client feedback of 10 September. Plan at `~/.claude/plans/we-are-setting-up-noble-lighthouse.md`.
+Same rule as round 1: **PASS requires evidence** — a `file:line`, a demo-path assertion, or a
+screenshot. A claim is not evidence.
+
+## Three corrections carried into this round
+
+| | what I had been saying | what the measurement showed |
+|---|---|---|
+| 1 | flattening the triage hues off warnings was the fix | it was half a fix. Every attention state was left on a **1.55–1.75:1** hairline, and `.sub.is-over` — the class marking a referral 31× past target — **restated the base class verbatim and did nothing** |
+| 2 | older days cannot be scored because evidence is date-blind | **3,963 referral-days, zero contamination.** Not one observation post-dates its own day. What *is* date-blind is **capacity** — all 14 days are served the same 30 Aug ward snapshot — which nobody had been citing, and which makes the Overview's ward panel a false statement on 13 of 14 days |
+| 3 | point 8 looked like a stale component | **not stale.** All 30 query keys are scoped to `[hospital, date]`. `runnable` is always the newest day, so the string is accurate and merely ambiguous |
+
+## A · Severity scale
+
+| ID | Task | Status | Evidence |
+|---|---|---|---|
+| A1 | `--sev-1..4` tokens, both grounds | **PASS** | `tokens.css`. First draft was **non-monotonic** (6.27→6.16→5.86→8.90) — the same fault it replaces. Solved: text **6.27 / 6.67 / 7.04 / 11.07**, fill-vs-page **1.08 / 1.18 / 7.35 / 11.57** |
+| A2 | `lib/severity.ts` + `Severity.tsx` primitive | **PASS** | Bands chosen against observed ranges; demo_path §16 proves **every step fires** — wait ratio 35/28/43/39/20 |
+| A3 | Wait against target | TODO | |
+| A4 | Reading age | TODO | |
+| A5 | NEWS2 sub-scores, monotonic | TODO | |
+| A6 | Rule verdicts, six registers unified | TODO | |
+| A7 | Integrity alarms at sev-4 | TODO | |
+| A8 | Occupancy and clinic pressure | TODO | |
+
+## B · Icons
+
+| ID | Task | Status | Evidence |
+|---|---|---|---|
+| B1 | Adopt `--icon` / `--icon-sm` | TODO | declared in tokens.css, used nowhere |
+| B2 | One stroke per role; fix 12 unset call sites | TODO | |
+| B3 | `TriangleAlert` and `Check` to one size each | TODO | were 5 sizes / 4 strokes for 6 meanings |
+
+## C · Copy
+
+| ID | Task | Status | Evidence |
+|---|---|---|---|
+| C1 | Remove 57 em-dashes from running copy, keep 58 placeholders | TODO | |
+| C2 | Remove the synthetic-data label entirely | TODO | client instruction; **README feature 1 then needs amending** |
+| C3 | Remove "attribution, not authentication" | TODO | client instruction |
+| C4 | Cut box explainers to sources and caveats | TODO | |
+
+## D · Before/after
+
+| ID | Task | Status | Evidence |
+|---|---|---|---|
+| D1 | Pre-ranking view on unscored days | TODO | confirmed available for 2026-08-20: 285 referrals, 123 breached of 156 |
+| D2 | **Ward and clinic panels carry their true snapshot date** | TODO | **data-truth fix**; demo_path §17 pins why it is needed |
+| D3 | "Check for new data" wired | TODO | `refreshDays` exists and **no component has ever called it** |
+| D4 | Point 8's wording | TODO | |
+| D5 | Run overlay states what changes | TODO | |
+
+## E · Layout
+
+| ID | Task | Status | Evidence |
+|---|---|---|---|
+| E1 | `min-width` above the 1154px of fixed columns | TODO | **the cause of point 13**: Referral gets 0px between 1440 and 1656 |
+| E2 | Compact rule for `.pw-line` | TODO | 8 planted rows run 47px in a 36px row |
+| E3 | `.rulez` must not silently clip a rule | TODO | |
+| E4 | Intake chart overflow | TODO | 3.8px per column at 60 days |
+| E5 | Ward table "Also backs" must wrap | TODO | inherits `nowrap` via `.c-dim` |
+| E6 | Bound the rule board and sparkline | TODO | |
+| E7 | Override log: cap, page, sticky header | TODO | 200 rows ≈ 11,000px, no sticky header |
+
+## F · Brand
+
+| ID | Task | Status | Evidence |
+|---|---|---|---|
+| F1 | Full-width rail above the kit's 13px cap floor | TODO | cap height is **8.7px**, 33% under; stems resample to **0.39px** |
+| F2 | Collapsed rail uses the mark SVG | TODO | image is 68px wide in a 48px box, overflows by 20px |
+
+## G · Correctness
+
+| ID | Task | Status | Evidence |
+|---|---|---|---|
+| G1 | Tied priority shows what separates | TODO | **12 adjacent pairs** print identical 3dp values then say "decides it" |
+| G2 | "What separates this from the one above" on the page | TODO | client point 12 |
+| G3 | KG context-lost: deps, latch, isConnected, z-index | TODO | client-reported; mechanism confirmed |
+| G4 | An untested rule must not render "holds" | TODO | renders green "0 tested · holds" |
+| G5 | Whole-list verdicts keyed by rule ID | TODO | a third rule takes RULE-TIEBREAK's verdict |
+
+## Verification added this round
+
+- **demo_path §16** — every severity step fires on real data; NEWS2 total is still too degenerate
+  to grade on (148 of 308 tie at 0)
+- **demo_path §17** — capacity evidence is date-blind, so it may never be labelled as the
+  selected day's. Pins the fact that makes D2 necessary
+- **81 passed, 0 failed** (was 71)

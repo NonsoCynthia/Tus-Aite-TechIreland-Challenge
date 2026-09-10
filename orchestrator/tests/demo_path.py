@@ -268,6 +268,68 @@ check("the orchestrator says which hospital-days it holds", len(held) > 0)
 check("this hospital-day is one of them",
       any(x["hospital_hipe"] == HOSP and x["as_of_date"] == DATE for x in held))
 
+print("\n16. the severity scale still discriminates on this data")
+# web/src/lib/severity.ts picked its band boundaries against the ranges below.
+# If the data moves far enough that a step stops firing, the scale has gone
+# stale and a whole class of "this needs attention" silently reads as calm.
+# Mirrored here rather than imported because that module is TypeScript.
+def _sev_wait(r):
+    if r is None or r <= 1: return 0
+    return 1 if r < 2 else 2 if r < 5 else 3 if r < 10 else 4
+def _sev_age(d):
+    if d is None: return 0
+    return 0 if d < 90 else 1 if d < 365 else 3 if d < 730 else 4
+def _sev_occ(p):
+    return 0 if p < 85 else 1 if p < 95 else 3 if p < 100 else 4
+def _sev_booked(b):
+    return 0 if b < 0.75 else 1 if b < 0.9 else 3 if b < 1 else 4
+
+ratios = [r["adjusted_wait_days"] / r["crt_threshold_days"]
+          for r in rows if r.get("crt_threshold_days")]
+ages = [c["reading_age_days"] for c in ops["clinical"].values()
+        if c.get("reading_age_days") is not None]
+occs = [w["occupancy_pct"] for w in ops["wards"]]
+booked = [c["cited_pressure"] for c in ops["clinics"]]
+
+check("wait ratio still spans the scale", ratios and max(ratios) >= 10,
+      f"max {max(ratios):.1f}x -- sev-4 needs 10x+")
+check("every wait-ratio step fires", {_sev_wait(r) for r in ratios} == {0, 1, 2, 3, 4},
+      f"fired {sorted({_sev_wait(r) for r in ratios})}")
+check("reading age still spans the scale", ages and max(ages) >= 730,
+      f"max {max(ages)}d -- sev-4 needs 730d+")
+# sevReadingAge deliberately skips step 2 so that "over two years" is unmistakable
+check("every reading-age step fires", {_sev_age(a) for a in ages} == {0, 1, 3, 4},
+      f"fired {sorted({_sev_age(a) for a in ages})}")
+check("occupancy crosses the 85% line and reaches 100",
+      any(o >= 85 for o in occs) and any(o >= 100 for o in occs))
+check("clinic booked reaches full", any(b >= 1 for b in booked))
+# a scale driven off these would be flat, which is why severity.ts refuses them
+n2_totals = [c["news2"] for c in ops["clinical"].values() if c.get("news2") is not None]
+zeros = sum(1 for n in n2_totals if n == 0)
+check("NEWS2 total is still too degenerate to drive a scale", zeros > len(n2_totals) / 3,
+      f"{zeros} of {len(n2_totals)} score exactly 0 -- do not grade on the total")
+
+print("\n17. capacity evidence is date-blind, so it must never be labelled as the day's")
+# core.bed_status and core.clinic_sessions are fetched upstream with
+# ORDER BY ... DESC LIMIT n and no date predicate, so EVERY hospital-day is
+# served the same newest snapshot. The UI has to say so; this pins the fact
+# that makes that necessary. If it ever becomes false, the caveat can come off.
+older = [d["date"] for d in get(f"/api/hospital-days/{HOSP}")["days"] if d["date"] != DATE]
+if older:
+    probe = older[len(older) // 2]
+    old_ops = get(f"/api/operations/{HOSP}/{probe}")
+    same_ward = old_ops["wards"][0]["snapshot"] == ops["wards"][0]["snapshot"]
+    check("an older day is served the newest ward snapshot", same_ward,
+          f"{probe} -> {old_ops['wards'][0]['snapshot']}")
+    check("that snapshot post-dates the day it is served for",
+          old_ops["wards"][0]["snapshot"][:10] > probe,
+          f"snapshot {old_ops['wards'][0]['snapshot'][:10]} vs as-of {probe}")
+    # the cohort itself IS correctly date-scoped, which is why the day is
+    # readable at all -- only the capacity half is blind
+    check("the cohort for that day is genuinely that day's",
+          len(get(f"/api/cohort/{HOSP}/{probe}")["referrals"]) != len(rows),
+          "an older day should hold fewer referrals than the newest")
+
 print(f"\n{'=' * 62}\n  {len(ok)} passed, {len(failed)} failed")
 if failed:
     print("  FAILED: " + "; ".join(failed))
