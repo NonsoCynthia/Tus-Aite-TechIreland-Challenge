@@ -27,6 +27,12 @@ the track name matters as much as the number.
 
 ## Get it running
 
+Before any of this you need three things: Docker running, a copy of `.env` made from
+`.env.example`, and access to the dataset. The data is **gated**: the page is public but
+the files are not, and Thabang approves each person by hand, in a browser. There is no way
+to request it from a script, and a rejected request is final. Ask first if you are unsure.
+`dataset/docs/GETTING_THE_DATA.md` walks through it.
+
 ```bash
 # 1. From the repo root, not from web/. This starts the database, pgadmin,
 #    Oxigraph and retrieval. It does NOT start the interface. There is no
