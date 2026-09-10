@@ -23,3 +23,6 @@ node_modules/
 web/dist/
 **/dist/
 .playwright-mcp/
+# tsc --build writes this on every compile, so a tracked copy shows up as a
+# modification in every status and every diff for a file nobody reads.
+*.tsbuildinfo
