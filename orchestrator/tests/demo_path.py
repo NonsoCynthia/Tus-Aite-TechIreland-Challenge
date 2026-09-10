@@ -131,15 +131,27 @@ check("capacity cites bed status and clinic", len(star.get("capacity", {}).get("
 
 print("\n9. the override path")
 p = d["rankings"][0]
+ovr_id = f"ovr-demo-check-{int(time.time())}"
 res = post("/api/overrides", {
-    "override_id": f"ovr-demo-check-{int(time.time())}",
+    "override_id": ovr_id,
     "decision_id": d["decision_id"], "hospital_hipe": HOSP,
     "pathway_number": p["pathway_number"], "clinician_id": "demo-path-check",
     "from_position": p["position"], "to_position": p["position"],
     "reason": "ACCEPTED: position confirmed by the demo-path check",
     "rule_warning_accepted": False,
 })
-check("override accepted and recorded", res.get("status") in ("ok", None) or True)
+# `or True` used to make this unconditionally pass -- 1 of the 81 checks
+# asserted nothing at all. post() raises on any non-2xx, so a failed write
+# already crashed the script; what was never asserted is what the response
+# SAYS. retrieval returns {"status": "ok"} on the happy path and 207 with
+# "postgres_committed_graph_projection_failed" when the row committed but the
+# graph projection did not -- both are accepted here, because the override IS
+# recorded in Postgres in both cases and section 14 reads it back from there.
+# A silent shape change is now a failure rather than a pass.
+check("override accepted and recorded",
+      isinstance(res, dict) and res.get("status") in (
+          "ok", "postgres_committed_graph_projection_failed"),
+      f"POST /api/overrides returned {res!r}")
 
 print("\n10. the reference layer (A5) -- nothing about it may be hardcoded")
 ref = get("/api/reference")
