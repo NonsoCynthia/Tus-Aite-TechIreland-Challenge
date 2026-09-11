@@ -80,6 +80,7 @@ def _wrap_wait_counters_query(referral_iri: str, as_of_date: date) -> str:
 
 @router.get(
     "/referrals/{hospital_hipe}/{pathway_number}/wait-counters",
+    response_model=None,
     summary="Get the four wait-time counters for one referral",
     description=(
         "Wraps `kg/queries/wait_counters.rq` unmodified -- the one shared fragment every agent and "
@@ -117,6 +118,7 @@ async def wait_counters(
 
 @router.get(
     "/referrals/{hospital_hipe}/{pathway_number}/context",
+    response_model=None,
     summary="Get everything needed to judge one referral (agent input)",
     description=(
         "Built for the urgency/capacity agents (spec.md FR9, added by user request after "
@@ -143,6 +145,7 @@ async def referral_context(hospital_hipe: str, pathway_number: str) -> dict[str,
 
 @router.get(
     "/hospitals/{hospital_hipe}/cohort/{as_of_date}",
+    response_model=None,
     summary="Get the coordinator's cohort for one hospital-day (agent input)",
     description=(
         "Built for the coordinating agent (spec.md FR10, added by user request): which "
@@ -173,6 +176,7 @@ async def cohort(hospital_hipe: str, as_of_date: date) -> dict[str, Any]:
 
 @router.get(
     "/runs/{run_id}/hospitals/{hospital_hipe}/scores",
+    response_model=None,
     summary="Get already-written agent scores for one run (agent input)",
     description=(
         "Built for the coordinating agent (spec.md FR10, added by user request): the urgency "
@@ -256,6 +260,7 @@ async def _evidence_for_placement(
 
 @router.get(
     "/evidence/{hospital_hipe}/{as_of_date}/{pathway_number}",
+    response_model=None,
     summary="Get one ranked position's cited evidence, resolved",
     description=(
         "Every citation the coordinator recorded for this placement (via `POST /decisions`), "
@@ -285,6 +290,7 @@ async def evidence_for_placement(
 
 @router.get(
     "/decisions/{hospital_hipe}/{as_of_date}",
+    response_model=None,
     summary="Get one hospital-day's ranked list, with resolved evidence",
     description=(
         "The audit trail, made queryable: reconstructs the full decision -- every ranked "
