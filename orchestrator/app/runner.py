@@ -29,10 +29,12 @@ def _now() -> str:
 
 
 def coerce_scores(scores: dict) -> int:
-    """retrieval serialises numeric(4,3) as a JSON string; rank_cohort sums them.
+    """Belt and braces: rank_cohort sums these, and a string operand raises.
 
-    Without this, rank_cohort raises TypeError: unsupported operand type(s) for
-    +: 'int' and 'str'. Returns how many were coerced, for the log.
+    retrieval served numeric(4,3) as a JSON string until it set
+    response_model=None on its GET routes, so this now coerces nothing and logs
+    0. Kept because the cost is one isinstance per score and the failure it
+    guards is a TypeError mid-run. Returns how many were coerced, for the log.
     """
     n = 0
     for pathway in scores.values():
