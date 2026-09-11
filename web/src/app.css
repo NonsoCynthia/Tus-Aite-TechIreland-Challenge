@@ -3,14 +3,16 @@
 /* --- the shell: rail plus content, side by side, filling the viewport. The rail
    is the fixed column; the content area takes whatever is left. */
 .app {
-  min-height: 100%;
+  /* The shell is the scrollport: html/body are pinned to the viewport, so this
+     scrolls and the scrollable extent is exactly the content. */
+  height: 100%; overflow-y: auto;
   display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr);
 }
 .main { display: flex; flex-direction: column; min-width: 0; }
 .content { flex: 1 1 auto; min-width: 0; }
 
 .boot {
-  height: 100%; display: flex; flex-direction: column;
+  min-height: 100vh; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: var(--d4);
   background: var(--bg); color: var(--text-2); font-size: var(--t-small);
 }

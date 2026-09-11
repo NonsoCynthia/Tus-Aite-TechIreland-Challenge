@@ -170,7 +170,20 @@
 
 /* --- base ---------------------------------------------------------------- */
 * { box-sizing: border-box; }
-html, body, #root { height: 100%; }
+/* min-height, not height. `height: 100%` pinned this chain to exactly the
+   viewport, so a taller .app overflowed a fixed-height body and the document
+   scrolled further than any content existed: at 1440x900 the shell was 1333px
+   and the page scrolled 1766, leaving 433px of empty white below the rail.
+   vh rather than % because a percentage min-height needs a definite parent
+   height to resolve against, which is the thing being removed. */
+/* The SHELL owns the scrollport, not the document. With the document scrolling,
+   a taller-than-viewport screen left dead space below the app: at 1440x900 the
+   list's shell was 1395px and the page scrolled to 1828, so the last 433px were
+   empty ground under the rail. Pinning html/body to the viewport and giving
+   .app the overflow means the scrollable extent IS the content. The sticky rail
+   and top bar stick to .app's scrollport instead of the document's, which is
+   the same behaviour from the reader's side. */
+html, body, #root { height: 100%; min-height: 0; overflow: hidden; }
 body {
   margin: 0;
   background: var(--bg);
