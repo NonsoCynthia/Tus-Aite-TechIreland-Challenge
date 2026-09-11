@@ -4,26 +4,12 @@ import { Mark } from '../components/Mark'
 
 const fmt = (n: number) => n.toLocaleString('en-IE')
 
-/** The opener.
+/** The opener. Both figures are counted from the live cohort.
  *
- *  An empty waiting room. A row of chairs IS a waiting list, which is also what
- *  the mark draws, so the photograph and the logo are saying the same thing
- *  before a single number appears.
- *
- *  Both figures are counted from the live cohort, not written down.
- *
- *  WORDING. The photograph is documentary -- a real waiting room, real people's
- *  chairs -- and it lends whatever sits over it the authority of a photograph.
- *  "308 people are waiting" therefore read as a headcount of that room, and
- *  this screen is in no position to assert one: it can see a list, not a
- *  population. It says what it can actually see instead. A referral is a row on
- *  this list; the count of rows is a fact about the list, and the sentence now
- *  claims exactly that and no more.
- *
- *  This is NOT a hedge and must not become one. The synthetic-data label was
- *  removed at the client's explicit instruction and does not come back, and no
- *  disclaimer replaces it. The fix is in the noun, which costs the screen
- *  nothing: the number is as large, as immediate and as true as it was.
+ *  WORDING TRAP: this screen sees a LIST, not a population, so the lead counts
+ *  rows -- "referrals are on this list" -- and must never become "people are
+ *  waiting". Not a hedge: no disclaimer, and the synthetic-data label was
+ *  removed at the client's instruction and does not come back.
  */
 export function Landing({ hospital, date, name, hospitals, onHospital, onEnter }: {
   hospital: string; date: string; name: string
@@ -67,9 +53,8 @@ export function Landing({ hospital, date, name, hospitals, onHospital, onEnter }
           evidence it used.
         </p>
 
-        {/* The selector belongs here, not only behind the door: the two
-            figures above are counted from whichever hospital is chosen, and
-            with no control on this screen they always read 9001. */}
+        {/* The selector stays on this screen: the two figures above are
+            counted from whichever hospital is chosen. */}
         <div className="landing-pick">
           <label className="landing-sel">
             <span className="lab">Hospital</span>

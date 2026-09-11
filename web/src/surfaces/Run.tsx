@@ -18,12 +18,9 @@ const SIGNAL = 2.25
 
 /** The state the run is about to change, counted from the cohort itself.
  *
- *  Two things it will not do. It will not call 143 of 308 late: Routine and
- *  Uncategorised have no target at all, so a breach count is of the 165 that
- *  HAVE one and never of the whole cohort. And it reads no threshold from this
- *  file: the authoritative CRT days are core.ref_codes via crtDays(reference,
- *  cpc), with the cohort row's own copy only as a fallback for the first paint.
- */
+ *  A breach count is of the referrals that HAVE a target, never of the whole
+ *  cohort: Routine and Uncategorised have none. Thresholds come from
+ *  core.ref_codes via crtDays(), never from this file. */
 function cohortBefore(rows: CohortReferral[], ref: Reference | undefined) {
   let withTarget = 0, past = 0, worst = 0, longest = 0
   for (const r of rows) {
@@ -61,23 +58,16 @@ const AGENTS = [
 
 /** The run, as an overlay rather than a destination.
  *
- *  It used to be a nav item -- a verb sitting between two nouns -- on a page
- *  that was 80% empty until someone pressed the one button on it. Running is an
- *  action, so it is a top-bar CTA that opens this, and the surface it resolves
- *  into is the graph it just built.
- *
  *  The bar counts rows committed to agent.agent_scores, polled from the same
- *  endpoint the coordinator reads. It cannot advance unless work happened, and
- *  it never interpolates between polls: it steps when data arrives.
- */
+ *  endpoint the coordinator reads. It never interpolates between polls, so it
+ *  cannot advance unless work happened. */
 export function Run({ hospital, name, date, runnable, onClose, onSeeGraph, onSeeList }: {
   hospital: string; name: string; date: string; runnable: string | null
   onClose: () => void; onSeeGraph: () => void; onSeeList: () => void
 }) {
-  // Evidence is date-blind: GET /referrals/{h}/{pw}/context takes no date and
-  // returns the most recent observation whichever day is asked about. Scoring
-  // an older day would cite readings taken after it, so only the newest day
-  // holding data can honestly be ranked.
+  // Evidence is date-blind: /referrals/{h}/{pw}/context takes no date and returns
+  // the newest observation, so scoring an older day would cite readings taken
+  // after it. Only the newest day holding data can be ranked.
   const rankable = runnable == null || date === runnable
   const [run, setRun] = useState<RunT | null>(null)
   const [busy, setBusy] = useState(false)
@@ -166,14 +156,9 @@ export function Run({ hospital, name, date, runnable, onClose, onSeeGraph, onSee
           </div>
         ) : (
           <>
-            {/* D1/D5. The overlay used to say what the run would DO. What a
-                reader needs first is what it will CHANGE, so the cohort that
-                exists right now is stated on the left and what will be true of
-                it on the right. Every figure on the left is counted from the
-                cohort payload on screen; nothing on it is written down.
-
-                It leaves when the run starts, because from that moment the
-                lanes are the answer to the same question. */}
+            {/* What the run will CHANGE: the cohort as it stands on the left,
+                what will be true of it on the right. Every figure on the left is
+                counted from the cohort payload. It leaves once the run starts. */}
             <AnimatePresence initial={false}>
               {!run && (
                 <motion.div className="run-ba" key="ba"
@@ -191,22 +176,10 @@ export function Run({ hospital, name, date, runnable, onClose, onSeeGraph, onSee
                       </ul>
                     ) : (
                       <ul className="run-ba-l">
-                        {/* NOT "N people are waiting".
-                            This screen can see a LIST, not a population. Every
-                            figure in this panel is counted from the cohort
-                            payload, which is a set of referral rows: the count
-                            of rows is a fact about the list, and a headcount of
-                            a waiting room is a claim about people that nothing
-                            on this screen is in a position to make. Landing.tsx
-                            made this correction in these words about this same
-                            cohort, so the two screens say the same thing about
-                            the same rows.
-
-                            It is NOT a hedge and must not become one: the count
-                            is as large, as immediate and as true as it was, and
-                            no disclaimer and no synthetic-data label goes near
-                            it. The fix is in the noun, which costs the screen
-                            nothing. */}
+                        {/* NOT "N people are waiting": this screen sees a LIST
+                            of referral rows, not a population. Same wording as
+                            Landing.tsx about the same cohort. Not a hedge -- no
+                            disclaimer, no synthetic-data label. */}
                         <li>
                           <b className="num">{fmt(before.n)}</b> referrals are on this list. The
                           longest has waited <b className="num">{fmt(before.longest)}</b> days.
@@ -282,12 +255,10 @@ export function Run({ hospital, name, date, runnable, onClose, onSeeGraph, onSee
               {AGENTS.map((p, i) => {
                 const state = done || phaseIdx > i ? 'done' : phaseIdx === i ? 'live' : 'todo'
                 const c = committed(p.key)
-                // Capacity scores everyone. Urgency refuses paediatric
-                // specialties, and the coordinator can only place what urgency
-                // scored -- so those two lanes can never reach the cohort size,
-                // and a bar that stops at 99% with no explanation reads as a
-                // stall. The refusal count is only known once the run reports
-                // it, so until then the denominator is the cohort.
+                // Capacity scores everyone; urgency refuses paediatric specialties
+                // and the coordinator places only what urgency scored, so those two
+                // lanes can never reach the cohort size. The refusal count arrives
+                // with the run, so until then the denominator is the cohort.
                 const refused = run?.refused_paediatric ?? 0
                 const denom = p.key === 'scoring_capacity' ? n : Math.max(1, n - refused)
                 return (
@@ -356,8 +327,7 @@ export function Run({ hospital, name, date, runnable, onClose, onSeeGraph, onSee
                     own category, past target first, each carrying what it cited.
                   </p>
                 )}
-                {/* The count is the "outside" readout directly above; printing it
-                    again here was the same figure twice in two inches. */}
+                {/* No count here: the "outside" readout above is it. */}
                 <p className="run-done-p measure">
                   NEWS2 is validated in adults, so the agent refuses paediatric referrals rather
                   than scoring a child on an adult scale: a coverage statement, not a low

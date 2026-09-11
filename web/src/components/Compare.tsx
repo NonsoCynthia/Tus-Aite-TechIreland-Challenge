@@ -4,19 +4,15 @@ import { sevBreach, type Sev } from '../lib/severity'
 import { SevChip } from './Severity'
 import type { Decision, Ranking } from '../lib/types'
 
-/** Why A is ahead of B, resolved step by step.
- *
- *  This is the only surface that answers the question the whole project is
- *  built on: among two people a clinician marked equally urgent, why is this
- *  one first? The ladder is the coordinator's real sort key, in order:
+/** Why A is ahead of B, resolved step by step. The ladder is the coordinator's
+ *  real sort key, in order:
  *
  *      1  clinical category      a hard boundary; no score crosses it
  *      2  past target or not     a tier, decided before any score
  *      3  priority               alpha*urgency + (1-alpha)*wait-percentile
  *      4  referral date          oldest first, when priority ties
  *
- *  It stops at the first step that separates them and says which one did it.
- */
+ *  It stops at the first step that separates them and says which one did it. */
 const n3 = (x: number) => x.toFixed(3)
 const fmt = (x: number) => x.toLocaleString('en-IE')
 
@@ -54,31 +50,22 @@ export interface Margin {
   /** The term whose sign matches the gap: the one left standing. */
   carrier: 'urgency' | 'wait' | 'both'
   /** The two terms pull opposite ways, so the margin is only what did not
-   *  cancel. Twelve of the adjacent in-band pairs in this hospital-day are of
-   *  this shape, and it is the whole reason two "identical" numbers are not. */
+   *  cancel -- the reason two "identical" numbers are not. */
   offsetting: boolean
-  /** These two print the SAME string at 3 d.p. Only then may the copy say so:
-   *  a gap of 0.0012 also needs a fourth decimal to carry two significant
-   *  figures, and those two priorities were never identical on screen. */
+  /** These two print the SAME string at 3 d.p. Only then may the copy say so: a
+   *  gap of 0.0012 also needs a fourth decimal, but was never a tie on screen. */
   tiedAtDisplay: boolean
 }
 
 /** Where a priority difference actually comes from.
  *
- *  The ladder used to print both priorities at 3 d.p. and then label one of them
- *  "decides it". On this hospital-day that puts two IDENTICAL numbers under that
- *  label on 12 adjacent in-band pairs: positions 18 and 19 are 0.282693 and
- *  0.282539, and both print 0.283. The reader is shown a = b and told a > b,
- *  which is the client's point 12 word for word.
- *
- *  The cause is worth stating rather than hiding behind more decimals. On those
- *  pairs the two terms pull in OPPOSITE directions and very nearly cancel: at
- *  18/19 one is 0.061 more unwell and the other waited 0.061 longer, and the
- *  0.00015 left over is the whole margin. So the precision is widened only where
- *  the values really differ, and the term that survives the cancellation is
- *  named. Sixteen further pairs tie EXACTLY and fall through to referral date;
- *  those are untouched and still read as identical.
- */
+ *  On adjacent in-band pairs the two terms routinely pull in OPPOSITE directions
+ *  and all but cancel -- one side 0.061 more unwell, the other 0.061 longer
+ *  waited, and the 0.00015 left over is the whole margin. Printing both at 3
+ *  d.p. and labelling one "decides it" shows the reader a = b and tells them
+ *  a > b. So precision is widened only where the values really differ, and the
+ *  term that survives the cancellation is named. Exact ties fall through to
+ *  referral date and still read as identical. See BUILD_LEDGER.md. */
 export function margin(a: Ranking, b: Ranking, alpha: number): Margin {
   const du = alpha * (a.urgency_score - b.urgency_score)
   const dw = (1 - alpha) * (a.wait_normalised - b.wait_normalised)
@@ -161,18 +148,10 @@ function priorityNote(m: Margin): string {
   return `${same}The margin is ${gap}, carried by ${TERM[m.carrier]}.`
 }
 
-/** What separates two adjacent people, stated ON the page.
- *
- *  The client's point 12: "your why on single view of patient just doesn't carry
- *  any explanation. It just says both are the same, but why is the other top
- *  then or below? What key differences?" That was true for two reasons. The
- *  explanation lived behind a "why?" click on a neighbour row, so the page as
- *  read said nothing at all; and when it was opened it printed two numbers
- *  rounded to the same 3 d.p. and called one of them the decider.
- *
- *  This is the one-line answer, inline, between the two rows it is about. The
- *  full ladder stays behind the click.
- */
+/** What separates two adjacent people, stated ON the page: the one-line answer,
+ *  inline, between the two rows it is about. Behind a click alone, the page as
+ *  read said nothing about why either was where it was. The full ladder stays
+ *  behind the click. See BUILD_LEDGER.md. */
 export function WhatSeparates({ a, b, alpha }: { a: Ranking; b: Ranking; alpha: number }) {
   const steps = ladder(a, b, alpha)
   const by = steps.find((s) => s.decided)
@@ -185,12 +164,9 @@ export function WhatSeparates({ a, b, alpha }: { a: Ranking; b: Ranking; alpha: 
     body = <><strong>the clinical category</strong>: {by.a.text} against {by.b.text}. A hard
       boundary, decided before any score.</>
   } else if (by.rule === 'Past their target') {
-    // Read the side off the FACT, never off the rendered cell text. The cells
-    // say 'past target' / 'within target' / 'no target' (tier(), above) and
-    // never 'yes', so a text test here is always false and always names the
-    // wrong person: this step is only reached when exactly one of the two is
-    // breached, and the caller passes the higher-ranked side as `a`, which is
-    // by construction the breached one.
+    // Read the side off the FACT, never off the rendered cell text: tier()
+    // renders 'past target' / 'within target' / 'no target' and never 'yes', so
+    // a text test here is always false and always names the wrong person.
     const past = a.crt_breached === true ? a : b
     const within = past === a ? b : a
     body = <><strong>the target</strong>: <span className="num">{past.pathway_number}</span> is
@@ -232,12 +208,10 @@ export function WhatSeparates({ a, b, alpha }: { a: Ranking; b: Ranking; alpha: 
 
 export function Compare({ a, b, decision, ages, onClose }: {
   a: Ranking; b: Ranking; decision: Decision
-  /** Each side's reading age in days, keyed by pathway.
-   *
-   *  Without it this panel presented "how unwell: 0.812 vs 0.406" in the present
-   *  tense for two people whose single readings can be 12 and 800 days old, and
-   *  concluded "NEWS2 separates them". Ages in this cohort run to 871 days, so
-   *  equal-looking evidence is routinely nothing of the kind. */
+  /** Each side's reading age in days, keyed by pathway. Without it the panel
+   *  states "how unwell" in the present tense for two people whose single
+   *  readings can be 12 and 800 days old, so equal-looking evidence is routinely
+   *  nothing of the kind. */
   ages?: Record<string, number | null>
   onClose: () => void
 }) {

@@ -8,47 +8,20 @@ import type { Observation } from '../lib/types'
 /** What actually reached each agent, and (for capacity) what it could not do
  *  with it.
  *
- *  Two lanes, because two agents ran and they read different worlds. The
- *  urgency agent read six numbers about ONE person. The capacity agent read a
- *  ward snapshot and a clinic session about a whole SPECIALTY, and its score is
- *  the same for everybody in that specialty.
+ *  Capacity is a property of the SPECIALTY, never of the person: the score is
+ *  shared by every peer in it, and priority never reads it
+ *  (coordinator/app/priority.py:158-162). The guard saying so is drawn before
+ *  the ward figures, never after.
  *
- *  The most serious error this page could make is letting the capacity figures
- *  read as a statement about the individual, so the lane opens with the
- *  arithmetic that rules it out: the score is shared by every peer in the
- *  specialty and priority never reads it at all
- *  (coordinator/app/priority.py:158-162). The ward is drawn after that, never
- *  before.
+ *  WHAT WAS READ IS A CITATION, NEVER A GUESS, AND IT CARRIES ITS DATE. The
+ *  evidence is served date-blind, so on any day but 2026-08-30 these figures are
+ *  dated FORWARD of the day selected (CapacityAsOf). Never substitute the newest
+ *  session for a missing citation -- these four states stay apart:
  *
- *  WHAT WAS READ IS A CITATION, NEVER A GUESS -- AND IT CARRIES ITS DATE.
- *
- *  The capacity evidence is served date-blind: core.bed_status and
- *  core.clinic_sessions are read latest-first with no date predicate, so all 14
- *  hospital-days get the SAME 2026-08-30 ward snapshot and the same clinic
- *  series ending 2026-08-28. On any day but 2026-08-30 the figures in this lane
- *  are therefore dated FORWARD of the day selected, and they used to print
- *  undated. CapacityAsOf says so now, in the Overview's own words.
- *
- *  `citedSession ?? newest` used to stand where readDate is computed. With no
- *  citation to hand it substituted the newest session in the series, and the
- *  page then drew "read by the agent" against that row and stated underneath
- *  that "One session was read. The other 4 were not scored." On 13 of the 14
- *  hospital-days nothing has run at all -- /api/decision 404s there, which is
- *  NORMAL, and no score and no citation reach this component -- so the page
- *  asserted that an agent read a clinic session on a day no agent ran, and
- *  named a specific row as the one it read.
- *
- *  There is no fallback now. A row is marked read only when a citation names
- *  it, and the four states are told apart rather than collapsed:
- *
- *    a citation names a row in the series   that row was read, the others were not
- *    a citation names a row NOT in it       the citation is stated, no row is marked
- *    a score, but no citation of that kind  which row it read is not on the record
- *    no capacity score for this referral    nothing read anything; this is context
- *
- *  The same rule governs the ward tag: "not the cited snapshot" says another
- *  snapshot WAS cited, which is a claim of its own, so it is not printed on a
- *  day when nothing cited anything.
+ *    citation names a row in the series   that row was read, the others not
+ *    citation names a row NOT in it       the citation is stated, no row marked
+ *    a score, no citation of that kind    which row it read is not on record
+ *    no capacity score for this referral  nothing read anything; this is context
  */
 
 export interface BedStatus {
@@ -67,12 +40,10 @@ export interface CapacityWard {
   ward_id: string
   is_primary: boolean
   /** THIS SPECIALTY'S ALLOCATION to the ward -- NOT the ward's bed
-   *  establishment. A /context row carries one specialty, so the 92-bed
-   *  W-9001-02 reports 45 here. /operations sums every specialty's allocation
-   *  and calls THAT `nominal_beds` (lib/api.ts:47-50: "which is why a 92-bed
-   *  ward used to report 45"); this field is one term of that sum. It is never
-   *  the ward's size and never the denominator of occupancy_pct, so it is drawn
-   *  as an allocation or it is not drawn. */
+   *  establishment, and never the denominator of occupancy_pct. A /context row
+   *  carries one specialty, so the 92-bed W-9001-02 reports 45 here;
+   *  /operations sums every specialty's allocation and calls THAT
+   *  `nominal_beds` (lib/api.ts:47-50). Draw it as an allocation or not at all. */
   nominal_beds: number | null
   latest_bed_status: BedStatus | null
 }
@@ -84,9 +55,8 @@ export interface ClinicSession {
   slots_booked: number
   slots_available: number
 }
-/** `capacity` on GET /context is typed `unknown` in lib/types.ts and is not
- *  mine to widen, so the shape the endpoint really returns is declared here and
- *  narrowed once, in Patient.tsx. */
+/** `capacity` on GET /context is typed `unknown` in lib/types.ts, so the shape
+ *  the endpoint really returns is declared here and narrowed in Patient.tsx. */
 export interface CapacityContext {
   specialty_hipe: string | null
   wards: CapacityWard[]
@@ -96,10 +66,9 @@ export interface CapacityContext {
 const GAR_WORD = { G: 'Green', A: 'Amber', R: 'Red' } as const
 const GAR_WEIGHT = { G: 1, A: 2, R: 3 } as const
 
-/** --icon and --icon-sm from tokens.css. lucide sizes in JS rather than in CSS,
- *  so the two steps live here as numbers; STROKE is passed on every icon in this
- *  file because lucide's default of 2 renders heavier than the 1.75 hairline
- *  chrome beside it. */
+/** --icon and --icon-sm from tokens.css; lucide sizes in JS, so the two steps
+ *  live here as numbers. STROKE is passed on every icon in this file: lucide's
+ *  default of 2 renders heavier than the 1.75 hairline chrome beside it. */
 const ICON_PX = 16
 const ICON_SM_PX = 14
 const STROKE = 1.75
@@ -119,11 +88,9 @@ const stamp = (s: string | null) =>
  *  surfaces print one date one way. */
 const longDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })
-/** The calendar day a timestamp falls on, as the API writes dates -- and null
- *  when it does not write one. Overview.tsx:138 can slice the same ten
- *  characters unguarded because /operations types its snapshot non-null; here
- *  `snapshot_datetime` is nullable, and slicing anything else would manufacture
- *  a "day" to compare the selected date against, which is a guess. */
+/** The calendar day a timestamp falls on, and null when there is not one.
+ *  `snapshot_datetime` is nullable here, and slicing anything else would
+ *  manufacture a "day" to compare the selected date against. */
 const DAY_RE = /^\d{4}-\d{2}-\d{2}(?:$|[T ])/
 const dayOf = (s: string | null | undefined): string | null =>
   s != null && DAY_RE.test(s) ? s.slice(0, 10) : null
@@ -153,10 +120,9 @@ export function AgentInputs({
   /** How many referrals carry this exact capacity score, and how many are in
    *  this specialty. Counted from the decision, not asserted. */
   peers: { same: number; inSpecialty: number } | null
-  /** The hospital-day selected in the top bar. The capacity evidence below is
-   *  served date-blind, so this is the only thing that can date it -- and it is
-   *  used for NOTHING else: no figure here is fetched, filtered or scored by
-   *  it. */
+  /** The hospital-day selected in the top bar. The evidence below is served
+   *  date-blind, so this is the only thing that can date it, and it is used for
+   *  NOTHING else: no figure here is fetched, filtered or scored by it. */
   date: string
 }) {
   const wards = capacity?.wards ?? []
@@ -166,14 +132,10 @@ export function AgentInputs({
   const sessions = [...(capacity?.clinic_sessions ?? [])]
     .sort((a, b) => a.session_date.localeCompare(b.session_date))
 
-  /** Did the capacity agent score THIS referral at all?
-   *
-   *  A score OR a citation, not the score alone. A paediatric referral is
-   *  refused by the urgency agent and therefore never placed, so no ranking row
-   *  carries its capacity score -- but the capacity agent scored it anyway
-   *  (Overview says so, and GET /scores returns its two capacity citations), and
-   *  those citations are what reach this component. They are evidence that the
-   *  agent read something, and they are honoured. */
+  /** Did the capacity agent score THIS referral at all? A score OR a citation,
+   *  not the score alone: a paediatric referral is refused by urgency and never
+   *  placed, so no ranking row carries its capacity score -- but the capacity
+   *  agent scored it anyway, and its citations reach this component. */
   const capacityRan = capacityScore != null || citedWard != null || citedSession != null
   /** The session the record NAMES. No substitute: see the header. */
   const readDate = citedSession
@@ -250,11 +212,10 @@ export function AgentInputs({
             </div>
           </div>
 
-          {/* Invariant 7 and invariant 8: a hospital-day with no decision is a
-              normal state, and the thing to say about it is what the system
-              did, which is nothing. Said once at the top of the lane, because
-              everything below it is drawn from the date-blind context call and
-              is on screen either way. */}
+          {/* Invariants 7 and 8: a hospital-day with no decision is a normal
+              state, so this is said once at the top of the lane -- everything
+              below comes from the date-blind context call and is on screen
+              either way. */}
           {!capacityRan && (
             <p className="pt-mini">
               No capacity score was recorded for this referral, so nothing below was read by an
@@ -356,31 +317,17 @@ export function AgentInputs({
   )
 }
 
-/** THE AS-OF STATEMENT, borrowed whole from the Overview.
+/** THE AS-OF STATEMENT, borrowed whole from the Overview (Overview.tsx:497-524)
+ *  down to the class names, so both surfaces state ONE fact one way.
  *
- *  /api/context is not keyed by hospital-day: it returns the same
- *  2026-08-30T20:00:00 ward snapshot and the same five sessions ending
- *  2026-08-28 whatever day is selected. So on 2026-08-24 this lane drew a ward
- *  reading taken six days LATER than the day selected, and four clinic sessions
- *  that had not been held, with nothing on the page saying so. The Overview
- *  flags exactly that at SEV_INTEGRITY on its ward and clinic panels
- *  (Overview.tsx:497-524, placed at :704, :1218 and :1374); this is the same
- *  panel, the same chip and the same sentence, down to the class names, because
- *  a reader who opens both surfaces must find ONE fact stated once rather than
- *  two phrasings of it.
+ *  /api/context is not keyed by hospital-day: the same ward snapshot and the
+ *  same sessions come back whatever day is selected. On the default day the
+ *  snapshot IS the day selected, so this renders nothing.
  *
- *  On the default day, 2026-08-30, the snapshot IS the day selected and no
- *  session is dated after it, so this renders nothing and the lane is unchanged.
- *
- *  Only sessions dated AFTER the day selected are named. A series running up to
- *  the selected day is an ordinary record of clinics already held and is not a
- *  date problem; a session dated after it has not happened.
- *
- *  A snapshot with no readable date is an ABSENCE of information, not a match:
- *  it is said in words rather than assumed to be the day selected. No
- *  hospital-day is inferred from the snapshot either -- /operations is keyed by
- *  hospital AND day, this component has no hospital, and a day guessed from the
- *  evidence being dated is the same guess twice. */
+ *  Only sessions dated AFTER the selected day are named -- a series running up
+ *  to it is an ordinary record of clinics already held. An unreadable snapshot
+ *  date is an ABSENCE of information, not a match, and is said in words. No
+ *  hospital-day is inferred from the evidence: that is the same guess twice. */
 function CapacityAsOf({ ward, sessions, selected }: {
   /** The ward drawn below this line, and the only one it speaks for. */
   ward: CapacityWard | undefined
@@ -398,19 +345,16 @@ function CapacityAsOf({ ward, sessions, selected }: {
     : days.length === 1 ? longDate(days[0])
       : `${longDate(days[0])} to ${longDate(days[days.length - 1])}`
   const both = wardOff && ahead.length > 0
-  // The subject names exactly what the span covers and no more. A series
-  // running from before the selected day into the days after it is PARTLY
-  // dated forward, and "the clinic sessions below are as of ..." would then be
-  // a claim about the past sessions too, which is false.
+  // The subject names exactly what the span covers and no more: a series only
+  // PARTLY dated forward must not be described as though all of it were.
   const clinics = ahead.length === sessions.length
     ? 'the clinic sessions below'
     : `${ahead.length} of the ${sessions.length} clinic sessions below`
   const what = both ? `The ward figures and ${clinics}`
     : wardOff ? 'The ward figures below'
       : clinics.charAt(0).toUpperCase() + clinics.slice(1)
-  // Overview's sentence is borrowed word for word; only the verb agrees with
-  // the subject, which is singular in the one case where a lone clinic session
-  // is dated forward and no ward is.
+  // Only the verb differs from Overview's sentence: singular in the one case
+  // where a lone clinic session is dated forward and no ward is.
   const verb = !wardOff && ahead.length === 1 ? 'is' : 'are'
   const source = both
     ? 'core.bed_status and core.clinic_sessions are read latest-first with no date filter, so every hospital-day is served this same snapshot and this same series.'
@@ -450,48 +394,24 @@ const WARD_READ: Record<WardRead, string> = {
 
 /** The one ward snapshot the capacity agent cited, when one was.
  *
- *  GAR is an escalation status whose own vocabulary is green/amber/red. Those
- *  hues belong to CPC triage categories on this product and are not lent out,
- *  so the status is drawn in ink weight with the word beside it: the same
- *  neutral register MTS gets.
- *
- *  The meter used to span `Math.max(100, pct)` on the theory that occupancy
- *  passes 100 when surge beds are open. It cannot. occupancy_pct is
- *  occupied/(occupied+free), which is bounded at 100 by construction, so the
- *  span was always exactly 100, the 100% tick was pinned to the right edge on
- *  every ward, and the only line a reader actually needs -- 85%, the
- *  safe-operating line -- was absent from this page altogether. 100% is now the
- *  end of the scale, because that is what it is, and 85% is the mark.
- *
- *  That 85 is SAFE_OCCUPANCY from lib/severity.ts, the same constant
- *  sevOccupancy bands on. It was declared a SECOND time in this file, which is
- *  exactly how a drawn line and the colour beneath it drift a point apart and
- *  stop meaning each other. One constant, one line, one band boundary.
- *
- *  The bed counts here are the WARD's. `nominal_beds` beside them is one
- *  SPECIALTY's allocation, and it used to be drawn under the word "nominal" --
- *  so every patient page showed 91 people in a 45-bed ward, and disagreed with
- *  the Overview's ward table by 2x about the same ward. Two numbers, one name.
- *
- *  The ward-level bed count this payload really carries is the census,
- *  occupied + free, which is also the denominator occupancy_pct is computed
- *  from (lib/api.ts:53-55) -- so it is the one figure that may stand beside the
- *  percentage. The allocation stays, under its own name, because it is a true
- *  and relevant fact: it is this specialty's share of that ward.
- *
- *  The ward's nominal establishment is /operations' summed `nominal_beds`, and
- *  it is deliberately absent rather than approximated: /operations is keyed by
- *  hospital AND day, and while `AgentInputs` now takes the selected date so the
- *  lane can date its evidence (CapacityAsOf above), it is given no hospital and
- *  neither is this panel. Substituting it here would not have removed the
- *  contradiction anyway
- *  -- W-9001-02 is 91 occupied against a nominal 90, over its establishment on
- *  surge beds. 91 of the 92 recorded is the only pair that reconciles. */
+ *  The bed counts here are the WARD's; `nominal_beds` beside them is one
+ *  SPECIALTY's allocation and is drawn under its own name, never as the ward's
+ *  size. The ward-level count this payload carries is the census, occupied +
+ *  free, which is also the denominator occupancy_pct is computed from
+ *  (lib/api.ts:53-55), so it is the one figure that may stand beside the
+ *  percentage. The ward's nominal establishment is /operations' summed
+ *  `nominal_beds` and is deliberately absent rather than approximated: this
+ *  panel is given no hospital to key /operations by. See BUILD_LEDGER.md. */
 function WardPanel({ w, read, pressure }: {
   w: CapacityWard; read: WardRead; pressure: number | null
 }) {
   const b = w.latest_bed_status
+  // occupied/(occupied+free), so it is bounded at 100 by construction: 100% is
+  // the end of the meter's scale, never a span that surge beds push past.
   const pct = num(b?.occupancy_pct)
+  // GAR's own vocabulary is green/amber/red, but those hues belong to CPC triage
+  // categories on this product and are not lent out, so it is drawn in ink
+  // weight with the word beside it -- the neutral register MTS gets.
   const gar = b?.gar_status ?? null
   const sev = sevOccupancy(pct)
   const occ = b?.occupied ?? null
@@ -499,13 +419,15 @@ function WardPanel({ w, read, pressure }: {
   // occupied + free: the census actually recorded on the ward, and the only
   // ward-level bed count in this payload.
   const census = occ != null && free != null ? occ + free : null
-  // ...and it stands beside the percentage only while it reproduces it. If it
-  // does not, the figure is not describing these two numbers and is not drawn
-  // as their fraction. occupancy_pct arrives rounded to 2dp, hence 0.05.
+  // ...and it stands beside the percentage only while it reproduces it.
+  // occupancy_pct arrives rounded to 2dp, hence the 0.05 tolerance.
   const censusHolds = pct != null && census != null && census > 0
     && Math.abs((occ! / census) * 100 - pct) <= 0.05
   // The word beside the figure names the line the number has crossed, so the
-  // fill is never the only channel and the threshold is never implied.
+  // fill is never the only channel and the threshold is never implied. Both
+  // constants come from lib/severity.ts, the same ones sevOccupancy bands on:
+  // a second declaration here is how a drawn line and the colour beneath it
+  // drift a point apart and stop meaning each other.
   const state = sev === 0 ? null
     : sev === 1 ? `past the ${SAFE_OCCUPANCY}% safe line`
       : sev === 3 ? `past ${CROWDED_OCCUPANCY}%`
@@ -551,18 +473,10 @@ function WardPanel({ w, read, pressure }: {
                 Above <span className="num">{SAFE_OCCUPANCY}%</span> a hospital loses the slack it
                 needs to admit safely (Bagust, Place &amp; Posnett, BMJ 1999;319:155-8).
               </p>
-              {/* The bed counts below are the ward's and the allocation is one
-                  specialty's, so the panel says which is which rather than
-                  leaving a reader to divide one into the other.
-
-                  A SPLIT, not a full conversion. WHICH NUMBER THE PERCENTAGE
-                  DIVIDES BY is the fact these figures were wrong about until
-                  last round, so it stays on the visible line, with the two
-                  counts in it. What goes behind the toggle is the argument for
-                  it: the establishment it is NOT measured against, and the
-                  allocation below that a reader might otherwise divide into.
-                  Hiding the denominator itself would put the panel back where
-                  it started. */}
+              {/* A SPLIT, not a full conversion: WHICH number the percentage
+                  divides by stays on the visible line, with both counts in it.
+                  Only the argument for it goes behind the toggle -- hiding the
+                  denominator would put the panel back where it started. */}
               {census != null && (censusHolds ? (
                 <Aside className="pt-mini" label="why occupied + free is the denominator"
                        summary={<>That percentage is <span className="num">{fmt(occ!)}</span> of the{' '}
@@ -636,13 +550,10 @@ function Fact({ k, v, note }: { k: string; v: number | null; note?: string }) {
 }
 
 /** The specialty's sessions in date order, and -- only if a citation names one
- *  of them -- which one was read.
- *
- *  `readDate` is null whenever no citation names a row here, and then NO row is
- *  marked and none of them says "not read" either: "context, not read" is a
- *  statement that something else was read, and on a day no agent ran there is
- *  nothing for it to point at. The caller says which of the four states this
- *  is, in words, underneath. */
+ *  of them -- which one was read. When `readDate` is null NO row is marked and
+ *  none says "not read" either: "context, not read" asserts that something else
+ *  WAS read, and on a day no agent ran there is nothing for it to point at. The
+ *  caller states which of the four cases this is, underneath. */
 function ClinicSeries({ sessions, readDate }: { sessions: ClinicSession[]; readDate: string | null }) {
   const anyRead = readDate != null
   const max = Math.max(1, ...sessions.map((s) => s.slots_total))

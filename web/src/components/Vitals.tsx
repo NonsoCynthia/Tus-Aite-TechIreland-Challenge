@@ -5,36 +5,24 @@ import { SevBar, SevChip } from './Severity'
 import { Aside } from './Aside'
 import type { Observation } from '../lib/types'
 
-/** NEWS2 as six instruments, not as a sentence.
- *
- *  The page used to print "NEWS2 7 of 17. Add the six by hand and you get the
- *  same number." That is a note asking the reader to do arithmetic. Here the
- *  arithmetic IS the picture: every parameter shows its own sub-score and where
- *  the reading sits on the band table in lib/news2.ts -- the same table the
- *  urgency agent scored against -- and the six sub-scores are summed on screen
- *  and CHECKED against the recorded total. A disagreement is printed, never
- *  hidden behind whichever number happened to be handy.
+/** NEWS2 as six instruments, not as a sentence. The arithmetic IS the picture:
+ *  every parameter shows its own sub-score and where the reading sits on the
+ *  band table in lib/news2.ts -- the same table the urgency agent scored against
+ *  -- and the six are summed on screen and CHECKED against the recorded total.
+ *  A disagreement is printed, never resolved to whichever number is handy.
  *
  *  The sub-score ladder is the product's severity scale, through sevNews2Sub,
- *  and never --cat-* : those five hues belong to CPC triage categories and a
- *  NEWS2 sub-score of 3 is not a triage category. The ladder here used to be
- *  four ink steps of its own whose contrast was NOT monotonic -- 0 at 3.56:1,
- *  1 at 5.99:1, 2 at 15.37:1 and then 3 at 14.70:1, so the most severe step was
- *  the LESS contrasty of the top two, which is the exact fault the severity
- *  scale exists to end. sevNews2Sub maps 0/1/2/3 onto steps 0/1/3/4: it skips a
- *  step so that a 3 lands on a solid block and cannot be mistaken for a 2.
- *  The magnitude still travels three ways at once -- the numeral, three pips
- *  and the fill -- so colour is never load-bearing on its own.
- */
+ *  and never --cat-*: those five hues belong to CPC triage categories, and a
+ *  NEWS2 sub-score is not one. sevNews2Sub maps 0/1/2/3 onto steps 0/1/3/4,
+ *  skipping a step so a 3 lands on a solid block and cannot be read as a 2. */
 
 const ICON: Record<Vital['key'], typeof Activity> = {
   rr: Wind, spo2: Droplet, sbp: Activity, hr: HeartPulse, avpu: Brain, temp: Thermometer,
 }
 
-/** --icon and --icon-sm from tokens.css. lucide sizes in JS rather than in CSS,
- *  so the two steps live here as numbers; STROKE is passed on every icon in
- *  this file because lucide's default of 2 renders heavier than the 1.75
- *  hairline chrome beside it. */
+/** --icon and --icon-sm from tokens.css; lucide sizes in JS, so the two steps
+ *  live here as numbers. STROKE is passed on every icon in this file: lucide's
+ *  default of 2 renders heavier than the 1.75 hairline chrome beside it. */
 const ICON_PX = 16
 const ICON_SM_PX = 14
 const STROKE = 1.75
@@ -54,8 +42,7 @@ const dateLong = (s: string) =>
 
 /** Where each band sits on the meter. The table's edges are inclusive integers
  *  (... 8 | 9 ...), so the drawn boundary is the midpoint between them: any
- *  other choice either overlaps the segments or opens a gap the scale does not
- *  have. */
+ *  other choice overlaps the segments or opens a gap the scale does not have. */
 function spans(v: Vital) {
   const [lo, hi] = v.axis
   return v.bands.map((b, i) => {
@@ -80,22 +67,13 @@ const bandFor = (v: Vital, value: number) =>
 
 /** Age of a reading, as a state rather than as an opinion about the patient.
  *
- *  The word and the severity step are ONE ladder. sevReadingAge owns the
+ *  The word and the severity step are ONE ladder: sevReadingAge owns the
  *  boundaries (90, 365 and 730 days) and the word is read off the step it
- *  returns, so the two can never drift apart. Below 90 days there is no mark at
- *  all, which is what a severity of 0 means: the absence of a severity is not a
- *  severity. This was the one existing four-step ramp in the product and it
- *  bottomed out at 3.56:1; it is now the same four steps everything else uses.
- *
- *  The two UNMARKED steps used to say "fresh" and "recent", so an 89-day-old
- *  reading was called RECENT: a reassurance, two days short of the same reading
- *  being called stale, on the same panel that argues a stale normal reading is
- *  an absence of information rather than reassurance. The banding is right and
- *  is unchanged — under 90 days genuinely needs no mark — so only the WORD
- *  moved. Where there is no mark the word now states the interval and nothing
- *  else, and the reader decides what it is worth. From 90 days, where the
- *  product does take a position, it keeps saying so.
- */
+ *  returns, so the two cannot drift apart. Below 90 days there is no mark, and
+ *  the word states the interval and nothing else -- calling an 89-day-old
+ *  reading "recent" is a reassurance this panel is not entitled to give, on the
+ *  same page that argues a stale normal reading is an absence of information.
+ *  From 90 days the product does take a position, and keeps saying so. */
 export const ageState = (days: number | null): { word: string; sev: Sev } => {
   if (days == null) return { word: 'age unknown', sev: 0 }
   const sev = sevReadingAge(days)
@@ -110,12 +88,10 @@ export const ageState = (days: number | null): { word: string; sev: Sev } => {
 
 export interface AgeStats { n: number; median: number; mean: number; max: number; over_1y: number; over_2y: number }
 
-/** The staleness meter, drawn on the reading itself.
- *
- *  Invariant: a stale normal reading is an ABSENCE of information, not
- *  reassurance -- so the age never travels separately from the reading, and the
- *  meter draws this reading's age against the real spread of ages in this
- *  cohort rather than against a round number nobody chose. */
+/** The staleness meter, drawn on the reading itself. Invariant: a stale normal
+ *  reading is an ABSENCE of information, not reassurance, so the age never
+ *  travels separately from the reading, and it is drawn against the real spread
+ *  of ages in this cohort rather than a round number nobody chose. */
 export function Staleness({ when, ageDays, stats }: {
   when: string | null; ageDays: number | null; stats: AgeStats | undefined
 }) {
@@ -263,10 +239,9 @@ export function Vitals({ obs, recordedTotal, agentTotal, when, ageDays, stats, c
           </span>
         </p>
       )}
-      {/* A DEFINITION, and the same one on every refused referral: why a scale
-          that was declined is drawn at all. What a reader cannot be allowed to
-          miss is that nothing here was used, so that claim is the line that
-          stays; the reason the bands are on screen is the argument for it. */}
+      {/* The claim a reader cannot be allowed to miss -- nothing here was used
+          -- is the line that stays; the reason the bands are drawn is what
+          opens. */}
       {!applied && (
         <Aside className="pt-mini" label="why the bands are still drawn"
                summary="NEWS2 was not applied here, so no sub-score above was used by anything.">
@@ -289,17 +264,11 @@ function Pips({ score }: { score: number | null }) {
 /** One parameter's contribution: numeral, pips and fill, three channels of one
  *  value.
  *
- *  The fill is the product's severity scale through sevNews2Sub, so a 3 lands on
- *  a solid block two steps above a 1 rather than on an ink shade that measured
- *  LESS contrasty than the step below it.
- *
- *  A refused score is not an acuity claim, so a paediatric refusal takes the
- *  whole severity register away: sev is forced to 0 whatever the number is. That
- *  is deliberate, and it is also how a refused 3 came to look exactly like a
- *  refused 0. It no longer does. The chip keeps the number and the pips, so the
- *  value is still legible, and marks it as withdrawn rather than absent: the
- *  word "refused", a struck numeral and a dashed edge, none of which a zero has.
- */
+ *  A refused score is not an acuity claim, so a paediatric refusal forces sev to
+ *  0 whatever the number is -- which is what would otherwise make a refused 3
+ *  look exactly like a refused 0. The chip keeps the number and the pips and
+ *  marks it withdrawn rather than absent: the word "refused", a struck numeral
+ *  and a dashed edge, none of which a zero has. */
 function SubScore({ score, applied }: { score: number | null; applied: boolean }) {
   const sev = applied ? sevNews2Sub(score) : 0
   const title = score == null ? 'no reading'

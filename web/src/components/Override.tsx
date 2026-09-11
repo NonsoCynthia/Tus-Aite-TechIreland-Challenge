@@ -7,30 +7,15 @@ import type { Decision, Ranking } from '../lib/types'
 // name -- and CPC 3 outranks CPC 2, so the number is actively misleading on
 // screen. Always resolve through bandOf().
 
-/** The one modal in the product.
+/** The one modal in the product: interrupting dialogs are accepted far less
+ *  often than non-interrupting ones, so there is exactly one, reserved for the
+ *  thing a clinician must not do by accident -- moving someone across a clinical
+ *  category boundary. Every other action is inline.
  *
- *  Interrupting dialogs are accepted far less often than non-interrupting ones,
- *  so there is exactly one, reserved for the thing a clinician must not do by
- *  accident: moving someone across a clinical category boundary. Every other
- *  action is inline.
- *
- *  RULE-ORDER says every Urgent is seen before every Semi-Urgent. The system
- *  cannot cross that boundary; a clinician can, but only deliberately and on
- *  the record, which is what rule_warning_accepted stores.
- *
- *  Two things changed here.
- *
- *  The write used to end in a flash message that died on the next navigation,
- *  because nothing could read an override back. GET /overrides exists now, so a
- *  successful POST invalidates ['overrides', hospital, date] and the list
- *  re-reads it: the row moves, keeps a badge naming who moved it and why, and
- *  goes on showing the position the system gave it.
- *
- *  And rule_warning_accepted used to be sent as `crosses` -- the app's own
- *  comparison of the two bands -- while the checkbox only gated the submit
- *  button. The stored attestation was therefore the system's opinion of what
- *  the clinician had done, not the clinician's. It now sends the checkbox.
- */
+ *  RULE-ORDER puts every Urgent before every Semi-Urgent. The system cannot
+ *  cross that boundary; a clinician can, deliberately and on the record.
+ *  rule_warning_accepted stores the CHECKBOX, never the app's own comparison of
+ *  the two bands: the attestation is the clinician's, not the system's. */
 const REASONS = [
   'Clinical information not in the record',
   'Patient contacted the service',
@@ -43,9 +28,9 @@ export function Override({ patient, decision, displayedOrder, onClose, onDone }:
   patient: Ranking
   decision: Decision
   /** Pathway numbers in the order actually ON SCREEN: the coordinator's, with
-   *  every live override already spliced in. The boundary check must ask about
-   *  this list, not about decision.rankings: after one override, position N in
-   *  what the clinician sees is a different person. */
+   *  every live override spliced in. The boundary check must ask about this
+   *  list, never decision.rankings -- after one override, position N in what the
+   *  clinician sees is a different person. */
   displayedOrder?: string[]
   onClose: () => void
   onDone: (msg: string) => void
@@ -75,9 +60,9 @@ export function Override({ patient, decision, displayedOrder, onClose, onDone }:
   const isAccept = Number(to) === patient.position
   const needsAttest = crosses && !accepted
 
-  // An attestation belongs to the move it was made for. Editing the position
-  // back inside the band retires it, so a tick can never be carried over and
-  // stored against a move that never crossed anything.
+  // An attestation belongs to the move it was made for, so editing back inside
+  // the band retires the tick rather than carrying it over to a move that
+  // crossed nothing.
   useEffect(() => { if (!crosses) setAccepted(false) }, [crosses])
 
   async function submit() {

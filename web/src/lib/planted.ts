@@ -1,16 +1,9 @@
-/** The eight planted cases, and what each one is for.
- *
- *  `dataset/tests/test_planted_cases.py` opens with: *"The seven demo cases must
- *  exist at fixed pathway numbers in every run. Random sampling will not
- *  reliably produce them and the demo depends on them."* They are deliberate
- *  fixtures from the dataset track, each planted to exercise a specific rule or
- *  edge, and every one of them is inside the 308.
- *
- *  Unlabelled they read as leftover test data in the middle of a clinical list —
- *  which is the first thing a reviewer would challenge. Labelled, they are the
- *  cases worth pointing at, because each one is a claim the system can be tested
- *  against. Sources are named so nobody has to take this on trust.
- */
+/** The eight planted cases, and what each one is for. Deliberate fixtures from
+ *  the dataset track, each exercising a specific rule or edge and each inside the
+ *  cohort. They must exist at these fixed pathway numbers in every run —
+ *  `dataset/tests/test_planted_cases.py`: *"Random sampling will not reliably
+ *  produce them and the demo depends on them."* Unlabelled they read as leftover
+ *  test data in a clinical list, so every entry carries its source. */
 export interface Planted { what: string; why: string; source: string }
 
 export const PLANTED: Record<string, Planted> = {

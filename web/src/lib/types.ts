@@ -1,12 +1,8 @@
 /* Hand-written. Every read handler in retrieval is annotated `-> dict[str, Any]`,
    so /openapi.json carries request schemas only and codegen buys nothing here. */
 
-/** One row of `core.hospitals`, from GET /api/hospitals. Column names, not
- *  invented ones, so a reader can find the row this came from.
- *
- *  App.tsx used to carry the hipe ids and the names as a literal. An EMPTY
- *  array from that endpoint means the read failed, never "no hospitals exist" --
- *  see api.hospitals(). */
+/** One row of `core.hospitals`, from GET /api/hospitals. An EMPTY array from that
+ *  endpoint means the read failed, never "no hospitals exist" — api.hospitals(). */
 export interface Hospital {
   /** char(4). Compared against the selector's string value. */
   hospital_hipe: string
@@ -31,15 +27,14 @@ export interface CohortReferral {
   currently_suspended: boolean | null
   /** NTPF clinical prioritisation category. 1 Urgent, 3 Semi-Urgent, 2 Routine, 4 Excluded, null uncategorised. */
   cpc: number | null
-  /** null for Routine and Uncategorised: 143 of 308 have no target at all. */
+  /** null for Routine and Uncategorised, which have no target at all. */
   crt_threshold_days: number | null
   crt_breached: boolean | null
 }
 
 export interface Citation { evidence_type: string; evidence_key: string }
 
-/** One rule the coordinator tested against this referral.
- *  All five live in core.ref_rules; `detail` is already human-readable, e.g.
+/** All five live in core.ref_rules; `detail` is already human-readable, e.g.
  *  "urgent, day 152 of 28, over by 124". */
 export interface RuleCheck {
   rule_id: 'RULE-CRT-URGENT' | 'RULE-CRT-SEMI' | 'RULE-TRIAGE-TURNAROUND'
@@ -48,35 +43,31 @@ export interface RuleCheck {
   detail: string | null
 }
 
-/** A ranked placement, as the coordinator produced it and the orchestrator holds it. */
 export interface Ranking extends CohortReferral {
   position: number
   /** RAW CPC CODE, not a name. Always resolve through bandOf(). */
   band: string
   severity_rank: number | null
   urgency_score: number
-  /** Specialty-level, identical for every referral in a specialty. It sets
-   *  alpha for the whole hospital-day and can never reorder two people. */
+  /** Specialty-level, identical within a specialty: it sets alpha for the
+   *  hospital-day and can never reorder two people. */
   capacity_score: number
   wait_normalised: number
   priority: number
   alpha: number
   scarcity: number
   run_id: string
-  /** Present on every row. The two agents' own citations, ride-along since the
-   *  first run; the UI simply never declared them. Six urgency (one per NEWS2
-   *  vital, zeros included), one or two capacity. */
+  /** Present on every row: six urgency (one per NEWS2 vital, zeros included),
+   *  one or two capacity. */
   urgency_citations: Citation[]
   capacity_citations: Citation[]
-  /** The coordinator's own deterministic note. Not the LLM rationale — that is
-   *  another track's unbuilt feature. */
+  /** The coordinator's own deterministic note, NOT an LLM rationale. */
   rationale_summary: string | null
-  /** 2-5 per referral. Computed since the first run and dropped before the UI
-   *  saw them until the orchestrator merged them back. */
+  /** 2-5 per referral. */
   rule_checks: RuleCheck[]
-  /** What the capacity agent computed on its way to a score. Neither reaches
-   *  Postgres or the graph — POST /scores carries only the score — so this is
-   *  harvested from the agent pass, the way news2 is. */
+  /** What the capacity agent computed on its way to a score. Neither value
+   *  reaches Postgres or the graph (POST /scores carries only the score), so it
+   *  is harvested from the agent pass, the way news2 is. */
   capacity_detail: { ward_pressure: number | null; clinic_pressure: number | null } | null
 }
 
@@ -100,18 +91,9 @@ export interface Decision {
   /** Harvested during the urgency pass: news2 is not in the cohort payload. */
   news2: Record<string, number | null>
   built_at: string
-  /** WHERE THIS DECISION CAME FROM, and the only signal that carries it into
-   *  the payload the surfaces draw.
-   *
-   *  A decision lives in orchestrator memory and is written to
-   *  /snapshots/decisions.json, which is read back at process boot. The restore
-   *  is the ONLY writer of this key (orchestrator/app/state.py:136); a decision
-   *  produced by a run in this process carries no such key at all. So ABSENT
-   *  means "this process ran it", and it clears itself the moment a real run
-   *  replaces the entry (state.py put_decision stores the run's own dict).
-   *
-   *  /api/health says the same thing about every held hospital-day as
-   *  decisions_held[].source, which defaults the absent case to 'run'. */
+  /** The snapshot restore is the ONLY writer of this key
+   *  (orchestrator/app/state.py:136), so ABSENT means a run in this process
+   *  produced the decision. Same fact as /api/health decisions_held[].source. */
   _source?: 'run' | 'snapshot'
 }
 
@@ -175,11 +157,10 @@ export interface ScoreEntry {
 export type ScoresByPathway = Record<string, Record<'urgency' | 'capacity', ScoreEntry>>
 
 
-/** The reference layer, from core.ref_*. The UI hardcoded 28 and 91 and printed
- *  bare HIPE codes because retrieval exposes no endpoint for these. */
+/** The reference layer, from core.ref_*. */
 export interface Reference {
   specialties: Array<{ specialty_hipe: string; specialty_name: string; is_paediatric: boolean }>
-  /** Authoritative severity_rank and crt_days. Never hardcode these again. */
+  /** Authoritative severity_rank and crt_days. Never hardcode these. */
   triage_categories: Array<{
     code_value: string; description: string
     severity_rank: number | null; crt_days: number | null
@@ -190,8 +171,6 @@ export interface Reference {
   codes: Array<{ code_table: string; code_value: string; description: string }>
 }
 
-/** What a clinician actually did. Written since the first build, readable only
- *  since the orchestrator gained a read path. */
 export interface OverrideRecord {
   override_id: string
   decision_id: string
@@ -212,7 +191,6 @@ export interface Overrides {
   current: Record<string, OverrideRecord>
 }
 
-/** The whole decision as a graph, from one SPARQL query over the run graph. */
 export interface GraphNode {
   id: string; label: string
   kind: 'decision' | 'placement' | 'score' | 'referral_state' | 'bed_status'
@@ -232,11 +210,9 @@ export interface CohortGraph {
   edges: GraphEdge[]
   placements: number
   /** Role-tagged edges from placements. NOT a citation count: six cited vitals
-   *  arrive as one link to the urgency score, and timeframe links cover rules
-   *  and referral states, which are not evidence. */
+   *  arrive as one link, and timeframe links cover rules and referral states. */
   evidence_links: number
-  /** False on this machine: the batch KG was never loaded, so a cited node has
-   *  an identity and a type but no resolved property values. Say so on screen
-   *  rather than implying the graph knows more than it does. */
+  /** False when the batch KG was not loaded: a cited node then has an identity
+   *  and a type but no resolved property values. Say so on screen. */
   inputs_graph_loaded: boolean
 }

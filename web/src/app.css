@@ -1,10 +1,7 @@
 /* Component styles. Every colour comes from tokens.css; none is a literal. */
 
-/* --- the shell -----------------------------------------------------------
-   Rail plus content, side by side, filling the viewport. The old shell capped
-   everything at 1248px and centred it, which left a third of a wide screen
-   empty and made a dense operational product read as a document. The rail is
-   the fixed element now; the content area takes whatever is left. */
+/* --- the shell: rail plus content, side by side, filling the viewport. The rail
+   is the fixed column; the content area takes whatever is left. */
 .app {
   min-height: 100%;
   display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr);
@@ -17,13 +14,12 @@
   align-items: center; justify-content: center; gap: var(--d4);
   background: var(--bg); color: var(--text-2); font-size: var(--t-small);
 }
-/* the same arithmetic as the rail: cap height is 266/676 of the rendered
-   height, and the kit's floor is 13px. 40px puts it at 15.7px. */
+/* the same arithmetic as the rail: cap height is 266/676 of the rendered height
+   and the kit's floor is 13px, so 40px puts the cap at 15.7px. */
 .boot-brand { display: grid; justify-items: center; gap: var(--d2); }
 .boot-mark { display: block; height: 40px; width: auto; }
-/* The boot screen is normally a dead end that resolves itself. It is not, for a
-   hospital that holds no waiting list: nothing is loading and nothing will
-   arrive, so that screen needs a way out of it. */
+/* For a hospital that holds no waiting list nothing is loading and nothing will
+   arrive, so the boot screen needs a way out of it. */
 .boot-pick { display: flex; align-items: center; gap: var(--d3); margin-top: var(--d4); }
 .boot-pick select {
   background: var(--surface); color: var(--text); border: 1px solid var(--rule-firm);
@@ -91,10 +87,8 @@
 .sysstat-i:not(.is-up) b { color: var(--text); }
 .sysstat-i.is-up { color: var(--text-2); }
 
-/* --- icon sizing, from the token rather than from a number typed at the call
-   site. lucide writes width/height as PRESENTATION attributes, so a CSS rule
-   wins and --icon stays the single source. Stroke is the other half and is a
-   ROLE, not a size: 1.75 chrome, 2.25 signal. */
+/* lucide writes width/height as PRESENTATION attributes, so a CSS rule wins and
+   --icon stays the single source. Stroke is a ROLE: 1.75 chrome, 2.25 signal. */
 .ico   { width: var(--icon);    height: var(--icon);    flex: none; }
 .ico-s { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
 
@@ -107,12 +101,9 @@
 }
 .scope { display: flex; align-items: center; gap: var(--d2); min-width: 0; flex-wrap: nowrap; }
 
-/* --- "has anything new arrived?" -----------------------------------------
-   The days in the selector are DISCOVERED by probing a 60-day window, and the
-   answer is cached per hospital for the life of the process
-   (orchestrator/app/main.py:120-165). A batch loaded while the service is up is
-   therefore invisible until that cache is cleared, which is what
-   POST /api/hospital-days/{h}/refresh does. Nothing called it until now. */
+/* The days in the selector are DISCOVERED by probing and cached per hospital
+   for the life of the process (orchestrator/app/main.py:120-165), so a batch
+   loaded while the service is up is invisible until this clears that cache. */
 .probe {
   display: inline-flex; align-items: center; gap: var(--d2);
   padding: 0 var(--d3); min-height: 34px;
@@ -135,12 +126,9 @@
   background: none; border: 0; padding: 6px 0; max-width: 30ch;
   text-overflow: ellipsis;
 }
-/* The bar has to hold two pickers, the refresh control, the run pill and the
-   run button on ONE row. Adding "check for new data" tipped it over at 1440:
-   scope 699 + actions 438 + gap + padding came to 1217 in a 1204px bar, so it
-   wrapped and the bar grew from 56px to 101px. The pickers are the elastic
-   part -- their labels carry a date and a count that can ellipsise -- so they
-   give up the width rather than the actions dropping to a second row. */
+/* Everything in the bar stays on ONE row or the bar grows from 56px to 101px.
+   The pickers are the elastic part, so they give up width rather than the
+   actions dropping to a second row. */
 @media (max-width: 1600px) {
   .picker { max-width: 22ch; }
 }
@@ -154,9 +142,8 @@
   flex: 0 0 auto;   /* the actions never shrink; the pickers give way first */
 }
 
-/* the only durable display of alpha: agent.decision_rankings stores no alpha,
-   scarcity, priority or band, so the number that produced the order on screen
-   exists nowhere else once this process ends */
+/* the only durable display of alpha: agent.decision_rankings stores none of
+   alpha, scarcity, priority or band, so it exists nowhere else after this run */
 .runpill {
   display: inline-flex; align-items: center; gap: var(--d2);
   padding: 5px var(--d3); border: 1px solid var(--rule);
@@ -178,26 +165,10 @@
 .cta:hover:not(:disabled) { background: var(--ink-deep); }
 .cta:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* --- what the chrome could not say inline --------------------------------
-   A full-width strip directly under the bar, carrying a whole sentence: where
-   the decision on screen came from when it did not come from a run in this
-   process, and a lookup that failed. Both are statements of fact and NEITHER
-   IS AN ERROR, so neither is dressed as one -- .err above takes a 3px
-   --sev-4-bg edge because an error means a number on screen cannot be trusted,
-   and nothing here says that. This sits on the page's own well ground with a
-   hairline, no reserved triage hue, no severity step, and every word carried by
-   the text rather than by the ground under it.
-
-   Contrast COMPUTED on this ground, --bg-sunk #F2F1EC, not copied from the
-   token file, whose figures are quoted against --surface:
-     --text   #122056  13.59:1   the bold lead and every value
-     --text-2 #545B6E   5.99:1   the sentence, at --t-small 12px (AA needs 4.5)
-     --text-3 #6B7183   4.30:1   the glyph -- decorative, aria-hidden, and
-                                 duplicated by the words beside it, so 1.4.11's
-                                 3:1 is the bar it has to clear, and does.
-   The strip is in the flow rather than sticky: there is no second offset that
-   can be trusted under a sticky bar whose height is a min-height, and this is
-   provenance rather than an alarm. */
+/* --- what the chrome could not say inline. Both statements here are facts and
+   NEITHER IS AN ERROR, so neither takes .err's severity edge: no reserved hue,
+   no severity step. In the flow rather than sticky, because no second offset can
+   be trusted under a sticky bar whose height is a min-height. */
 .notes { display: grid; }
 .notes-i {
   display: flex; align-items: flex-start; gap: var(--d3);
@@ -216,17 +187,14 @@
 }
 .notes-act:disabled { color: var(--text-3); cursor: progress; text-decoration: none; }
 
-/* --- layout --------------------------------------------------------------
-   .pad fills its column. A reading measure is applied to PROSE only, via
-   .measure, so a paragraph stays readable without the grid collapsing around
-   it. */
+/* --- layout. .pad fills its column; a reading measure is applied to PROSE only,
+   via .measure, so a paragraph stays readable without the grid collapsing. */
 .pad { padding: var(--d6) var(--d6) var(--d8); width: 100%; }
 .measure { max-width: 68ch; }
 .muted { color: var(--text-2); }
 .num { font-variant-numeric: tabular-nums; }
 /* An error means a number on screen cannot be trusted, which is SEV_INTEGRITY
-   (lib/severity.ts:84) and the top of the severity scale. It used to sit on a
-   3px --cat-urgent edge: a RESERVED triage hue, spent on chrome. */
+   (lib/severity.ts:84) and the top of the severity scale -- never a triage hue. */
 .err {
   padding: var(--d3) var(--d4);
   border: 1px solid var(--sev-4-edge); border-left: 3px solid var(--sev-4-bg);
@@ -240,31 +208,19 @@
 .lede-p { margin: 0; font-size: var(--t-body); line-height: 1.6; color: var(--text-2); }
 .lede-p strong { color: var(--text); font-size: var(--t-data); }
 
-/* Overview draws its own tiles now (.ov-ro, surfaces/overview.css). The .tiles
-   / .tile pair here had no consumer left, and .tile's padding read var(--pad),
-   which is not defined anywhere and resolved to nothing. */
 .big { font-family: var(--font-brand); font-size: 26px; font-weight: 300; }
 
-/* --- band distribution ---------------------------------------------------
-   The .bands container is gone with the surface that used it. The five triage
-   swatches below STAY. */
-/* The five triage swatches. Reserved hues, and every one of them also carries
-   its name on screen, so colour is never the only channel.
-
-   These class names are BUILT BY CONCATENATION -- List.tsx's TAB_TOKEN and
-   Patient.tsx's chipClass produce `cat-semiurgent` and `cat-uncategorised`,
-   which no static search of the source will ever find. A dead-CSS sweep removed
-   both and the Semi-Urgent and Uncategorised swatches rendered with no colour
-   at all. Do not delete anything here on the evidence of a grep. */
+/* The five triage swatches. Reserved hues, each also carrying its name on screen.
+   TRAP: these class names are BUILT BY CONCATENATION -- List.tsx's TAB_TOKEN and
+   Patient.tsx's chipClass produce `cat-semiurgent` and `cat-uncategorised`, which
+   no static search will find. Do not delete any of them on a grep's evidence. */
 .cat-urgent        { background: var(--cat-urgent); }
 .cat-semiurgent    { background: var(--cat-semi); }
 .cat-routine       { background: var(--cat-routine); }
 .cat-uncategorised { background: var(--cat-uncat); }
 
-/* The .spine-* primitive is gone with components/Spine.tsx's SpineBar, which
-   was exported and imported nowhere. The list draws its overflow through
-   .spn (surfaces/list.css), and --spine-w / --spine-bar still drive .j-steps,
-   .j-line and .j-mark below. */
+/* --spine-w / --spine-bar drive .j-steps, .j-line and .j-mark below; the list
+   draws its own overflow through .spn (surfaces/list.css). */
 
 /* --- the mark drawing itself, once, on the landing ----------------------- */
 @keyframes markStem { from { transform: scaleY(0); } to { transform: scaleY(1); } }
@@ -280,12 +236,9 @@
   font-weight: 400; color: var(--text-2);
 }
 
-/* Staleness is drawn on the reading itself now (.pt-stale, components/Vitals)
-   and the ward panel is .ov-ward / .pt-ward. The .stale, .wards, .ward-*, .gar
-   rules here had no consumer, .stale also read the undefined var(--pad), and
-   two media queries had been emptied by an earlier sweep and left behind.
-   TrolleyGAR keeps its Green/Amber/Red in surfaces/overview.css (.ov-gar),
-   where the instrument that owns those hues actually renders. */
+/* TrolleyGAR's Green/Amber/Red lives in surfaces/overview.css (.ov-gar), where
+   the instrument that owns those hues renders. Staleness is drawn on the reading
+   itself (.pt-stale, components/Vitals). */
 
 /* --- surface nav ---------------------------------------------------------- */
 .surfaces { display: flex; gap: 2px; margin-left: 8px; }
@@ -318,11 +271,8 @@
 }
 .panel-note strong { color: var(--text); }
 
-/* --- the rows -------------------------------------------------------------
-   The ranked table is .lst-table / .lst-row (surfaces/list.css). What is left
-   here are the CELL classes that table still spends. The .rows / .row shell,
-   .over and .contrib-track went with the surface that used them; .over also
-   held a 3px --cat-urgent, a reserved triage hue, on a plain text run. */
+/* --- the rows. The ranked table is .lst-table / .lst-row (surfaces/list.css);
+   what is left here are the CELL classes that table still spends. */
 .th-sub { display: block; font-weight: 400; letter-spacing: 0; color: var(--text-3); }
 .pw { font-size: var(--t-body); }
 .sub { font-size: var(--t-micro); color: var(--text-2); margin-top: 1px; }
@@ -368,16 +318,8 @@
   width: 11px; height: var(--spine-bar); background: var(--text-3);
 }
 .j-steps li.is-clinical::before { background: var(--clay); width: 15px; }
-/* The three of these that carry a VALUE -- the step date, its detail, and the
-   date under an axis mark -- were raw 10px, a size the type scale does not
-   have at all. They read at --t-small now. The LABELS beside them (.j-h,
-   .j-mt) stay at --t-micro, which is the same 11px they already rendered, so
-   the pair sizes the way it should: the value is the larger of the two, which
-   is the standing rule on --t-micro (tokens.css). Note that the old wording of
-   that rule -- "uppercase labels ONLY, never a value" -- was cited here when
-   this was fixed, and has since been rewritten because 117 of its 126
-   declarations broke it. The fix stands on the restated rule: .j-mt is a
-   lowercase label at the annotation step, .j-md is its value one step up. */
+/* The three that carry a VALUE read at --t-small; the LABELS beside them stay
+   at --t-micro, so the value is the larger of the pair (tokens.css). */
 .j-d { font-size: var(--t-small); color: var(--text-2); }
 .j-t { font-size: var(--t-small); color: var(--text); line-height: 1.3; }
 .j-x { font-size: var(--t-small); color: var(--text-3); }
@@ -386,20 +328,11 @@
 /* the wait: the LENGTH is the argument, so it is drawn to scale */
 .j-axis { position: relative; height: 74px; }
 .j-line { position: absolute; left: 0; right: 0; top: 12px; height: var(--spine-w); background: var(--rule-firm); }
-/* GRADIENT 1 OF 2 in this file, and it stays: it is not what the kit's ban
-   means. `repeating-linear-gradient` with two HARD stops -- transparent for
-   0-5px, then --bg-sunk for 5-10px -- interpolates nothing. Every pixel is one
-   of exactly two values. It is CSS's only primitive for a hatch, and a hatch
-   is not a blend: it claims no light source and no elevation, which is the
-   whole of what "no gradients, glows or drop shadows. Depth comes from blur
-   and hairlines" exists to forbid.
-
-   It is also load-bearing. This band is the stretch of the wait with NOTHING
-   recorded: Journey.tsx:96 renders it only when `silent`, and legends it in
-   words and a number -- "unmeasured for N days" (.j-leg.is-silent). Hatching
-   is the standing notation for absent data, and an absence of information is
-   never reassurance. Delete it and the EXTENT of the silence leaves the axis:
-   the legend line would still say how long, and nothing would show where. */
+/* GRADIENT 1 OF 2, and it stays: two HARD stops interpolate nothing, so this is
+   a hatch, not a blend, and claims no light source or elevation. It is also
+   load-bearing -- this band is the stretch of the wait with NOTHING recorded
+   (Journey.tsx:96), and deleting it takes the EXTENT of the silence off the
+   axis, leaving the legend to say how long and nothing to say where. */
 .j-silence {
   position: absolute; left: 0; right: 0; top: 4px; height: 21px;
   background: repeating-linear-gradient(-45deg, transparent 0 5px, var(--bg-sunk) 5px 10px);
@@ -427,16 +360,9 @@
 .p-sec { margin-bottom: 28px; }
 .p-note { font-size: var(--t-small); color: var(--text-2); max-width: 76ch; line-height: 1.55; margin: 10px 0 0; }
 .p-note strong { color: var(--text); }
-/* The vitals grid is .pt-vitals (surfaces/patient.css) and the caveat panel is
-   .pt-novitals / .lst-warn; .vital, .vitals, .warn and .row.is-clickable had no
-   consumer left.
-
-   Everything the RUN drew when it was a full page was dead here too, and worse
-   than dead: app.css loads before run.css, so a property run.css does not
-   restate still applied. .lanes kept a 1px --rule border and a --rule
-   background around the overlay's lane list, .lane kept a 12px font, and
-   .run-go put a bordered button background behind the overlay's button ROW.
-   The overlay owns all of it now, in surfaces/run.css. */
+/* TRAP: app.css loads before surfaces/run.css, so anything declared here that
+   run.css does not restate still applies inside the run overlay. The overlay
+   owns its own lane and button styles; do not put them back here. */
 
 /* --- provenance graph: the one dark surface inside a light screen --------- */
 .prov { border: 1px solid var(--rule-firm); background: var(--ink-deep); }
@@ -473,10 +399,8 @@
 }
 .ovr-ta { resize: vertical; min-height: 54px; }
 .ovr-hint { font-size: var(--t-micro); color: var(--text-3); line-height: 1.4; }
-/* The boundary warning: the one place an interruption is justified, so it is
-   the one panel that takes a FILL rather than an edge. It sat on a 3px
-   --cat-urgent, which is a CPC band's own hue spent on chrome; it reads on the
-   severity scale now, sev-2's tint carrying a sev-3 edge. */
+/* The one place an interruption is justified, so the one panel that takes a
+   FILL rather than an edge -- on the severity scale, never a triage hue. */
 .ovr-warn {
   border: 1px solid var(--sev-2-edge); border-left: 3px solid var(--sev-3-bg);
   background: var(--sev-2-bg); color: var(--text);
@@ -488,9 +412,8 @@
 .ovr-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 .ovr-go { min-height: 40px; padding: 0 var(--d5); font-size: var(--t-body); }
 .ovr-err { margin-top: 12px; }
-/* A recorded override is a confirmation, not a severity and certainly not a
-   CPC band: it sat on 3px of --cat-routine, the Routine category's own green.
-   The ink register says "this happened" without claiming a clinical grade. */
+/* A recorded override is a confirmation, not a severity and not a CPC band, so
+   it stays in the ink register: "this happened", with no clinical grade. */
 .flash {
   border-left: 3px solid var(--text); background: var(--surface-2);
   padding: 11px 16px; margin-bottom: 18px; font-size: var(--t-body);
@@ -502,39 +425,12 @@
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: 62% 50%;
 }
-/* GRADIENT 2 OF 2, and the only genuine soft blend in the product. It stays,
-   and the reason is measured rather than asserted.
-
-   The photograph (/brand/chairs.png, 1300x873, alt="" aria-hidden) is
-   decorative. The type over it is not. Sampling that image through
-   `object-fit: cover` / `object-position: 62% 50%` and compositing each stop's
-   alpha over the pixels each text block actually covers -- --text #122056 and
-   --text-2 #545B6E against the composite, worst pixel in each block, across
-   1366x768, 1440x900, 1920x1080 and 2560x1440:
-
-       element            no scrim              with this scrim
-       .landing-word      6.28 - 6.58 : 1  AA   11.33 - 11.77 : 1  AA
-       .landing-sub       3.06 - 3.24 : 1  FAIL  5.65 -  6.12 : 1  AA
-       .landing-lead      6.28 - 7.19 : 1  AA   12.12 - 13.70 : 1  AA
-       .landing-thesis    2.47 - 2.89 : 1  FAIL  4.93 -  5.52 : 1  AA
-
-   (Block geometry computed from the rules below, `ch` taken at 0.60em, the
-   generous end, so the sampled boxes run wider than the text really does.)
-
-   Two of the four elements fail WCAG AA at every width with no veil at all.
-   The non-gradient replacement is the flat color-mix the <=720px breakpoint
-   already uses -- and the flat alpha that clears 4.5:1 everywhere is 0.52 at
-   1440x900, 0.55 at 1920x1080, 0.58 at 2560x1440, which mutes 27-34% of the
-   photograph's tonal range across the WHOLE frame. This gradient spends
-   0.90-0.97 on the third of the screen the type occupies and 0.00-0.15 on the
-   two thirds it does not. Removing it obscures MORE of the picture, not less.
-
-   Why it is not the thing the kit bans: it is not a surface. It sits in the
-   photographic plane over a decorative image, it makes no depth or elevation
-   claim, and all four stops are ONE token -- --paper at four alphas -- so
-   there is no second colour that could read as a light source. No panel, chip,
-   rule, bar or glyph anywhere in the product carries a blend. Do not add a
-   third gradient on the strength of this one. */
+/* GRADIENT 2 OF 2, and the only soft blend in the product. Without it
+   .landing-sub and .landing-thesis fail WCAG AA at every width, and the flat
+   color-mix alternative needs 0.52-0.58 alpha across the WHOLE frame, obscuring
+   MORE of the photograph. It is not what the kit bans: not a surface, no
+   elevation claim, all four stops ONE token at four alphas (BUILD_LEDGER.md).
+   Do not add a third gradient on the strength of this one. */
 .landing-scrim {
   position: absolute; inset: 0;
   background: linear-gradient(100deg,
@@ -574,11 +470,6 @@
   .landing-scrim { background: color-mix(in srgb, var(--paper) 94%, transparent); }
   .landing-lead { max-width: none; }
 }
-/* .run-dark was the dark theme for the Run PAGE. The run is an overlay now
-   and carries data-surface="dark", which swaps the tokens themselves, so the
-   whole block had no consumer and held the last two hex literals in this file
-   plus four raw alpha literals. */
-
 /* --- why this position: arithmetic, not assertion ------------------------ */
 .why-tier {
   border-left: 3px solid var(--rule-firm); background: var(--surface-2);
@@ -670,9 +561,8 @@
   border-left: 3px solid var(--clay); padding-left: 14px;
 }
 
-/* --- landing: the hospital selector belongs on this screen ---------------
-   Both figures above it are counted from whichever hospital is chosen, and
-   with no control here they always read the default. */
+/* The hospital selector belongs on this screen: both figures above it are
+   counted from whichever hospital is chosen. */
 .landing-pick { display: flex; align-items: flex-end; gap: var(--d3); flex-wrap: wrap; }
 .landing-sel { display: grid; gap: 5px; }
 .landing-sel select {
@@ -695,28 +585,20 @@
   font: inherit; font-size: var(--t-small); cursor: pointer;
 }
 
-/* --- narrow screens: the rehearsal machine is 1280x800 ---------------------
-   --rail-w was a hard 236px with no breakpoint anywhere, so at 1280 the content
-   column was 1044px and the ranked table (min-width 1320) was cut by ~340px
-   with a horizontal scrollbar. The rail collapses to icons instead: the labels
-   are the first thing to go, because the icons plus the active marker still say
-   where you are, and 172px is the single biggest reclaim available. */
+/* --- narrow screens: the rehearsal machine is 1280x800. The rail collapses to
+   icons rather than letting the ranked table scroll -- 172px, the biggest single
+   reclaim, and the icons plus the active marker still say where you are. */
 @media (max-width: 1439px) {
   .app { grid-template-columns: 64px minmax(0, 1fr); }
   .rail-item span:not(.lab) { display: none; }
   .rail-item { justify-content: center; padding: var(--d2); }
   .rail-lab, .sysstat-i { display: none; }
   .rail-brand { padding: var(--d4) var(--d2); align-items: center; }
-  /* F2. The <picture> has already swapped the source to the VECTOR mark here.
-     52x70 at height 24px is 17.8px wide, inside a 48px content box with room to
-     spare, and it resamples at no size because there is nothing to resample.
-     The lockup at height 18px was 68px wide in that same 48px box: it hung 10px
-     past each edge and lapped over the rail's own border-right. */
+  /* The <picture> has already swapped to the VECTOR mark here: 52x70 at 24px is
+     17.8px wide in a 48px box. The lockup at 18px was 68px and overhung it. */
   .rail-brand img { height: 24px; }
   /* The kit: "in any clinical setting the words decision support travel with
-     the mark." They may not disappear with the nav labels, so they wrap to two
-     lines under the mark instead. Most of the tracking comes off: 0.1em over
-     "decision support" is 1.6px of the 48px the box has. */
+     the mark", so they wrap under it rather than going with the nav labels. */
   .rail-descriptor {
     text-align: center; letter-spacing: 0.02em; line-height: 1.35;
     overflow-wrap: anywhere;
@@ -725,9 +607,8 @@
   .pad { padding: var(--d4) var(--d4) var(--d7); }
 }
 
-/* A day that can be read but not scored. Evidence is date-blind, so ranking an
-   older day would cite readings taken after it -- a real limit, and one that has
-   to be visible rather than hidden in a disabled control's tooltip. */
+/* A day that can be read but not scored: evidence is date-blind, so ranking an
+   older day would cite readings taken after it. Visible, not in a tooltip. */
 .cta-locked {
   display: inline-flex; align-items: center; gap: var(--d2);
   padding: var(--d1) var(--d3); min-height: 34px;

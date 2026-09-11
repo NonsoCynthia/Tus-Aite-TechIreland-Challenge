@@ -14,71 +14,37 @@ import { QUIET_OFF_DAY, SevBar, SevChip, SevLegend, SevQuiet } from '../componen
 import {
   SAFE_OCCUPANCY, SEV_INTEGRITY, sevBooked, sevBreach, sevOccupancy, sevReadingAge, type Sev,
 } from '../lib/severity'
-/** Median wait. ONE home, lib/stats.ts, shared with List.tsx -- the two surfaces
- *  used to hold a copy each and printed 142 against 141 on 2026-08-21. */
+/** Median wait. ONE home, lib/stats.ts, shared with List.tsx: two copies drift. */
 import { median } from '../lib/stats'
 import type { CohortReferral, Decision, Reference } from '../lib/types'
 import './overview.css'
 
-/* ---------------------------------------------------------------------------
-   Constants that are CITED, not assumed. Everything else on this surface is
-   counted at render time from a payload.
---------------------------------------------------------------------------- */
+/* --- constants that are CITED. Everything else is counted from a payload. --- */
 
 /* Safe-operating occupancy -- Bagust, Place & Posnett, BMJ 1999;319:155-8 -- is
-   imported from lib/severity above, beside the bands that grade against it.
-   It used to be declared here as well, a second time in components/AgentInputs
-   and a third time implicitly as sevOccupancy's first boundary. A drawn safe
-   line that can drift from the band edge grading the same number is the
-   "never hardcode a threshold" fault in another costume: one declaration. */
+   imported from lib/severity, beside the bands that grade against it. ONE
+   declaration, or the drawn line drifts from the edge grading the same number. */
 
 /** Colour is never the only channel: the GAR letter always resolves to a word. */
 const GAR_WORD = { G: 'Green', A: 'Amber', R: 'Red' } as const
 
-/** --icon-sm. The token floor for an icon that carries meaning; the readouts
- *  used to draw theirs at 12px, the smallest mark in the product. */
+/** --icon-sm: the token floor for an icon that carries meaning. */
 const ICON = 14
 
-/** THE QUIET MARKS THIS SURFACE DRAWS, and the only ones its key may show.
- *
- *  Exactly one, at SEV_INTEGRITY: a date that is not the day selected, drawn on
- *  the cited session in the specialty panel, on the cited session in Clinic
- *  capacity, and on the ward snapshot. Every one of those goes through
- *  <SevQuiet mark={QUIET_OFF_DAY}>, so the three marks and this key read the
- *  same object and cannot name different steps.
- *
- *  NOT the rule step. A rule that fired is drawn on this surface too, in the
- *  Rules panel, but it is drawn SOLID there -- one verdict per rule on a panel
- *  with room for it, not one per row of a 595-mark table -- so List's quiet
- *  mark has no referent here and this key must not show it.
- *
- *  A module constant rather than an inline array: a fresh array on every render
- *  would re-subscribe the legend's audit on every render. */
+/** THE QUIET MARKS THIS SURFACE DRAWS, and the only ones its key may show: one,
+ *  at SEV_INTEGRITY, for a date that is not the day selected. NOT List's quiet
+ *  rule mark -- a rule that fired is drawn SOLID here, so it has no referent.
+ *  A module constant, not an inline array: a fresh array re-subscribes the
+ *  legend's audit on every render. */
 const QUIET_HERE = [QUIET_OFF_DAY]
 
 /** NTPF Outpatient Waiting List by Speciality, OpenData_OPNational02_2026.csv,
- *  snapshot 30/07/2026. Counted from the file itself, which is in this repo at
- *  dataset/generator/calibration/_raw/, over EVERY row of that snapshot: 77
- *  adult and child rows carrying 58 distinct specialty labels.
- *
- *  This block used to cite "682,279 people over the 57 non-SDC specialties".
- *  There is no SDC in that file -- no such column, no such label, and nothing
- *  marking any row as excludable. The figure was the snapshot with the two
- *  `Small Volume Specialties` rows dropped (1,278 people; bands 1,021 / 194 /
- *  36 / 27), which is exactly where both the 57 and the 682,279 came from. A
- *  citation is the one thing on this page a judge can reproduce, so what is
- *  cited is now what the file says when nothing is taken out of it.
- *
- *  TWO totals, because the file carries two and they disagree. Its Total
- *  column sums to 683,553; its four band columns sum to 683,557, and 18 of the
- *  77 rows do not add up on their own. The shares below are of the band sum,
- *  because the bands are what they are computed from; the Total column figure
- *  is cited beside it rather than quietly reconciled away.
- *
- *  NTPF publishes the bands in months. The day boundaries below are the ones
- *  every wait in this dataset was cut on, so bucketing this hospital on
- *  183/365/548 compares like with like rather than inventing a days-per-month
- *  constant. */
+ *  snapshot 30/07/2026, in this repo at dataset/generator/calibration/_raw/.
+ *  Counted over EVERY row, nothing excluded: a citation is the one thing here a
+ *  judge can reproduce. TWO totals, because the file carries two that disagree --
+ *  its Total column and its four band columns; the shares are of the band sum,
+ *  and the Total is cited beside it rather than reconciled away. 183/365/548 are
+ *  the day boundaries every wait in this dataset was cut on. */
 const NTPF_SNAPSHOT = '2026-07-30'
 /** The Total column, summed over the snapshot. */
 const NTPF_TOTAL = 683_553
@@ -90,29 +56,19 @@ const NTPF_BAND_ROWS = [
   { key: '12–18 months', lo: 365, hi: 548, n: 71_212 },
   { key: '18 months +', lo: 548, hi: Infinity, n: 50_340 },
 ] as const
-/** DERIVED, never written down beside the four counts that are it: the last
- *  hand-written copy of this figure is what drifted 1,278 people away from the
- *  file. The shares are derived from it for the same reason. */
+/** DERIVED, never written beside the four counts that are it; so are the shares. */
 const NTPF_BAND_TOTAL = NTPF_BAND_ROWS.reduce((a, b) => a + b.n, 0)
 const NTPF_BANDS = NTPF_BAND_ROWS.map((b) => ({ ...b, share: b.n / NTPF_BAND_TOTAL }))
 
-/* DAILY_ROWS lived here: 70,022, the row count of dataset/out/referral_daily.csv,
-   printed as the evidence that nothing ever leaves this list. That file is the
-   GENERATOR's output and is not what gets loaded -- the sample profile puts
-   8,161 rows in core.referral_daily, 4,063 of them at 9001 -- so the screen was
-   citing a figure 8.6x the data it was drawing, and would have drifted again on
-   any reload. The count now comes from /api/hospital-days, which this panel
-   already fetches, so it follows the data and needs no second request. */
+/* No referral-day row count is written down: the generator's output file is not
+   what gets loaded, so the figure comes from /api/hospital-days. */
 
-/** How many day-columns the intake chart will draw. Past this the chart scrolls
- *  and the panel says how many of the series it is showing: 59 columns in a
- *  ~400px panel leaves 3.8px each, and a count label centred on a 3.8px track
- *  lands on top of its neighbours on both sides. */
+/** Day-columns before the chart scrolls: past this, a count label centred on its
+ *  track overlaps its neighbours. */
 const INTAKE_COLUMNS = 30
 
-/** Reading age, bucketed. The boundaries are the ones observation_age already
- *  reports against (a year, two years), extended downwards so the shape shows.
- *  Severity comes from sevReadingAge, never from these edges. */
+/** Bucketed on observation_age's own boundaries. Severity comes from
+ *  sevReadingAge, never from these edges. */
 const AGE_BUCKETS = [
   { key: 'under 3 months', lo: 0, hi: 90 },
   { key: '3–6 months', lo: 90, hi: 180 },
@@ -121,13 +77,9 @@ const AGE_BUCKETS = [
   { key: 'over 2 years', lo: 730, hi: Infinity },
 ] as const
 
-/** Rules whose subject is the whole list, and where each one's verdict actually
- *  lives on the decision.
- *
- *  This was a Set of two IDs read by a two-way branch, so a third whole-list
- *  rule added to core.ref_rules would have silently rendered RULE-TIEBREAK's
- *  verdict under its own name. A lookup cannot do that: a whole-list rule with
- *  no entry here has no verdict to show, and the board says so. */
+/** Rules whose subject is the whole list, and where each verdict lives on the
+ *  decision. A lookup, not a two-way branch: a new one with no entry here has no
+ *  verdict to show, rather than rendering another rule's under its name. */
 const WHOLE_LIST_VERDICT: Record<string, ((d: Decision) => boolean) | undefined> = {
   'RULE-ORDER': (d) => d.rule_order_passed,
   'RULE-TIEBREAK': (d) => d.rule_tiebreak_passed,
@@ -159,11 +111,7 @@ const dayNum = (iso: string) => String(new Date(iso).getDate())
 /** The calendar day a timestamp falls on, as the API writes dates. */
 const dayOf = (iso: string) => iso.slice(0, 10)
 
-/* ---------------------------------------------------------------------------
-   Aggregation. Two figures are counted the honest way and never any other:
-   a breach is of the referrals that HAVE a target, and the referrals with no
-   target at all get their own count rather than a denominator to hide in.
---------------------------------------------------------------------------- */
+/* --- Aggregation. A breach is always of the referrals that HAVE a target. --- */
 
 function summarise(rows: CohortReferral[]) {
   const withTarget = rows.filter((r) => r.crt_threshold_days != null)
@@ -189,37 +137,23 @@ function summarise(rows: CohortReferral[]) {
 
 type SpecRow = ReturnType<typeof bySpecialty>[number]
 
-/** What /api/decision actually returns in `excluded`.
- *
- *  types.ts declares two fields, which is all the rest of the app reads. The
- *  payload is the whole banded cohort row, and it carries `capacity_score`:
- *  GET /api/decision/9001/2026-08-30 returns 0.781 on each of the three 0601
- *  referrals. Every field picked up here is optional and is checked before it
- *  is used, so a payload that stops carrying them degrades to "not scored"
- *  rather than to a wrong number. */
+/** What /api/decision returns in `excluded`: the whole banded cohort row, of
+ *  which types.ts declares only the two fields the rest of the app reads. Every
+ *  field here is optional and checked, so a payload that drops them degrades to
+ *  "not scored", never to a wrong number. */
 type ExcludedRow = Decision['excluded'][number] & Partial<{
   specialty_hipe: string
   capacity_score: number | null
 }>
 
-/** What the capacity agent computed, per SPECIALTY.
+/** What the capacity agent computed, per SPECIALTY. These three are identical for
+ *  every referral in a specialty, so none may be drawn against a person or called
+ *  the hospital's figure.
  *
- *  ward_pressure, clinic_pressure and capacity_score are identical for every
- *  referral inside a specialty and differ between specialties, which is why
- *  `capacity_score` is documented in types.ts as "specialty-level, identical for
- *  every referral in a specialty". Reading one ranking's capacity_detail and
- *  calling it the hospital's figure would be wrong; so would drawing it against
- *  a person. It is drawn against a specialty.
- *
- *  BOTH LISTS, not just `rankings`. A specialty the urgency agent refuses (0601)
- *  produces no ranking, so reading rankings alone made this map report the
- *  capacity agent as absent for a specialty it had scored -- and that score is
- *  not idle: ranking.py:147-155 builds the distinct-capacity-by-specialty dict
- *  from every banded referral, "not about which referrals have an urgency score
- *  yet", so 0601's 0.781 is one of the seven numbers whose mean IS this
- *  decision's scarcity (0.778) and therefore its alpha. `placed` is what the two
- *  sources differ on, and the table says which of the two it is looking at:
- *  an excluded row carries the score without the ward/clinic split behind it. */
+ *  BOTH LISTS, not just `rankings`: a refused specialty produces no ranking, yet
+ *  ranking.py:147-155 builds the distinct-capacity dict from every banded
+ *  referral, so its score is one of those whose mean IS scarcity. `placed` says
+ *  which list a row came from; an excluded one carries no ward/clinic split. */
 function agentCapacity(d: Decision | undefined) {
   const m = new Map<string, {
     ward: number | null; clinic: number | null; score: number; placed: boolean
@@ -236,9 +170,7 @@ function agentCapacity(d: Decision | undefined) {
   for (const e of (d?.excluded ?? []) as ExcludedRow[]) {
     const code = e.specialty_hipe
     if (code == null || m.has(code) || typeof e.capacity_score !== 'number') continue
-    // No capacity_detail on an excluded row: the score is carried, the ward and
-    // clinic halves it was built from are not. Null is "not carried", which the
-    // cells below say in those words rather than as an em dash.
+    // No capacity_detail on an excluded row: null is "not carried", said in words.
     m.set(code, { ward: null, clinic: null, score: e.capacity_score, placed: false })
   }
   return m
@@ -268,11 +200,7 @@ function bySpecialty(rows: CohortReferral[], clinics: Clinic[] | undefined) {
     .sort((a, b) => b.n - a.n)
 }
 
-/* ---------------------------------------------------------------------------
-   Reconciliation. Two independent counts of the same list, plus the decision's
-   own account of it. A gap here means a number on this page cannot be trusted,
-   which outranks any clinical state, so it renders at SEV_INTEGRITY.
---------------------------------------------------------------------------- */
+/* --- Reconciliation. A gap outranks any clinical state: SEV_INTEGRITY. --- */
 
 type Check = { holds: boolean; said: string }
 
@@ -305,20 +233,12 @@ function reconcile(total: number, ops: OpsQuery, d: Decision | undefined): Check
 
 /* ------------------------------------------------------------------------- */
 
-/** The hospital overview as an instrument panel.
- *
- *  Everything that used to be a paragraph here is now something you can read a
- *  number off. The staleness prose became a distribution; the bed-pressure
- *  prose became a table with free beds, DTOC, surge, outliers and the specialty
- *  each ward actually backs; "specialty 0600" became Otolaryngology (ENT).
- *
- *  Five things are held to on every panel. A breach is always of the 165 that
- *  have a target, never of the 308. A reading's age always travels with the
- *  reading. Every colour carries a word beside it. Capacity is only ever shown
- *  as one number for the whole hospital-day, because priority.py guarantees it
- *  cannot reorder two people. And every panel says the day its figures were
- *  actually taken on, which is not always the day selected above.
- */
+/** The hospital overview as an instrument panel. Five rules hold on every panel:
+ *  a breach is of the referrals that have a target; a reading's age travels with
+ *  the reading; every colour carries a word; capacity is one number for the whole
+ *  hospital-day (priority.py guarantees it cannot reorder two people); and every
+ *  panel says the day its figures were taken on, which is not always the day
+ *  selected above. */
 export function Overview({ hospital, date, name, reference, onOpenList }: {
   hospital: string; date: string; name: string
   reference: Reference | undefined
@@ -328,8 +248,7 @@ export function Overview({ hospital, date, name, reference, onOpenList }: {
     queryKey: ['cohort', hospital, date],
     queryFn: () => api.cohort(hospital, date),
   })
-  // ~3.3s uncached: every ward's latest snapshot, every clinic's session
-  // series, and one context per referral for the observation ages.
+  // ~3.3s uncached: every ward, every clinic series, one context per referral.
   const ops = useQuery({
     queryKey: ['operations', hospital, date],
     queryFn: () => api.operations(hospital, date),
@@ -365,9 +284,8 @@ export function Overview({ hospital, date, name, reference, onOpenList }: {
   const s = summarise(rows)
   const specs = bySpecialty(rows, ops.data?.clinics)
   const d = dec.data
-  // A 404 is the ordinary "nothing has run yet" state. Anything else is a
-  // failure to read a decision that may well exist, and the two cannot be told
-  // apart by isError alone.
+  // A 404 is the ordinary "nothing has run yet" state; anything else is a failed
+  // read of a decision that may exist. isError alone cannot tell them apart.
   const decErr = dec.error instanceof Error ? dec.error.message : String(dec.error ?? '')
   const noRun = dec.isError && decErr.includes('404')
   const decFailed = dec.isError && !noRun
@@ -399,33 +317,14 @@ export function Overview({ hospital, date, name, reference, onOpenList }: {
       )}
       {noRun && <BeforeRanking date={date} runnable={days.data?.runnable} />}
 
-      {/* THE KEY TO EVERY MARK BELOW IT, and this is the surface those marks
-          are on: App.tsx:64 opens the app here, and this screen draws roughly
-          twenty of them -- the past-target readout, a clinic bar per specialty,
-          the five staleness chips and their five bars, an occupancy bar and
-          block per ward, the booked ratio per clinic -- while the only place
-          the ladder was ever named was one tab away, on the List.
+      {/* ONE key strip for the whole surface, and the same component the marks
+          are built from so the two cannot drift. BELOW the reconciliation band:
+          a strip between the header and that role="alert" pushes the one thing
+          that outranks everything else down the screen.
 
-          ONE strip for the whole surface, not one per panel. The scale is one
-          scale and six of the eight panels spend it, so a legend beside each
-          would be five more copies of the same ladder, each competing with that
-          panel's own citation line for the same corner of the eye. It sits here,
-          above the first mark on the page, and it is the component the marks are
-          built from -- imported, never redrawn, so the two cannot drift.
-
-          BELOW the reconciliation band and the no-run notice on purpose. Both
-          of those are prose that says its own state in words, and a key strip
-          between the header and a role="alert" would push the one thing on this
-          page that outranks everything else down the screen.
-
-          THE QUIET GROUP IS THIS SURFACE'S, passed rather than inherited. The
-          strip's default is List's mark -- a rule that fired, at step 3 -- and
-          this surface draws no such thing: it draws the quiet tone at step 4
-          only, on a date that is not the day selected. Placed with no prop, the
-          key taught the wrong step for the loudest signal the product has and
-          omitted the only quiet mark on the page. QUIET_HERE is the whole
-          answer, declared once at the top of this file and drawn from by every
-          one of those three marks. */}
+          THE QUIET GROUP MUST BE PASSED. The strip's default is List's mark,
+          which this surface never draws, so with no prop the key teaches the
+          wrong step and omits the only quiet mark on the page. */}
       <div className="ov-key">
         <SevLegend quiet={QUIET_HERE} />
         <ReadoutBand s={s} d={d} decNote={decNote} reference={reference} />
@@ -454,9 +353,7 @@ export function Overview({ hospital, date, name, reference, onOpenList }: {
 
 /* --- 0. integrity, and the state before anything has been ranked ---------- */
 
-/** The loudest thing this surface can say. Quiet while the counts agree; a
- *  solid block the moment they do not, because a clinician can act on a bad
- *  number long before anyone notices it was bad. */
+/** The loudest thing here: quiet while the counts agree, solid when they do not. */
 function IntegrityBand({ checks }: { checks: Check[] }) {
   if (!checks.length) return null
   const broken = checks.filter((c) => !c.holds)
@@ -485,8 +382,7 @@ function IntegrityBand({ checks }: { checks: Check[] }) {
   )
 }
 
-/** No decision means this surface is the whole product: the list as it stands,
- *  before anything has been ranked. Said plainly, with the way forward. */
+/** With no decision this surface is the whole product: the list, unranked. */
 function BeforeRanking({ date, runnable }: { date: string; runnable: string | null | undefined }) {
   const here = runnable == null || runnable === date
   return (
@@ -495,11 +391,8 @@ function BeforeRanking({ date, runnable }: { date: string; runnable: string | nu
         <ListOrdered size={ICON} strokeWidth={1.9} aria-hidden />
         Nothing has been ranked for this day
       </h2>
-      {/* 352 characters, and most of them were an enumeration of the columns of
-          the table two inches below: who is waiting, which have a target, how
-          stale the readings are. A reader who can see the table does not need it
-          read out. What the table cannot say is who put those numbers there, and
-          what the agent columns do when nothing has run. That is what is left. */}
+      {/* Only what the table below cannot say: who put those numbers there, and
+          what the agent columns do when nothing has run. */}
       <p>
         Everything here was recorded by a clinician, not computed by an agent. With no run,
         α, scarcity, placement and rule verdict read "no run" rather than zero.
@@ -523,17 +416,11 @@ function BeforeRanking({ date, runnable }: { date: string; runnable: string | nu
   )
 }
 
-/** D2. `core.bed_status` and `core.clinic_sessions` are read latest-first with
- *  no date predicate, so every one of the 14 hospital-days is served the same
- *  rows. The payload carries the true date on every ward and every clinic; the
- *  panel shows it, and says plainly when it is not the day selected.
- *
- *  `source` is a DEFINITION: the same data-model quirk on all 14 hospital-days,
- *  and this component is placed on three panels, so on one screen it was three
- *  copies of one paragraph. It is behind the disclosure. What is NOT behind it
- *  is the reading's age (invariant 2): the span, the day selected, and the fact
- *  that the two differ are the summary, and the chip beside them still carries
- *  the date as a mark. Only the argument for why the date is what it is moved. */
+/** `core.bed_status` and `core.clinic_sessions` are read latest-first with no
+ *  date predicate, so every hospital-day is served the same rows. The payload
+ *  carries the true date; this panel shows it and says when it is not the day
+ *  selected. `source` is a DEFINITION on three panels, so it goes behind the
+ *  disclosure; the span and the fact that it differs stay visible. */
 function AsOf({ what, taken, selected, source }: {
   what: string; taken: string[]; selected: string; source: string
 }) {
@@ -581,9 +468,8 @@ function ReadoutBand({ s, d, decNote, reference }: {
                n={BANDS.map((b) => `${fmt(s.bands.get(b.key) ?? 0)} ${b.key}`).join(' · ')} />
       <Readout icon={Clock} k="have a target" v={fmt(s.withTarget)}
                n={`Urgent ${urgentDays ?? '—'}d · Semi-Urgent ${semiDays ?? '—'}d`} />
-      {/* A pass/fail with no magnitude at hospital level: either some referral
-          is past its target or none is. sevBreach is the scale for exactly
-          that, and it replaces a 3px clay edge that said nothing at distance. */}
+      {/* A pass/fail with no magnitude at hospital level -- some referral is past
+          its target or none is -- which is exactly what sevBreach grades. */}
       <Readout icon={TriangleAlert} k="past target" v={fmt(s.breached)}
                sev={sevBreach(s.breached === 0)}
                n={`${pct(s.withTarget ? s.breached / s.withTarget : 0, 0)} of the ${fmt(s.withTarget)} that have one`} />
@@ -591,10 +477,7 @@ function ReadoutBand({ s, d, decNote, reference }: {
                n="Routine and Uncategorised carry no timeframe, so nothing here can be late" />
       <Readout icon={Clock} k="median wait" v={fmt(s.median)} unit="days"
                n={`longest ${fmt(s.longest)} days`} />
-      {/* The guarantee this carries, one number for the whole hospital-day and
-          therefore one that cannot reorder anyone, was stated in four separate
-          paragraphs across this file, the graph legend and the patient page. It
-          belongs on the number, once. */}
+      {/* One alpha for the whole hospital-day, so it cannot reorder anyone. */}
       <Readout icon={Gauge} k="α · weight on urgency" v={d ? d.alpha.toFixed(3) : '—'}
                n={d ? 'hospital-day scope · cannot reorder anyone' : decNote ?? undefined} />
       <Readout icon={Activity} k="scarcity" v={d ? d.scarcity.toFixed(3) : '—'}
@@ -621,19 +504,14 @@ function Readout({ icon: Icon, k, v, unit, n, sev = 0 }: {
 
 /* --- panel chrome --------------------------------------------------------- */
 
-/** A caption is one line per panel and there are five of them on this page, so
- *  it is the repetition rule's own case: a definition read once and re-read on
- *  every later visit. `cite` is what STAYS -- the claim, the source, the thing
- *  invariant 2 or invariant 10 puts on the caption in the first place -- and
- *  `citeMore` is the argument for it, behind the toggle. A panel whose whole
- *  caption is already a line passes `cite` alone and gets no toggle: a
- *  disclosure over one short sentence is more chrome than the sentence. */
+/** `cite` STAYS on the caption -- the claim and its source -- and `citeMore` is
+ *  the argument for it, behind the toggle. A one-line caption passes `cite`
+ *  alone: a disclosure over one sentence is more chrome than the sentence. */
 function Panel({ icon: Icon, title, note, cite, citeLabel, citeMore, children }: {
   icon: typeof Gauge; title: string; note?: string; cite?: string
   /** The toggle's visible text: a noun phrase naming what opens. */
   citeLabel?: string
-  /** The half of the caption that is a definition. Omit it and `cite` renders
-   *  as plain text, exactly as it did before. */
+  /** The half of the caption that is a definition. Omit it and `cite` is plain. */
   citeMore?: React.ReactNode
   children: React.ReactNode
 }) {
@@ -668,8 +546,7 @@ function PanelState({ q, children }: {
   return <>{children}</>
 }
 
-/** A horizontal bar with no severity attached: a share, a count, a magnitude
- *  that is context rather than a state. The number always sits beside it. */
+/** A bar with no severity: a magnitude that is context, not a state. */
 function Bar({ v, max = 1 }: { v: number; max?: number }) {
   const w = max > 0 ? Math.min(100, Math.max(0, (v / max) * 100)) : 0
   return (
@@ -692,12 +569,9 @@ function SevMeter({ v, sev, empty, label }: {
   )
 }
 
-/** A 0–1 pressure carrying no severity: the agent's own working, shown as the
- *  agent's. Neutral, because a busy ward is not an Urgent referral.
- *
- *  `title` is an aside on the word that replaces a missing number, never the
- *  only place that word is explained -- the surface says the load-bearing half
- *  in visible text, the way the refused specialty is named in its own row. */
+/** A 0–1 pressure carrying no severity: the agent's own working, neutral because
+ *  a busy ward is not an Urgent referral. `title` is an aside on the word standing
+ *  in for a missing number, never the only place it is explained. */
 function Meter({ v, empty, title }: { v: number | null; empty: string; title?: string }) {
   if (v == null) return <span className="ov-none" title={title}>{empty}</span>
   return (
@@ -737,19 +611,15 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun, date }: {
   const cap = agentCapacity(d)
   const scored = [...cap.values()]
   const unplaced = scored.filter((c) => !c.placed).length
-  /* Scarcity is the mean of the distinct specialty capacity scores in the
-     cohort, refused specialties included (ranking.py:147-155). CHECKED, not
-     claimed: the arithmetic is reproduced here from the scores this table is
-     printing, and the footer says nothing about it unless it comes back to the
-     decision's own scarcity. ADR-007 fixes the sign convention, so a payload
-     that ever said "availability" would invert the mean and is not asserted
-     over either. */
+  /* Scarcity is the mean of the distinct specialty capacity scores, refused ones
+     included (ranking.py:147-155). CHECKED, not claimed: reproduced from the
+     scores this table prints, and the footer says nothing unless it comes back to
+     the decision's own scarcity. ADR-007 fixes the sign convention. */
   const capMean = scored.length ? scored.reduce((a, c) => a + c.score, 0) / scored.length : null
   const scarcityIsMean = d != null && capMean != null
     && d.capacity_direction === 'pressure' && Math.abs(capMean - d.scarcity) < 1e-6
-  /* Rows that will draw a clinic figure NOTHING computed for this day: the
-     cited session's own number. Collected so the panel can date them all at
-     once, above the table, the way the ward and clinic panels date theirs. */
+  /* Rows that will draw a clinic figure nothing computed for this day: the cited
+     session's own number. Collected so the panel can date them all at once. */
   const citedFallback = specs
     .filter((x) => cap.get(x.code)?.clinic == null && !noSlots(x.clinic)
       && x.clinic?.cited_pressure != null && x.clinic?.cited_session_date != null)
@@ -758,11 +628,9 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun, date }: {
   return (
     <Panel icon={Stethoscope} title="By specialty"
            note={`${specs.length} specialties · core.ref_specialties`}>
-      {/* The By-specialty table used to print a graded clinic pressure with no
-          date on it, in a table whose header names the selected day, on days
-          when no decision existed at all -- and on 13 of the 14 hospital-days
-          that figure is the 2026-08-28 session, which is in the FUTURE for 11
-          of them. It is dated now, in the cell and here. */}
+      {/* A clinic pressure drawn undated in a table whose header names the
+          selected day claims that day. The cited session can be in the FUTURE
+          for most hospital-days, so it is dated in the cell and here. */}
       {citedFallback.length > 0 && (
         <AsOf what="Clinic sessions cited with no agent figure"
               taken={citedFallback} selected={date}
@@ -787,24 +655,19 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun, date }: {
           <tbody>
             {specs.map((x) => {
               const a = cap.get(x.code)
-              // What the capacity agent produced FOR THIS HOSPITAL-DAY, and
-              // only that. The cited session's own figure is a different
-              // claim and is drawn as one, below.
+              // What the capacity agent produced FOR THIS HOSPITAL-DAY and only
+              // that. The cited session's own figure is a different claim, below.
               const agentClinic = a?.clinic ?? null
               const citedP = noSlots(x.clinic) ? null : x.clinic?.cited_pressure ?? null
               const citedDay = x.clinic?.cited_session_date
                 ? dayOf(x.clinic.cited_session_date) : null
               // A standing property of the SPECIALTY, not of a run: 0601 is
-              // refused unconditionally because NEWS2 is validated in adults,
-              // and /api/decision 404s on 13 of 14 days. Same derivation as
-              // List.tsx:475 and Patient.tsx:87. It replaced a test for "this
-              // specialty produced no ranking", which is a different fact and
-              // was answering with the word "not ranked" in three columns at
-              // once -- including the two the capacity agent had filled.
+              // refused unconditionally and /api/decision 404s on most days. NOT
+              // "produced no ranking", a different fact that answers "not ranked"
+              // in columns the capacity agent has filled.
               const refused = isRefusedPaediatric(x.code)
-              // THREE absences, and they are not the same claim. Nothing ran;
-              // this specialty is in no decision list at all; or the decision
-              // carries the score without the working behind it.
+              // THREE absences, and not the same claim: nothing ran; this
+              // specialty is in no decision list; or the working is not carried.
               const empty = !d ? (noRun ? 'no run' : '—') : a ? 'not carried' : 'not scored'
               const notCarried = a && !a.placed
                 ? 'the capacity agent scored this specialty; the decision carries the score for'
@@ -832,11 +695,9 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun, date }: {
                   </td>
                   <td className="c-n num">{fmt(x.median)}<span className="ov-of">d</span></td>
                   <td className="c-n num">{fmt(x.longest)}<span className="ov-of">d</span></td>
-                  {/* ward_pressure is 0.6 x occupancy + 0.4 x an escalation
-                      flag, not an occupancy, so the 85% line does not apply to
-                      it and neither does sevOccupancy. It stays the agent's
-                      working. The occupancy itself is graded, on the ward
-                      table, against the line it belongs to. */}
+                  {/* ward_pressure is 0.6 x occupancy + 0.4 x an escalation flag,
+                      not an occupancy, so the safe line and sevOccupancy do not
+                      apply to it. Occupancy itself is graded on the ward table. */}
                   <td className="c-bar">
                     <Meter v={a?.ward ?? null} empty={empty}
                            title={a && a.ward == null ? notCarried : undefined} />
@@ -845,20 +706,14 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun, date }: {
                     {noSlots(x.clinic)
                       ? <span className="ov-none">no clinic that day</span>
                       : agentClinic != null
-                        // The agent's own figure for this hospital-day: graded,
-                        // because the day it grades is the day at the top.
+                        // Graded: the day it grades is the day at the top.
                         ? <SevMeter v={agentClinic} sev={sevBooked(agentClinic)} empty="—"
                                     label={`clinic ${pct(agentClinic, 0)} booked on the cited session`} />
                         : citedP != null && citedDay != null
-                          // Nothing computed a clinic pressure for the selected
-                          // day, so this is the cited session's own number and
-                          // it travels with its own date. NOT graded: a step on
-                          // the scale is "how far past a line THIS day is", and
-                          // the same figure keeps its grade one panel down in
-                          // Clinic capacity, under a column that names the
-                          // session rather than the day. One column, one
-                          // subject: a graded mark here would say the same
-                          // thing about two different days.
+                          // The cited session's own number, with its own date.
+                          // NOT graded: a step means "how far past a line THIS
+                          // day is", and the same figure is graded one panel down
+                          // under a column that names the session, not the day.
                           ? (
                             <>
                               <Meter v={citedP} empty="—" />
@@ -875,18 +730,13 @@ function SpecialtyPanel({ specs, s, reference, ops, d, noRun, date }: {
                               </span>
                             </>
                           )
-                          // Withheld rather than drawn undated: a pressure whose
-                          // session has no date cannot say what it is a pressure
-                          // of.
+                          // Withheld rather than drawn undated.
                           : <span className="ov-none">{citedP != null ? 'no session cited' : empty}</span>}
                   </td>
                   <td className="c-n num">
                     {/* The urgency agent refuses this specialty; the capacity
-                        agent does not, and scored every referral in 0601. This
-                        cell printed "not ranked" over a score of 0.781 that the
-                        decision carries and that scarcity is the mean of. What
-                        is absent is a PLACEMENT, so that is what is said, and
-                        the number that exists is shown. */}
+                        agent does not. What is absent is a PLACEMENT, so that is
+                        what the cell says, and the score is shown. */}
                     {a ? (
                       <>
                         {a.score.toFixed(3)}
@@ -1001,10 +851,8 @@ function IntakePanel({ days, date }: {
       : `${fmt(list.length)} days holding a cohort`
     : undefined
 
-  // The evidence for the claim above the chart. Both figures come from
-  // core.referral_daily on the response this panel already has. Either being
-  // null means the read failed, and a failed read is not the finding "none were
-  // removed" -- so the line is dropped rather than printed as a nought.
+  // Evidence for the claim above the chart. Null means the read failed, which is
+  // not the finding "none were removed", so the line is dropped, not zeroed.
   const rowsHeld = days.data?.referral_days
   const removed = days.data?.removed
   const intakeEvidence = rowsHeld == null || removed == null
@@ -1013,10 +861,8 @@ function IntakePanel({ days, date }: {
       ? `${fmt(rowsHeld)} referral-days are recorded for this hospital, and not one of them carries a removal date.`
       : `${fmt(rowsHeld)} referral-days are recorded for this hospital, and ${fmt(removed)} carry a removal date, so a rise in the counts above is not intake on its own.`
 
-  // The claim follows its own evidence rather than standing over it. "Nothing
-  // has ever left this list" was written unconditionally, so the day a removal
-  // appeared in the data the sentence would have been false with nothing to
-  // catch it, which is the same fault as the constant it replaced.
+  // The claim follows its own evidence: written unconditionally, "nothing has
+  // ever left this list" goes false the day a removal appears.
   const intakeClaim = removed == null
     ? 'Net change per day. Whether anything has left this list could not be read.'
     : removed === 0
@@ -1041,9 +887,7 @@ function IntakePanel({ days, date }: {
               <span className="ov-intake-net num">+{fmt(last.referrals - first.referrals)}</span>
               <span className="ov-of">added, 0 removed</span>
             </div>
-            {/* One label per column rather than every delta concatenated into a
-                single ~900-character string, which is what a 60-day series used
-                to hand a screen reader. */}
+            {/* One label per column, not the whole series in one string. */}
             <div className="ov-chart-wrap">
               <div className="ov-cols-chart" role="list"
                    aria-label={`Referrals added per day, ${fmt(deltas.length)} days`}>
@@ -1102,12 +946,8 @@ function StalenessPanel({ ops }: {
               <div className="ov-hist">
                 {hist.map((h) => {
                   const sev = sevReadingAge(h.lo)
-                  // Where the rule is drawn and where the ramp steps are the
-                  // same fact, so they are read from the same place. This was
-                  // `h.lo >= 365`, a boundary re-derived beside the scale that
-                  // already owns it: sevReadingAge is what "a year old" means
-                  // here, and 365 is only ever its argument. The same test
-                  // List.tsx:477 uses to count year-old readings.
+                  // Where the rule is drawn and where the ramp steps are one
+                  // fact, so both read sevReadingAge; 365 is only its argument.
                   const pastYear = sev >= sevReadingAge(365)
                   return (
                     <div className={'ov-hist-row' + (pastYear ? ' is-past-year' : '')} key={h.key}>
@@ -1166,27 +1006,14 @@ function RulePanel({ d, decNote, reference, onOpenList }: {
     }
   }
   const carrying = d.rankings.filter((r) => failed(r.rule_checks).length > 0).length
-  // split out, because "past a CRT target" and "past the triage turnaround
-  // window" are different claims and only the first is what the readout band
-  // above counts as past target
+  // split out: only a CRT breach is what the readout band counts as past target
   const crtBreached = d.rankings.filter((r) =>
     failed(r.rule_checks).some((c) => c.rule_id.startsWith('RULE-CRT-'))).length
-  // EVERY rule in core.ref_rules, tested or not.
-  //
-  // This was filtered to `tally.has(id) || isWholeList(...)`, which kept a rule
-  // only when some referral carried a check for it. A per-referral rule that
-  // nothing was ever tested against therefore vanished from this board, while
-  // DecisionRecord.tsx -- drawn straight from reference.rules -- went on
-  // reporting the same rule as "not tested". Two audit surfaces disagreeing
-  // about whether a rule exists is worse than either answer on its own.
-  //
-  // The filter also made the "not tested" branch below unreachable: any id that
-  // survived it either had tested >= 1 or took the whole-list path, so the one
-  // case the branch was written for could not occur.
+  // EVERY rule in core.ref_rules, tested or not: filtering to the ones a referral
+  // carried a check for drops untested rules while DecisionRecord.tsx still
+  // reports them, and makes the "not tested" branch below unreachable.
   const ids = (reference?.rules ?? []).map((r) => r.rule_id)
-  // Still a union, never the reference alone: a rule the coordinator tested
-  // that core.ref_rules does not carry is a fact about this decision and keeps
-  // its place, with whatever statement the reference can give it.
+  // Still a union: a rule tested but absent from core.ref_rules keeps its place.
   for (const id of tally.keys()) if (!ids.includes(id)) ids.push(id)
   const untested = ids.filter((id) => !isWholeList(reference, id) && !tally.has(id)).length
   const perReferral = [...tally.entries()]
@@ -1196,9 +1023,7 @@ function RulePanel({ d, decNote, reference, onOpenList }: {
   return (
     <Panel icon={Activity} title="Rules"
            note={`${fmt(ids.length)} rules · ${fmt(perReferral)} per-referral checks`}>
-      {/* The board is drawn from the reference, so it has a state the decision
-          cannot fill: the rules have not arrived yet. Saying so is not the same
-          as a decision that tested nothing. */}
+      {/* "The rules have not arrived" is a state, and not "tested nothing". */}
       {!reference?.rules?.length && (
         <p className="ov-quiet">
           core.ref_rules has not arrived, so this board shows only the rules this decision
@@ -1218,11 +1043,8 @@ function RulePanel({ d, decNote, reference, onOpenList }: {
               <div className="ov-rule-top">
                 <span className="num ov-rule-id">{id}</span>
                 {held == null ? (
-                  // TWO ways to reach "no verdict", and they are different
-                  // claims: a per-referral rule that no referral was tested
-                  // against, and a whole-list rule this decision payload
-                  // carries no verdict field for. The word matches
-                  // DecisionRecord.tsx, so the two audit surfaces read alike.
+                  // TWO ways to reach "no verdict", and different claims. Wording
+                  // matches DecisionRecord.tsx so the audit surfaces read alike.
                   <span className="ov-verdict is-none">
                     <Minus size={ICON} strokeWidth={2.5} aria-hidden />
                     {whole ? 'no verdict' : 'not tested'}
@@ -1253,11 +1075,9 @@ function RulePanel({ d, decNote, reference, onOpenList }: {
         })}
       </div>
       <div className="ov-rule-foot">
-        {/* This is 131 while the readout band says 130 past target, and the two
-            differ for a real reason: 130 referrals are past a CRT target, and
-            one more sat untriaged past the 21-day turnaround window with no
-            category and therefore no target at all. Said, rather than left as
-            two numbers a page apart. */}
+        {/* This count and the readout band's "past target" differ for a real
+            reason -- an untriaged referral can be past the turnaround window with
+            no category and so no target -- so it is said, not left to be found. */}
         <span className="num">{fmt(carrying)}</span> of{' '}
         <span className="num">{fmt(d.rankings.length)}</span> placed referrals carry at least
         one breached rule: <span className="num">{fmt(crtBreached)}</span> past a CRT target
@@ -1265,9 +1085,8 @@ function RulePanel({ d, decNote, reference, onOpenList }: {
           <>, and <span className="num">{fmt(carrying - crtBreached)}</span> past the triage
           turnaround window with no category to be late against</>
         )}.
-        {/* An untested rule is not a passing rule, and the board no longer
-            hides it. Counted here so the reader is told the board holds a rule
-            this day says nothing about, without having to scan for it. */}
+        {/* An untested rule is not a passing rule. Counted here so a reader is
+            told the board holds one, rather than having to scan for it. */}
         {untested > 0 && (
           <span>
             <span className="num">{fmt(untested)}</span>
@@ -1330,9 +1149,8 @@ function ClinicPanel({ ops, reference, d, date }: {
                 const ratio = c.slots_total ? c.slots_booked / c.slots_total : 0
                 const empty = noSlots(c)
                 const unresolved = pressureUnresolved(c)
-                // booked + available must account for every slot. When it does
-                // not, the row's arithmetic is broken and the pressure drawn
-                // from it cannot be trusted.
+                // booked + available must account for every slot; when it does
+                // not, the pressure drawn from the row cannot be trusted.
                 const slotsHold = c.slots_booked + c.slots_available === c.slots_total
                 const off = c.cited_session_date != null && dayOf(c.cited_session_date) !== date
                 return (
@@ -1367,7 +1185,7 @@ function ClinicPanel({ ops, reference, d, date }: {
                     </td>
                     <td className="c-n num">
                       {empty ? (
-                        // 1.0 here is "no clinic ran", not "full". It must not
+                        // 1.0 here is "no clinic ran", not "full", and must not
                         // wear the same mark as a clinic with every slot taken.
                         <span className="ov-none">no clinic that day</span>
                       ) : (
@@ -1381,11 +1199,9 @@ function ClinicPanel({ ops, reference, d, date }: {
                       )}
                     </td>
                     <td className="c-n num">
-                      {/* Same three absences the By-specialty table draws, for
-                          the same reason: a specialty the decision scored but
-                          did not place carries no clinic half, and "not scored"
-                          over a capacity score of 0.781 is the claim this round
-                          exists to stop. */}
+                      {/* Same three absences the By-specialty table draws: a
+                          specialty scored but not placed carries no clinic half,
+                          and "not scored" over a real capacity score is wrong. */}
                       {cap.get(c.specialty_hipe)?.clinic?.toFixed(3)
                         ?? (
                           <span className="ov-none"
@@ -1407,10 +1223,8 @@ function ClinicPanel({ ops, reference, d, date }: {
   )
 }
 
-/** The session series as columns, with the one row the agent actually read
- *  marked in clay, the single accent on this page. The series scrolls inside
- *  its own cell rather than pushing the table: 60 sessions at 11px each is
- *  660px inside a cell that may not wrap. */
+/** The session series as columns, the cited one in clay. It scrolls inside its
+ *  own cell rather than push the table wider. */
 function Sessions({ clinic }: { clinic: Clinic }) {
   const ss = clinic.sessions
   if (!ss.length) return <span className="ov-none">no sessions</span>
@@ -1513,17 +1327,15 @@ function WardPanel({ ops, reference, date }: {
 function WardRow({ w, reference, date }: {
   w: Ward; reference: Reference | undefined; date: string
 }) {
-  // Absence of information is not Green. A ward that did not report an
-  // escalation status used to be drawn with the routine swatch and the word
-  // "Green", which is the same class of error as calling a 200-day-old normal
-  // reading reassuring.
+  // Absence of information is not Green: a ward that reported no escalation
+  // status gets "not reported", never the routine swatch.
   const gar = w.gar_status as keyof typeof GAR_WORD | null
   const sev = sevOccupancy(w.occupancy_pct)
   const over = w.occupancy_pct >= SAFE_OCCUPANCY
   const line = `${over ? 'over' : 'under'} the ${SAFE_OCCUPANCY}% line`
   const also = w.specialties.filter((c) => !w.primary_for.includes(c))
-  // occupied + free is the census occupancy_pct is computed against. When the
-  // three disagree the percentage beside them is not describing this ward.
+  // occupied + free is the census occupancy_pct is computed against; when the
+  // three disagree the percentage is not describing this ward.
   const censusHolds = w.occupied == null || w.free == null || w.census == null
     || w.occupied + w.free === w.census
   const off = dayOf(w.snapshot) !== date
@@ -1538,8 +1350,8 @@ function WardRow({ w, reference, date }: {
           ? w.primary_for.map((c) => specialtyName(reference, c)).join(', ')
           : <span className="ov-none">none</span>}
       </td>
-      {/* nowrap is inherited from .ov-t td, and one ward backing six
-          specialties is ~600px on a single unbreakable line. It wraps. */}
+      {/* nowrap is inherited from .ov-t td, and a ward backing six specialties
+          is one unbreakable ~600px line. This cell wraps. */}
       <td className="c-dim c-wrap">
         {also.length ? also.map((c) => specialtyName(reference, c)).join(', ') : <span className="ov-none">—</span>}
       </td>

@@ -1,25 +1,10 @@
-/* The patient page.
-   ------------------------------------------------------------------------
-   Every colour here comes from tokens.css. There are no hex literals, no
-   gradients that blend, no glows and no drop shadows: depth is a hairline and
-   a flat fill, which is the whole kit.
-
-   Two palette rules are load-bearing and are worth restating where they are
-   enforced rather than only where they were written:
-
-     --cat-* are the CPC triage categories. A NEWS2 sub-score is not a triage
-     category, an MTS colour is not a triage category and a ward's GAR status
-     is not a triage category, so none of the three touch those hues. They are
-     weighted in ink instead, and the magnitude always travels as a numeral and
-     as pips as well, so colour is never the only channel.
-
-     The one exception is a CRT breach. "Past target" IS a property of the
-     triage category's own target, and the ranked list spends CLAY on it, so
-     the axis spends clay too -- one fact, one colour, across the product.
-
-   clay marks one element per composition: the guard panel in the capacity
-   lane, the reader's own row in the neighbours table, the silence hatch on the
-   journey axis. It is never spent on a set of six. */
+/* The patient page. Every colour comes from tokens.css: no literals, no
+   blending gradient, no glow, no drop shadow.
+   --cat-* are the CPC triage categories. A NEWS2 sub-score, an MTS colour and a
+   ward's GAR status are none of them, so all three are weighted in ink, with the
+   magnitude travelling as a numeral and as pips too. The one exception is a CRT
+   breach, which IS a property of the triage category's own target and takes the
+   CLAY the ranked list spends on it. clay marks one element per composition. */
 
 /* --- 1 the header: where this person is ---------------------------------- */
 .pt-head {
@@ -46,10 +31,8 @@
 .pt-wait-n { font-family: var(--font-brand); font-size: 40px; font-weight: 300; line-height: 1; }
 .pt-wait-l { font-size: var(--t-small); color: var(--text-2); margin-top: 3px; }
 .pt-wait-l .num { color: var(--text); }
-/* Wait against target. The track, the fill and the target mark are all SevBar
-   now: this bar did not change colour AT ALL when the wait went past target,
-   whether by a day or by 31 times, and only the words underneath moved. The
-   wrapper is spacing and nothing else. */
+/* Track, fill and target mark are all SevBar, so the bar changes with the ratio
+   and not only the words underneath. This wrapper is spacing. */
 .pt-wait-bar { margin-top: var(--d2); }
 .pt-wait-x { font-size: var(--t-micro); color: var(--text-2); margin-top: 4px; }
 .pt-wait-x .sev { align-items: center; }
@@ -97,8 +80,7 @@
 .pt-check-id { color: var(--text); font-weight: 550; white-space: nowrap; }
 .pt-check-st { color: var(--text-2); line-height: 1.45; }
 .pt-check-d { color: var(--text-2); }
-/* A breached rule used to be a 1px inset hairline and a bolder id. It is a
-   breach: it takes the severity register, on the row as well as on the word. */
+/* A breach takes the severity register, on the row as well as on the word. */
 .pt-check[data-passed="no"] { box-shadow: inset 3px 0 0 var(--sev-3-bg); }
 .pt-check[data-passed="no"] .pt-check-id { color: var(--text); font-weight: 700; }
 .pt-check[data-passed="no"] .pt-check-d { color: var(--text); }
@@ -174,11 +156,9 @@
 .pt-ward-fig { display: grid; gap: var(--d1); justify-items: start; min-width: 0; }
 .pt-ward-pct { font-family: var(--font-brand); font-size: 30px; font-weight: 300; line-height: 1; }
 .pt-ward-fig-l { font-size: var(--t-micro); color: var(--text-3); }
-/* The track, the fill and the 85% mark are SevBar. 100% is the END of this
-   scale, not a line inside it: occupancy_pct is occupied/(occupied+free) and
-   cannot pass 100, so the old span of max(100, pct) was always exactly 100 and
-   pinned that tick to the right edge on every ward, while the one line a reader
-   needs was not drawn anywhere on the page. */
+/* Track, fill and the 85% mark are SevBar. 100% is the END of this scale, not a
+   line inside it: occupancy_pct cannot pass 100, so a span of max(100, pct) pins
+   that tick to the right edge on every ward. */
 .pt-ward-meter { min-width: 0; }
 .pt-ward-scale {
   position: relative; display: flex; justify-content: space-between; gap: var(--d2);
@@ -191,8 +171,8 @@
   color: var(--text-2); white-space: nowrap;
 }
 .pt-facts {
-  /* hairlines on the children: ten facts into a fluid track count leaves a
-     partial last row, and that row must be quiet surface, not painted grey. */
+  /* hairlines on the children: a partial last row must be quiet surface, and
+     gap-over-a-rule-background would paint its empty cells solid grey. */
   display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 0; margin: 0; background: var(--surface); border-top: 1px solid var(--rule);
 }
@@ -251,11 +231,9 @@
 .pt-stale-head { display: flex; align-items: baseline; gap: var(--d3); flex-wrap: wrap; }
 .pt-stale-when { font-size: var(--t-data); color: var(--text); }
 .pt-stale-age { font-size: var(--t-data); color: var(--text); font-weight: 600; }
-/* This was the one existing four-step ramp in the product, and it bottomed out
-   at 3.56:1. It is now sevReadingAge, on the word and on the meter, and below
-   90 days it carries no mark at all: the absence of a severity is not a
-   severity. The word is read off the step in Vitals.tsx, so the two cannot
-   drift apart. */
+/* sevReadingAge, on the word and the meter; below 90 days no mark at all,
+   because the absence of a severity is not a severity. Vitals.tsx reads the word
+   off the step, so the two cannot drift. */
 .pt-stale-state {
   font-size: var(--t-micro); letter-spacing: var(--track-lab); text-transform: uppercase;
   color: var(--text-2);
@@ -271,11 +249,8 @@
 /* --- the six instruments -------------------------------------------------- */
 .pt-vitals { display: grid; gap: var(--d3); }
 .pt-cards {
-  /* NEWS2 has exactly SIX parameters, so this is a fixed count. auto-fill gave
-     five tracks and painted the four empty cells as a solid grey block across
-     the clinical readings -- the same fault overview.css:32 already fixed on
-     the readout band. Two rows of three, and each instrument gets more width
-     for its band axis. */
+  /* NEWS2 has exactly SIX parameters, so this is a fixed count: auto-fill gives
+     five tracks and paints the four empty cells solid grey. */
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0; background: var(--surface); border: 1px solid var(--rule);
 }
@@ -289,10 +264,8 @@
 }
 .pt-unit { font-size: var(--t-small); color: var(--text-2); margin-left: 2px; }
 
-/* The sub-score: numeral, pips and fill, three channels of one value.
-   The four ink steps that used to live here measured 3.56 / 5.99 / 15.37 /
-   14.70:1, so the most severe step was the LESS contrasty of the top two. The
-   fill is sevNews2Sub now, which puts a 3 two steps above a 1. */
+/* The sub-score: numeral, pips and fill, three channels of one value. The fill
+   is sevNews2Sub, which puts a 3 two steps above a 1. */
 .pt-sub { margin-left: auto; display: inline-flex; align-items: center; border-radius: var(--radius); }
 .pt-sub .sev { align-items: center; gap: 5px; padding: 1px 5px 1px 6px; }
 .pt-sub-n { font-size: var(--t-body); font-weight: 600; line-height: 1.3; }
@@ -302,10 +275,9 @@
   border: 1px solid var(--rule); background: var(--surface-2); color: var(--text-3);
 }
 .pt-sub[data-score="none"] { border-style: dashed; }
-/* A paediatric refusal. The severity register is withheld entirely, because a
-   refused score is not an acuity claim -- which is also how a refused 3 came to
-   look exactly like a refused 0. The number and the pips stay, so the value is
-   still legible, and three channels say it was withdrawn rather than absent. */
+/* A paediatric refusal: the severity register is withheld, because a refused
+   score is not an acuity claim. Number and pips stay, so it reads as withdrawn
+   rather than absent. */
 .pt-sub[data-applied="no"] {
   gap: 5px; padding: 1px 5px 1px 6px; background: none; color: var(--text-3);
   border: 1px dashed var(--rule-firm);
@@ -371,9 +343,8 @@
 .pt-of { font-size: var(--t-small); color: var(--text-2); }
 .pt-sum-note { font-size: var(--t-micro); color: var(--text-3); margin-left: auto; }
 .pt-sum[data-applied="no"] .pt-total { color: var(--text-3); }
-/* the six sub-scores disagreeing with the record is a data-integrity alarm, not
-   a clinical one, so it wears clay and never the triage red: a reader must not
-   be able to mistake "these numbers do not reconcile" for "this person is ill" */
+/* a data-integrity alarm, not a clinical one, so clay and never a triage hue:
+   nobody may read "these do not reconcile" as "this person is ill" */
 .pt-disc {
   display: flex; gap: var(--d2); align-items: flex-start;
   border-left: 3px solid var(--clay); background: var(--surface-2);
@@ -393,50 +364,12 @@
 
 /* --- 4 the journey ------------------------------------------------------- */
 .pt-journey { margin: 0; }
-/* Past target, recoloured on the axis itself. It is the same fact as the
-   header's wait bar, so it is drawn on the SAME RAMP -- not merely the same
-   0-4 scale. The step arrives as a class on the Journey root because the ratio
-   is the header's to compute, not the axis's.
-
-   Steps 1 and 2 used to be --sev-1-edge and --sev-2-edge, one step below
-   severity.css's SevBar the whole way up the bottom half. Both marks read the
-   same waitSev off the same referral and painted it two different browns about
-   200px apart -- and that half is the majority. Recounted from the live API
-   (/api/cohort/9001/2026-08-30, adjusted_wait_days over crt_threshold_days):
-   130 of the 165 referrals with a target are past it, and 71 of those 130 sit
-   in the half where the two ramps disagreed -- 28 at step 1, 43 at step 2.
-   tokens.css credits that 71 to step 2 alone. The count is real and the
-   attribution is not; tokens.css is not this file's to correct, so it is
-   flagged here rather than copied.
-
-   MEASURED HERE, not carried over, against the stretch of axis this segment
-   recolours (--rule-firm) -- and the light ground is the only one it can
-   reach: Journey renders from Patient alone, inside .pad.pt, and no
-   [data-surface="dark"] subtree (.boot, .rail, .prov, .runlay, .cg) holds one.
-
-     step 1  --sev-2-edge  1.73    was --sev-1-edge at 1.15, which is not a
-     step 2  --clay        3.49    segment at all for the 28 referrals a day
-     step 3  --sev-3-bg    5.16    at step 1; 43 more move up to 3.49
-     step 4  --sev-4-bg    6.60
-
-   Strictly rising, and every step rises from where it stood. Against the page
-   (--bg), which is what the segment's long edges sit on: 2.90 / 5.86 / 8.67 /
-   11.07, rising too.
-
-   ON THE DARK GROUND, if a Journey ever landed on one, steps 1 and 2 are one
-   step: --sev-2-edge resolves there to exactly --clay, both 1.47 against
-   --rule-firm composited over --bg. That flat step is severity.css's own,
-   inherited with its ramp and written down there as well. It is still the
-   better of the two, because the OLD step 1 resolves on dark to exactly
-   --rule-firm: 1.00 against the axis -- not weak, absent.
-
-   WHAT THIS COSTS. Clay is no longer the one clay mark on this axis: at step 2
-   the overdue segment and .j-silence's clay rule are the same colour on the
-   same axis, and their two legend swatches below are identical. They stay two
-   different marks -- a solid horizontal fill of the axis line against a 2px
-   vertical rule over a hatch -- and each legend line carries its own word and
-   its own number, which is the standing invariant. A reserved colour is a
-   weaker guarantee than a measured contrast, so the contrast won. */
+/* Past target, recoloured on the axis: the same fact as the header's wait bar,
+   so the SAME RAMP, not merely the same 0-4 scale. The step arrives as a class
+   on the Journey root because the ratio is the header's to compute. Against the
+   axis it recolours (--rule-firm) the steps rise strictly: 1.73 / 3.49 / 5.16 /
+   6.60. COST: at step 2 this segment and .j-silence's clay rule are the same
+   colour on one axis, and stay apart by shape and by their legend words. */
 .j-overdue {
   position: absolute; top: 12px; height: var(--spine-w);
   background: var(--rule-firm);
@@ -461,8 +394,8 @@
 
 /* --- 6 what the instrument could not see --------------------------------- */
 .pt-chips {
-  /* hairlines on the children: a fluid track count leaves a partial last
-     row, and gap-over-a-rule-background paints those empty cells solid grey. */
+  /* hairlines on the children: a partial last row must be quiet surface, and
+     gap-over-a-rule-background would paint its empty cells solid grey. */
   display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 0; background: var(--surface); border: 1px solid var(--rule);
 }
@@ -531,9 +464,8 @@
   }
 }
 
-/* A planted fixture, named. These eight are deliberate (the dataset track keeps
-   them at fixed pathway numbers because the demo depends on them), and saying so
-   is the difference between a demonstration asset and apparent test debris. */
+/* A planted fixture, named: the dataset track keeps these eight at fixed
+   pathway numbers, and saying so is what stops them reading as test debris. */
 .pt-planted {
   display: grid; gap: var(--d2); margin: var(--d4) 0;
   padding: var(--d3) var(--d4);
@@ -542,23 +474,17 @@
 .pt-planted p { margin: 0; font-size: var(--t-small); color: var(--text-2); line-height: 1.55; max-width: 88ch; }
 .pt-planted code { font-size: var(--t-micro); color: var(--text-3); word-break: break-all; }
 
-/* Reading age beside each side of a neighbour comparison. Two single readings of
-   very different ages are not equivalent evidence, and this panel used to
-   present them in the present tense. */
+/* Reading age beside each side of a neighbour comparison: two single readings of
+   very different ages are not equivalent evidence. */
 .cmp-tk-s { display: block; font-size: var(--t-micro); color: var(--text-3); font-weight: 400; }
 .cmp-age { display: block; font-size: var(--t-micro); color: var(--text-3); }
 
-/* Shown only on the rows where the two rounded terms do not visibly add to the
-   exact priority: 38 of 305. Better than leaving a reader to hunt for an
-   arithmetic error that is not there. */
+/* Shown only where the two rounded terms do not visibly add to the exact
+   priority, so nobody hunts for an arithmetic error that is not there. */
 .why-round { display: block; font-size: var(--t-micro); color: var(--text-3); font-weight: 400; }
 
-/* --- what separates two adjacent people, on the page ----------------------
-   The client's point 12: the why "just doesn't carry any explanation. It just
-   says both are the same, but why is the other top then or below?" The answer
-   existed but was behind a click on a neighbour row, so the page as read said
-   nothing. It is a row of its own now, between the two rows it is about, and
-   the full ladder stays behind the click. */
+/* --- what separates two adjacent people, on the page: a row of its own between
+   the two rows it is about. The full ladder stays behind the click. */
 .nb-sep {
   display: grid; grid-template-columns: 78px 1fr; gap: var(--d3);
   padding: 7px var(--d4) 9px; border-top: 1px solid var(--rule);
@@ -572,14 +498,12 @@
 .nb-sep-v strong { color: var(--text); font-weight: 600; }
 .nb-sep-v .num { color: var(--text); font-variant-numeric: tabular-nums; }
 
-/* Two of the seven cells in a neighbour row had no rule at all, so the pathway
-   number and the wait sat at the row's default weight while every cell around
-   them was graded. */
+/* Without these two the pathway number and the wait sit at the row's default
+   weight while every cell around them is graded. */
 .nb-id { color: var(--text); }
 .nb-w  { color: var(--text-2); font-size: var(--t-micro); }
 
-/* The net of the two terms, at the precision the net needs. Without it the two
-   rows above can each read "0.061 apart" and leave no way to tell which way the
-   sum went. */
+/* The net of the two terms, at the precision the net needs: without it the rows
+   above can each read "0.061 apart" with no way to tell which way it went. */
 .cmp-trow.is-net { border-top: 1px solid var(--rule); margin-top: 3px; padding-top: 7px; }
 .cmp-trow.is-net .cmp-tk, .cmp-trow.is-net .cmp-tv { color: var(--text); font-weight: 600; }

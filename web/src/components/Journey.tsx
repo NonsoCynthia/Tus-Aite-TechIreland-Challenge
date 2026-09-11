@@ -1,21 +1,12 @@
 /** One person's real dates, in two shapes, because they are two different
- *  stories and one axis cannot hold both.
+ *  stories and one axis cannot hold both. Intake is five events inside about a
+ *  month: a dated list, which is how a sequence of steps reads. The wait is
+ *  years: an axis to scale, because its LENGTH is the argument.
  *
- *  Intake is five events inside about a month: a dated list, which is how a
- *  sequence of steps actually reads.
- *  The wait is years: an axis to scale, because its LENGTH is the argument.
- *
- *  The single clinical reading sits at the end of the list and the start of the
- *  axis, so the eye lands on the one measurement and then travels the whole
- *  empty line that follows it.
- *
- *  Revised for the patient page's new order. The axis now draws the two spans
- *  that the copy used to assert: the stretch past the CRT target, and the
- *  stretch since anyone measured this person. Both are lengths on the same
- *  scale, so they can be compared by eye instead of by reading two sentences.
- *  The staleness READING lives with the vitals, one section above; what is left
- *  here is its length, which is the part an axis can say better than a note.
- */
+ *  The axis draws the two spans rather than asserting them in copy -- past the
+ *  CRT target, and since anyone measured this person -- so they are compared by
+ *  eye. The staleness READING lives with the vitals, one section above; what is
+ *  left here is its length. */
 export interface Event {
   key: string; date: string; label: string
   detail?: string; clinical?: boolean; target?: boolean
@@ -31,14 +22,10 @@ export function Journey({ events, today, waitDays: waitProp, targetDays, classNa
   events: Event[]
   today: string
   /** `adjusted_wait_days` — the SAME number the header, the rule chip and the
-   *  breach tier use. The axis used to recompute the wait from the last intake
-   *  event, which is the triage date, while every other figure on the page is
-   *  measured from the date the referral was RECEIVED. On this cohort that made
-   *  the axis disagree with the header on 259 of 308 referrals, by up to 57
-   *  days — and on five of them the header said "past target" while the axis
-   *  drew no overdue span at all. It is also not simply a different anchor:
-   *  adjusted wait excludes suspended time, so it cannot be derived from dates
-   *  here at all. The number is passed in rather than recomputed. */
+   *  breach tier use. Never recompute the wait from the last intake event: that
+   *  is the triage date, while every other figure on the page is measured from
+   *  the date the referral was RECEIVED, and adjusted wait also excludes
+   *  suspended time, so it cannot be derived from the dates here at all. */
   waitDays?: number
   /** The CRT threshold in days, from core.ref_codes. The target sits this far
    *  into the wait, not this far past the triage date. */

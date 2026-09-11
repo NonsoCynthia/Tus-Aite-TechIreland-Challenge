@@ -1,13 +1,8 @@
-/* A rule verdict is not a triage category.
-
-   These pills used to be --cat-routine green for "holds" and --cat-urgent red
-   for "breached", which made the loudest colour on the surface belong to
-   something with no triage meaning at all -- and spent two reserved hues on
-   chrome. The word travels in every chip ("holds", "breached", "N past
-   target"), so nothing is lost by putting them back in the ink register.
-   --cat-* stays for band chips and tab swatches. */
 /* The decision record. A reviewer's surface: dense, tabular, every rule keeping
-   its ID so it can be found in core.ref_rules. */
+   its ID so it can be found in core.ref_rules.
+   A rule verdict is not a triage category, so the verdict pills sit in the ink
+   register and --cat-* stays for band chips and tab swatches. The word travels
+   in every chip ("holds", "breached", "N past target"). */
 
 .rec .lede { margin-bottom: var(--d5); }
 .rec-sec { margin-top: var(--d7); }
@@ -52,12 +47,8 @@
 .rules tr.is-breached .c-rid { color: var(--text); font-weight: 700; }
 
 /* Three verdicts, three glyphs, three registers. "holds" and "not tested" are
-   quiet because neither is an alarm; the breach is a SevChip, so its fill comes
-   from the severity scale and not from here.
-
-   .verdict.is-bad is gone. It was --bg-sunk with a --rule-firm inset ring, which
-   is the same weight as "holds": the row that mattered looked exactly like the
-   row that did not. */
+   quiet because neither is an alarm; a breach is a <SevChip>, so its fill comes
+   from the severity scale and never from here. */
 .verdict {
   display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
   font-size: var(--t-micro); padding: 3px var(--d2);
@@ -100,10 +91,9 @@
   font-size: var(--t-small); color: var(--text-2);
   background: var(--bg-sunk); border: 1px solid var(--rule);
 }
-/* The gap is an integrity failure, so the edge is the top of the severity scale
-   rather than --rule-firm at 1.55:1. The edge is only the supporting cue: the
-   fill area is the SevChip carrying the count, because fill is what carries
-   across a room and a hairline never did. */
+/* The gap is an integrity failure, so the edge is the top of the severity
+   scale. The edge is only the supporting cue: the SevChip carrying the count is
+   the fill area, and fill is what carries across a room. */
 .ledger-sum.is-off { border-left: 3px solid var(--sev-4-bg); color: var(--text); }
 .ledger-sum strong { color: var(--text); }
 .ledger-sum .sev { margin-left: var(--d1); }
@@ -114,20 +104,16 @@
   background: var(--bg-sunk); border-radius: var(--radius-pill);
   box-shadow: inset 0 0 0 1px var(--rule-firm);
 }
-/* --- the override log ----------------------------------------------------
-   Bounded so the section has a height a reviewer can hold, and so the header
-   has a scroll container to stick to. Without the viewport, `position: sticky`
-   on a th is inert: .scroll-x sets overflow on both axes but no height, so the
-   container never scrolls vertically and the header never engages. Past about
-   row 20 that left six unlabelled columns of timestamps and integers. */
+/* --- the override log. Bounded so the header has a scroll container to stick
+   to: `position: sticky` on a th is inert without one, and .scroll-x sets
+   overflow on both axes but no height. */
 .ovr-vp {
   max-height: min(calc(100vh - 320px), 640px); overflow: auto;
   border: 1px solid var(--rule); background: var(--surface);
 }
-/* sticky needs SEPARATE borders: a collapsed border belongs to the table rather
-   than to the cell, so it scrolls out from under a stuck header. The rule is an
-   inset shadow instead, which is what the brand allows and what the ranked
-   list's own header already does. */
+/* sticky needs SEPARATE borders: a collapsed border belongs to the table, not
+   the cell, so it scrolls out from under a stuck header. An inset shadow draws
+   the rule instead, as the ranked list's header already does. */
 .rules.ovr-log { border-collapse: separate; border-spacing: 0; }
 .ovr-vp .ovr-log th {
   position: sticky; top: 0; z-index: 2;
@@ -162,8 +148,6 @@
   .ledger-w { grid-column: 1 / -1; }
 }
 
-/* .ledger-gap is gone: the unexplained count is a SevChip now, so its weight
-   comes from the scale rather than from bolding 11px of text. */
 /* the buckets overlap; saying so IS the panel */
 .ledger-overlap {
   margin-top: var(--d2); padding-top: var(--d2);

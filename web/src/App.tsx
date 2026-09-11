@@ -16,9 +16,7 @@ import type { Decision } from './lib/types'
 
 export type Surface = 'overview' | 'list' | 'graph' | 'record'
 
-/** What GET (and POST .../refresh) hand back for a hospital's days. Taken from
- *  the client rather than restated, so a change to the endpoint's shape is a
- *  type error here rather than a silent one. */
+/** Taken from the client, not restated, so a shape change is a type error. */
 type Days = Awaited<ReturnType<typeof api.hospitalDays>>
 
 const dayLong = (d: string) =>
@@ -27,33 +25,21 @@ const dayShort = (d: string) =>
   new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'long' })
 const dayCount = (k: number) => `${k} ${k === 1 ? 'day holds' : 'days hold'} a cohort`
 
-/** Stroke weight is a ROLE, not a taste: 1.75 for chrome (a nav item, a picker
- *  adornment, a close button), 2.25 for signal (the thing that starts work).
- *  Size comes from --icon / --icon-sm through .ico / .ico-s in app.css, so no
- *  pixel number is typed at a call site. */
+/** Stroke weight is a ROLE, not a taste: chrome (nav, adornments, close) against
+ *  signal (the thing that starts work). Size comes from --icon / --icon-sm via
+ *  .ico / .ico-s, so no pixel number is typed at a call site. */
 const CHROME = 1.75
 const SIGNAL = 2.25
 
-/** The one HIPE id still typed into this file, and it is a FIRST SELECTION,
- *  not a roster: which hospitals exist and what they are called comes from
- *  GET /api/hospitals, which reads core.hospitals. If the roster arrives
- *  without this id -- a different database, a removed hospital -- the selection
- *  moves to the first hospital the records actually hold.
- *
- *  What stood here was a literal list of both ids AND display names, directly
- *  above the comment below, which says hospital-DAYS are discovered and never
- *  hardcoded. That was true of the days and had never been true of the
- *  hospitals: a third hospital in the seed was invisible until someone edited
- *  this file, and a renamed one would have kept its old name on screen. */
+/** A FIRST SELECTION, not a roster: which hospitals exist and what they are
+ *  called comes from GET /api/hospitals. Never add names or a second id here --
+ *  a third hospital in the seed would stay invisible until someone edited this
+ *  file. If the roster lacks this id, the selection moves to its first entry. */
 const SEED_HIPE = '9001'
 // Hospital-days are DISCOVERED, never hardcoded: a batch loaded while the
 // service is up must appear in the selector without a frontend change.
 
-/** The rail, grouped.
- *
- *  "Run the agents" used to sit here as a verb between two nouns, which read as
- *  a place rather than an action and left the graph with no home. Running is now
- *  a primary action in the top bar; the rail holds only destinations. */
+/** Destinations only: running is an action and lives in the top bar. */
 const NAV: Array<{ group: string; items: Array<{ key: Surface; label: string; icon: typeof Gauge }> }> = [
   { group: 'Hospital', items: [{ key: 'overview', label: 'Overview', icon: Gauge }] },
   { group: 'The list', items: [{ key: 'list', label: 'Ranked order', icon: ListOrdered }] },
@@ -80,24 +66,20 @@ export function App() {
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 20_000 })
   // seed data: fetched once for the life of the tab, never refetched
   const ref = useQuery({ queryKey: ['reference'], queryFn: api.reference, staleTime: Infinity })
-  // the same, and for the same reason: core.hospitals does not move while the
-  // service is up. It is the roster the two selectors draw.
+  // the same, for the same reason: core.hospitals does not move either
   const roster = useQuery({ queryKey: ['hospitals'], queryFn: api.hospitals, staleTime: Infinity })
   const days = useQuery({
     queryKey: ['hospital-days', hospital],
     queryFn: () => api.hospitalDays(hospital),
     staleTime: 5 * 60_000,
   })
-  // default to the newest day that actually holds data, whatever that turns
-  // out to be, and follow it if the hospital changes
   useEffect(() => {
     const r = days.data?.runnable
     if (r && (date === null || !days.data?.days.some((d) => d.date === date))) setDate(r)
   }, [days.data, date])
 
-  // Follow the records rather than the literal: if the roster does not hold the
-  // seeded id, select the first hospital it does hold. An EMPTY roster is a
-  // failed read (api.ts), never an empty world, so it changes nothing.
+  // An EMPTY roster is a failed read (api.ts), never an empty world, so it
+  // changes nothing.
   useEffect(() => {
     const list = roster.data?.hospitals
     if (!list?.length) return
@@ -107,15 +89,11 @@ export function App() {
   // a different hospital is a different question; the last answer is not about it
   useEffect(() => { setProbeSaid(null) }, [hospital])
 
-  /** D3. The day selector is DISCOVERED, by probing a 60-day window, and the
-   *  orchestrator caches the answer per hospital for the life of the process
-   *  (orchestrator/app/main.py:120-165). So a batch loaded while the service is
-   *  up cannot appear on its own: something has to clear that cache and probe
-   *  again. POST /api/hospital-days/{h}/refresh does exactly that and has been
-   *  implemented, and in api.ts, with no caller since it was written.
-   *
-   *  It reports what CHANGED rather than just finishing, because "I pressed it
-   *  and nothing moved" is indistinguishable from "it did not work". */
+  /** D3. The orchestrator caches the probed day list per hospital for the life of
+   *  the process (orchestrator/app/main.py:120-165), so a batch loaded while the
+   *  service is up cannot appear on its own; the refresh POST clears that cache.
+   *  It reports what CHANGED, because "nothing moved" is indistinguishable from
+   *  "it did not work". */
   async function checkForNewData() {
     setProbing(true); setProbeSaid(null)
     const before = qc.getQueryData<Days>(['hospital-days', hospital])
@@ -131,8 +109,7 @@ export function App() {
 
       if (now !== was || newRunnable) {
         // every cohort, decision, operations and overrides query is keyed
-        // [name, hospital, date]; the day list itself was just set from the
-        // response and does not need re-probing.
+        // [name, hospital, date]; the day list was just set from the response.
         qc.invalidateQueries({
           predicate: (q) => q.queryKey[0] !== 'hospital-days' && q.queryKey[1] === hospital,
         })
@@ -158,12 +135,9 @@ export function App() {
     enabled: !!date, retry: false,
   })
 
-  /** The roster in the shape both selectors take. NEVER EMPTY: Landing maps
-   *  this straight into <option>s, so an empty array would leave a <select>
-   *  with no options and a value matching none of them. When the read fails the
-   *  one entry is the selected HIPE code under its own name -- the code is what
-   *  the service actually knows, and a bare code says less than a name but
-   *  claims nothing that is not true. .notes below says the read failed. */
+  /** NEVER EMPTY: Landing maps this straight into <option>s, so an empty array
+   *  leaves a <select> with no options and a value matching none of them. .notes
+   *  below is what says the read failed. */
   const picks = useMemo(() => {
     const rows = roster.data?.hospitals ?? []
     return rows.length
@@ -171,30 +145,20 @@ export function App() {
       : [{ hipe: hospital, name: `HIPE ${hospital}` }]
   }, [roster.data, hospital])
 
-  /** [] is a failed read and not an empty world (api.ts), so this is the ONE
-   *  reading of it. isPending covers the first load; it is false once the query
-   *  has settled either way, including on error, where data is undefined. */
+  /** [] is a failed read, not an empty world (api.ts), so this is the ONE reading
+   *  of it. isPending is false once the query has settled, error included. */
   const rosterUnread = !roster.isPending && (roster.data?.hospitals.length ?? 0) === 0
 
-  /** Where the decision on screen came from. `_source` is written only by the
-   *  snapshot restore at process boot (orchestrator/app/state.py:136); a run in
-   *  this process stores its own dict, which carries no such key. So absent
-   *  means "a run in this process", and a real run clears it by replacing the
-   *  entry. /api/health reports the same fact as decisions_held[].source. */
+  /** `_source` is written only by the snapshot restore at boot, so ABSENT means
+   *  a run in this process. See types.ts. */
   const fromSnapshot = dec.data?._source === 'snapshot'
   const snapAge = dec.data ? ageOf(dec.data.built_at) : ''
 
-  // The roster is one cached SELECT and it names the hospital on the first
-  // screen of the product, so the boot screen waits for it rather than showing
-  // a HIPE code that turns into a name a moment later. It settles either way:
-  // isPending goes false on success AND on error.
-  // A hospital can hold NO waiting list at all and still be a real hospital: the
-  // full dataset carries six, of which two are private sites that are capacity
-  // only and carry no referrals by design. For those, /api/hospital-days returns
-  // days: [] and runnable: null, so `date` is never set -- and the guard below
-  // used to test `!date`, which meant selecting one left the boot splash on
-  // screen for ever, with "Reading the waiting lists..." under it and nothing
-  // ever arriving. The wait and the absence are now two different sentences.
+  // A hospital can hold NO waiting list and still be real: capacity-only sites
+  // carry no referrals by design, so /api/hospital-days returns days: [] and
+  // runnable: null and `date` is never set. Guarding on `!date` alone leaves the
+  // boot splash up for ever on those, so the wait and the absence must stay two
+  // different sentences.
   const noDays = !!days.data && days.data.days.length === 0
 
   if (noDays && !roster.isPending) {
@@ -231,10 +195,8 @@ export function App() {
   if (!date || !days.data || roster.isPending) {
     return (
       <div className="boot" data-surface="dark">
-        {/* height 26 put the WORDMARK CAP HEIGHT at 26 x 266/676 = 10.2px, under
-            the kit's 13px floor, on the first screen of the demo. 40px puts it
-            at 15.7px. The lockup carries no descriptor of its own, and the kit
-            requires the words in a clinical setting, so they travel below it. */}
+        {/* The lockup carries no descriptor of its own and the kit requires the
+            words in a clinical setting, so they travel below it. */}
         <div className="boot-brand">
           <img className="boot-mark" src="/brand/tus-aite-lockup-white.png" alt="Tús Áite" />
           <span className="boot-descriptor">decision support</span>
@@ -261,27 +223,18 @@ export function App() {
     <div className="app">
       <aside className="rail" data-surface="dark">
         <button className="rail-brand" onClick={() => setEntered(false)} aria-label="Back to the start">
-          {/* F1/F2. The lockup is 2552x676 but its INK is 2209x502, so a CSS
-              height renders only 74% of it as artwork and the wordmark's cap
-              height is 266/676 of that height. At the old 22px the cap was
-              8.7px, a third under the kit's 13px floor, and the Jost ExtraLight
-              stems resampled to 0.39 CSS px and antialiased away. 40px puts the
-              cap at 15.7px and the stems at 0.71px, and is the largest size the
-              kit's own clear-space rule allows: 151px of lockup plus a cap
-              height of gutter on each side is 182px of the 188px the rail has.
-
-              Below 1440 the rail collapses to a 48px content box, where no
-              amount of scaling saves a wordmark. The kit says so itself: "below
-              13px cap height, drop the wordmark and use the mark alone." The
-              <source> hands over the VECTOR mark, which is what the same rule
-              points at, and app.css sizes it to 24px. */}
+          {/* F1/F2. The lockup's INK is 2209x502 of a 2552x676 canvas, so a CSS
+              height renders 74% as artwork and the wordmark cap is 266/676 of it.
+              40px keeps the cap over the kit's 13px floor and is the largest the
+              clear-space rule allows in the rail's 188px. Below 1440 the rail
+              collapses to 48px, where the kit says drop the wordmark: <source>
+              hands over the VECTOR mark. See BUILD_LEDGER.md. */}
           <picture>
             <source media="(max-width: 1439px)" srcSet="/brand/tus-aite-mark-white.svg" />
             <img src="/brand/tus-aite-lockup-white.png" alt="Tús Áite" />
           </picture>
-          {/* the kit: "in any clinical setting the words decision support
-              travel with the mark". True at BOTH sizes: collapsed, they wrap to
-              two lines under the mark rather than going away. */}
+          {/* the kit: "in any clinical setting the words decision support travel
+              with the mark". Collapsed they wrap under it, never go away. */}
           <span className="rail-descriptor">decision support</span>
         </button>
 
@@ -322,9 +275,8 @@ export function App() {
                 {days.data.days.map((d) => (
                   <option key={d.date} value={d.date}>
                     {dayLong(d.date)}
-                    {/* the same noun as the landing: this counts ROWS on a
-                        list, which is all the service can see, not people in a
-                        room. One word, and it is no longer a headcount. */}
+                    {/* ROWS on a list, which is all the service can see -- not
+                        people in a room. Same noun as the landing. */}
                     {' · '}{d.referrals} referrals
                     {d.date === runnable ? '' : ' · view only'}
                   </option>
@@ -354,10 +306,8 @@ export function App() {
             ) : (
               // Not a disabled button. A disabled control cannot be focused and
               // its title never shows, so the reason has to be on the surface.
-              // D4. The old string was "Read only - scoring happens on 30
-              // August", which is true on every view-only day and reads as
-              // though 30 August were the day you had selected. Both days are
-              // named now, and each is said to be a different thing.
+              // D4. Both days must be named: a sentence that names only the
+              // runnable one reads as though it were the day you selected.
               <span className="cta-locked">
                 <Lock className="ico-s" strokeWidth={CHROME} aria-hidden />
                 <span>
@@ -371,14 +321,10 @@ export function App() {
           </div>
         </header>
 
-        {/* WHAT THE CHROME COULD NOT SAY INLINE.
-            A strip under the bar rather than a chip in it: the bar holds two
-            pickers, the probe, the run pill and the run button on ONE nowrap
-            row and is already tuned to fit at 1280 by shrinking the pickers, so
-            a sentence added to it would push the row into overflow. A strip is
-            also the only place a full sentence fits, and provenance needs a
-            sentence, not a badge. Neither note is an alarm and neither is
-            styled as one. */}
+        {/* A strip under the bar, not a chip in it: the bar holds two pickers,
+            the probe, the run pill and the run button on ONE nowrap row already
+            tuned to fit at 1280, so a sentence added to it overflows. Neither
+            note is an alarm and neither is styled as one. */}
         {(fromSnapshot || rosterUnread) && (
           <div className="notes">
             {fromSnapshot && dec.data && (
@@ -442,13 +388,9 @@ export function App() {
 }
 
 
-/** How old a decision is, in one unit, and empty when built_at will not parse
- *  -- an unreadable timestamp is an absence, and "NaNm ago" is worse than
- *  saying nothing.
- *
- *  Hours all the way up is where a RESTORED decision lands badly: a snapshot
- *  built three weeks ago read "504h ago". Nothing else changes -- a decision
- *  under two days old reads exactly as it did. */
+/** How old a decision is, in one unit. Empty when built_at will not parse:
+ *  "NaNm ago" is worse than saying nothing. Hours stop at 48 because a restored
+ *  snapshot is often weeks old and "504h ago" is not a readable age. */
 function ageOf(isoUtc: string): string {
   const t = new Date(isoUtc).getTime()
   if (Number.isNaN(t)) return ''
@@ -461,8 +403,8 @@ function ageOf(isoUtc: string): string {
   return `${days} days ago`
 }
 
-/** built_at is UTC. Shown in the reader's own zone, in the same locale as every
- *  other date on screen, and handed back unparsed rather than guessed at. */
+/** built_at is UTC, shown in the reader's zone, handed back unparsed if it will
+ *  not parse rather than guessed at. */
 function stamp(isoUtc: string): string {
   const d = new Date(isoUtc)
   if (Number.isNaN(d.getTime())) return isoUtc
@@ -471,11 +413,9 @@ function stamp(isoUtc: string): string {
   })
 }
 
-/** What the decision IS, kept in the chrome rather than repeated on every
- *  surface: which run produced the order on screen, how it is weighted, and how
- *  old it is. Alpha lives only here and in the orchestrator's memory -- it is
- *  not in agent.decision_rankings, so this pill is the only durable display of
- *  the number that produced the ranking. */
+/** Alpha is not in agent.decision_rankings -- it lives only here and in the
+ *  orchestrator's memory, so this pill is the only display of the number that
+ *  produced the ranking. */
 function RunPill({ decision }: { decision: Decision }) {
   const age = ageOf(decision.built_at)
   return (
@@ -493,9 +433,8 @@ function RunPill({ decision }: { decision: Decision }) {
   )
 }
 
-/** Three services, named. "service ok" said nothing about which service; the
- *  reference layer and the graph are separate connections that can fail
- *  independently, and a panel going quiet should be traceable from here. */
+/** Three services, named: separate connections that fail independently, so a
+ *  panel going quiet is traced from here. */
 function SystemStatus({ health }: { health: Awaited<ReturnType<typeof api.health>> | undefined }) {
   const s = health?.sources
   const parts: Array<[string, boolean]> = [
@@ -505,11 +444,9 @@ function SystemStatus({ health }: { health: Awaited<ReturnType<typeof api.health
   ]
   return (
     <div className="sysstat">
-      {/* The state used to be carried ONLY by a 5px dot going from green to
-          red, and the dot was aria-hidden -- so the one indicator telling a
-          clinician whether the numbers on screen are current failed WCAG 2.2
-          SC 1.4.1 outright. The word travels now, and the hues are off the
-          reserved triage set. */}
+      {/* The word must travel with the dot: state carried by a 5px aria-hidden
+          dot alone fails WCAG 2.2 SC 1.4.1. Hues are off the reserved triage
+          set. */}
       {parts.map(([k, up]) => (
         <span key={k} className={'sysstat-i' + (up ? ' is-up' : '')}>
           <i aria-hidden />{k}

@@ -1,12 +1,7 @@
 /** NEWS2 scoring bands, so a vital can be drawn against the scale that judged it.
- *
- *  Mirrors urgency-agent/urgency_agent/news2.py. The agent is the authority; this
- *  exists so the UI can SHOW why a reading scored what it scored instead of
- *  printing a total and a sentence telling the reader to add six numbers by hand.
- *
- *  Royal College of Physicians, National Early Warning Score (NEWS) 2, 2017.
- *  Six parameters, 0-3 each, plus a scale-2 oxygen row this dataset never uses.
- */
+ *  Mirrors urgency-agent/urgency_agent/news2.py, which is the authority.
+ *  Royal College of Physicians, National Early Warning Score (NEWS) 2, 2017:
+ *  six parameters, 0-3 each, plus a scale-2 oxygen row this dataset never uses. */
 export interface Band { lo: number | null; hi: number | null; score: 0 | 1 | 2 | 3 }
 
 export interface Vital {
@@ -14,17 +9,14 @@ export interface Vital {
   label: string
   short: string
   unit: string
-  /** The span the meter draws across. Chosen to hold every band edge plus a
-   *  little air, so the scale is honest rather than cropped to the reading. */
+  /** The span the meter draws across. Must hold every band edge, or the scale is
+   *  cropped to the reading. */
   axis: [number, number]
   bands: Band[]
-  /** The span that scores ZERO on NEWS2 -- nothing more.
-   *
-   *  This is NOT a clinical reference range and must never be labelled one.
-   *  NEWS2 awards no points for a systolic between 111 and 219, which includes
-   *  stage-2 hypertension; calling that "normal" would be a diagnostic claim
-   *  this system has no source for. urgency-agent/urgency_agent/news2.py carries
-   *  no concept of normal at all, and neither does this. */
+  /** The span that scores ZERO on NEWS2 -- nothing more. NOT a clinical
+   *  reference range, and must never be labelled one: the zero band for systolic
+   *  includes stage-2 hypertension, so calling it "normal" is a diagnostic claim
+   *  this system has no source for. */
   zeroBand: [number, number]
 }
 
@@ -93,8 +85,8 @@ export function scoreOf(key: Vital['key'], value: number | string | null | undef
   return null
 }
 
-/** Position on the meter, 0-1, clamped. A reading past the axis pins to the end
- *  and the value is still printed, so an off-scale number is never hidden. */
+/** Position on the meter, 0-1, clamped. An off-axis reading pins to the end, so
+ *  the caller must still print the value or the number is hidden. */
 export function positionOf(vital: Vital, value: number): number {
   const [lo, hi] = vital.axis
   return Math.max(0, Math.min(1, (value - lo) / (hi - lo)))

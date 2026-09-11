@@ -1,10 +1,7 @@
 /** The Tús Áite mark, drawn rather than loaded so it can animate.
- *
- *  viewBox 0 0 52 70: a 5-wide stem at x=24 with four 21x5 bars alternating
- *  left and right. The SECOND bar is clay, not navy -- the kit calls clay
- *  "the one being seen next", so the mark is already a waiting list with the
- *  next appointment marked. That is the same object as the rank spine.
- */
+ *  viewBox 0 0 52 70: a 5-wide stem at x=24, four 21x5 bars alternating sides.
+ *  One bar is clay rather than navy on purpose -- the kit's clay means "the one
+ *  being seen next" -- so the mark reads as a waiting list. */
 const BARS = [
   { x: 29, y: 10, accent: true },
   { x: 3,  y: 26, accent: false },

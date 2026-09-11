@@ -1,29 +1,10 @@
-/* Tús Áite design tokens.
-
-   Frozen before component work. Components consume these; they never invent one.
-
-   Palette is the brand kit verbatim (brand_assets/assets/README.md):
-     ink #122056 · clay #7A5B4D · taupe #C4B6A6 · paper #FAFAF8
-   Brand rules honoured here:
-     - red/amber/green are reserved for triage categories and appear ONLY as
-       --cat-* below. Nothing else may use them, including MTS, which carries
-       its own colour vocabulary and is therefore shown in a neutral register.
-     - clay marks ONE element per composition.
-     - no gradient, glow or drop shadow on any SURFACE of the UI. No panel,
-       chip, rule, bar, button or glyph carries a blend, and every box-shadow
-       is inset. Depth comes from ground steps, hairlines and blur.
-       Two linear-gradient declarations exist in the product and neither is one
-       of those things: a hatch built from hard stops (.j-silence, app.css) and
-       a single-token alpha veil over the landing photograph (.landing-scrim,
-       app.css). Both are argued at the point of use. There is no third, and
-       nothing here licenses one.
-
-   Structure, in three layers:
-     1. brand constants and triage hues -- identical on every ground
-     2. the LIGHT set, for every surface carrying a number a clinician reads
-     3. the DARK set, scoped to [data-surface="dark"], for the rail and the
-        showpieces. Both grounds coexist on one page: the rail is dark while the
-        content beside it is light, so this cannot be a document-level theme. */
+/* Tús Áite design tokens. Components consume these; they never invent one.
+   Palette is the brand kit verbatim (brand_assets/assets/README.md).
+   Constraints: red/amber/green are RESERVED for triage and appear only as
+   --cat-*; clay marks ONE element per composition; no gradient, glow or drop
+   shadow, and every box-shadow is inset (the two gradients that exist are argued
+   at .j-silence and .landing-scrim, app.css). LIGHT and DARK are both live on
+   one page, so DARK is scoped, never a document theme. */
 
 :root {
   /* --- 1. brand constants, identical on both grounds --------------------- */
@@ -40,107 +21,32 @@
   --cat-uncat:       #5A6172;   /* no category recorded  */
   --cat-outside:     #6B6257;   /* not scored, not placed */
 
-  /* Four --cat-*-wash tints stood here, and four more on dark below: "for a
-     fill behind a label rather than a signal". Eight declarations, ZERO
-     consumers, so all eight are gone.
+  /* No --cat-*-wash tints, deliberately: an unused token holding a RESERVED hue
+     is a breach waiting to happen. Add one only with its consumer. */
 
-     Checked the way this palette's own trap demands and not by a naive grep.
-     The only two places a cat- class name is BUILT rather than written are
-     List.tsx:195 (TAB_TOKEN) and Patient.tsx:44 (chipClass), and both
-     concatenate to .cat-urgent / .cat-semiurgent / .cat-routine /
-     .cat-uncategorised / .cat-outside -- every one of which resolves in
-     app.css:212-215 and app.css:267 to the SOLID hue, never to a wash. No .ts
-     or .tsx file calls setProperty('--...') or assembles a custom-property
-     name any other way, so there was no runtime path either.
+  /* --- SEVERITY. Four steps for every "this needs attention" state, and NOT a
+     triage category: the reserved hues above may not be borrowed for it.
+     Legibility is FILL AREA before hue, so the steps escalate hairline, tint,
+     solid, and both channels (text on fill, fill against --bg) rise monotonically
+     at every step. Keep it that way; ratios in BUILD_LEDGER.md.
+     --sev-3's fill is within 1.1:1 of --cat-urgent in LUMINANCE, so never draw a
+     band chip and a severity mark in the same shape side by side. */
+  --sev-1-fg:   #545B6E;   /* noted      hairline                              */
+  --sev-1-bg:   #F5F0E6;   /* NOT --surface-2: identical to it, so step 1 would */
+  --sev-1-edge: #BFB6A4;   /* vanish the moment a row is hovered               */
 
-     Removed rather than left, for the same reason --lift-1/--lift-2 were
-     removed below -- and with more urgency than those had. An unused token is
-     a rule breach waiting for someone to reach for it; an unused token holding
-     a RESERVED triage hue is worse, because red/amber/green may only ever mean
-     a CPC band, so the first non-triage fill that reaches for one breaks the
-     top rule of this palette. If a tinted band fill is ever genuinely wanted,
-     add it then, with its consumer in the same commit. */
+  --sev-2-fg:   #523C31;   /* attention  tinted */
+  --sev-2-bg:   #E6D5CB;
+  --sev-2-edge: #B08D79;   /* 2.68-3.03 against the grounds it is drawn on, so it
+                              clears WCAG 1.4.11's 3:1 only on --surface. Not a
+                              conformance failure -- the mark always carries its
+                              number or word -- but do not lean on this edge. */
 
-  /* --- SEVERITY. Four steps, one scale, used for every "this needs attention"
-     state in the product. NOT a triage category: the reserved red/amber/green
-     above belong to CPC bands and to TrolleyGAR, and nothing else may borrow
-     them.
-
-     Why this exists. Every attention state used to be carried by a hairline:
-     the reconciliation alarm by a 3px --rule-firm edge at 1.55:1, a
-     year-old reading by a 1px dashed underline at 1.75:1, and a referral 31x
-     past target by a class that restated the base class verbatim and therefore
-     did nothing at all. None of that reads across a room, which is the whole
-     job.
-
-     What makes it legible is FILL AREA before hue. A solid block carries at
-     five metres; 11px of coloured text does not. So the steps escalate from a
-     hairline, through a tint, to a solid fill.
-
-     Both channels were solved rather than guessed, and both rise monotonically
-     -- the first draft of these values did not, which is the same fault as the
-     NEWS2 ladder they replace, whose most severe step was LESS contrasty than
-     the one below it:
-
-        step   text on its own fill     fill against the page (--bg)
-        sev-1        5.97:1                   1.09:1
-        sev-2        7.19:1                   1.36:1
-        sev-3        8.67:1                   8.67:1
-        sev-4       11.07:1                  11.07:1
-
-     The first published version of this table measured the fill column against
-     --surface (white panels) while calling it "the page", which is --bg. It was
-     wrong by a step, and self-evidently so: sev-3 and sev-4 have --paper as
-     their fg, so text-on-fill and fill-on-page are arithmetically the SAME
-     number and cannot differ. Recomputed against --bg.
-
-     One honest limitation. --sev-3's fill sits within 1.1:1 of --cat-urgent in
-     LUMINANCE, because clay and the triage red are naturally close in
-     lightness; they separate on saturation (23% against 69%), not brightness.
-     They are kept out of each other's registers: a band chip is an 8px swatch
-     beside its name, a severity mark is a filled block carrying a numeral. Do
-     not put them side by side in the same shape.
-
-     The hue is clay, the brand's own accent, darkened rather than reddened.
-     --sev-4 is a brown at 29% saturation; --cat-urgent is a red at 69%. They
-     are not mistakable for one another.
-
-     Every use pairs the step with its number or its word. Colour is never the
-     only channel. */
-  --sev-1-fg:   #545B6E;   /* noted      text 5.97  fill-vs-page  1.09  hairline */
-  --sev-1-bg:   #F5F0E6;   /* NOT --surface-2: step 1 was byte-identical to it, */
-  --sev-1-edge: #BFB6A4;   /* so it vanished the moment a row was hovered       */
-
-  --sev-2-fg:   #523C31;   /* attention  text 7.19  fill-vs-page  1.36  tinted   */
-  --sev-2-bg:   #E6D5CB;   /* deepened from a lighter tint. Of the 130 past      */
-  --sev-2-edge: #B08D79;   /* target, 43 are at step 2 and 71 at steps 1-2 --    */
-                           /* recounted: 28/43/39/20 across steps 1-4. An earlier */
-                           /* version of this line credited the 71 to step 2      */
-                           /* alone. It is the pair, which is still the majority  */
-                           /* of past-target referrals and still the reason this  */
-                           /* step has to carry its weight.                       */
-  /* The edge is stated honestly, because an earlier version of this comment
-     claimed it cleared the 3:1 WCAG 1.4.11 floor and named no ground -- the same
-     unnamed-ground error that already put a wrong fill column in this file once.
-     Measured, --sev-2-edge #B08D79 clears 3:1 in exactly one place:
-
-         --surface   #FFFFFF   3.03   the panel the ranked table sits on
-         --bg        #FAFAF8   2.90   the page
-         --surface-2 #F7F6F2   2.80   a panel's inner well
-         --bg-sunk   #F2F1EC   2.68   table headers and the evidence expander
-         its own fill          2.13
-
-     1.4.11 governs a graphical object REQUIRED to understand the content, and
-     no severity mark here is ever required: every one carries its number or its
-     word, which is the standing invariant three files up. So this is not a
-     conformance failure. It is a step whose graphical channel is genuinely weak
-     off --surface, and saying so is worth more than a floor we do not clear. */
-
-  --sev-3-fg:   #FAFAF8;   /* high       text 8.67  fill-vs-page  8.67  SOLID    */
-  --sev-3-bg:   #5A4438;   /* cooler and darker, off the green/brown line       */
+  --sev-3-fg:   #FAFAF8;   /* high       SOLID */
+  --sev-3-bg:   #5A4438;
   --sev-3-edge: #5A4438;
 
-  --sev-4-fg:   #FAFAF8;   /* severe     text 11.07 fill-vs-page 11.07  SOLID+ring */
+  --sev-4-fg:   #FAFAF8;   /* severe     SOLID, plus an outward ring (severity.css) */
   --sev-4-bg:   #47352D;
   --sev-4-edge: #47352D;
 
@@ -151,10 +57,7 @@
   --surface-2:  #F7F6F2;   /* a panel's own inner well                  */
   --text:       #122056;
   --text-2:     #545B6E;   /* AA on --surface at 14px                   */
-  /* was #7C8290 at 3.85:1 on white and 3.56 on --surface-2, i.e. NOT AA at any
-     of the sizes it is used at -- and it carries the paediatric REFUSED chip,
-     every "not recorded" flag and every uppercase eyebrow. */
-  --text-3:     #6B7183;   /* 4.87 on --surface, 4.50 on --surface-2    */
+  --text-3:     #6B7183;   /* the AA floor: 4.87 on --surface, 4.50 on --surface-2 */
   --rule:       #E4E0D8;   /* the default hairline                      */
   --rule-firm:  #C9C3B7;   /* a divider that must be seen               */
   --accent:     #7A5B4D;   /* clay. ONE element per composition.        */
@@ -165,15 +68,9 @@
   --taupe-14:   rgba(196, 182, 166, 0.14);
   --scrim-deep: rgba(7, 15, 42, 0.90);
 
-  /* --- elevation, spent BY ROLE ------------------------------------------
-     The kit forbids drop shadows by name, so hierarchy comes from GROUND, of
-     which the palette gives four steps -- --bg-sunk / --bg / --surface /
-     --surface-2 -- plus --rule against --rule-firm for edge weight.
-
-     There were --lift-1 and --lift-2 tokens here defined as literal drop
-     shadows. Nothing ever used them (grep for var(--lift) returned nothing),
-     so they were a rule breach sitting in the token file waiting for someone
-     to reach for it. Removed rather than left. */
+  /* --- elevation, spent BY ROLE. The kit forbids drop shadows, so hierarchy is
+     GROUND (--bg-sunk / --bg / --surface / --surface-2) plus --rule against
+     --rule-firm for edge weight. There are no elevation tokens; do not add one. */
 
   /* --- 3. type ------------------------------------------------------------ */
   --font-brand: 'Jost', ui-sans-serif, system-ui, sans-serif;
@@ -187,48 +84,13 @@
   --t-small:    12px;   /* running prose, and a value read on its own       */
   --t-micro:    11px;   /* the annotation step, and the floor. see below.   */
 
-  /* --- what --t-micro is actually for -------------------------------------
-     This token used to be labelled "uppercase labels ONLY, never a value".
-     Counted across the eight stylesheets: 126 declarations set a font-size to
-     this token, and 9 of them sit in a rule that also sets
-     text-transform: uppercase. Seven per cent. (That count is a live check --
-     it is why this paragraph does not spell the reference out, which would
-     make the grep return 127 and the number wrong on the day it was written.) Those 9 are also the ONLY
-     `text-transform: uppercase` declarations in the product, so nothing
-     inherits its way onto the honoured side of that count -- and four further
-     rules (app.css:314, overview.css:198, list.css:356, list.css:454) set
-     `text-transform: none` at this size, cancelling an inherited uppercase on
-     purpose. A rule kept 7% of the time is worse than either answer, because
-     it makes a grep for the breach useless: the breach is the norm.
-
-     So the rule is restated to match what the token does. --t-micro is the
-     ANNOTATION step: text attached to something larger that is never read on
-     its own.
-       - the uppercase eyebrow and column head (.lab, and the 8 selectors that
-         uppercase themselves)
-       - a unit or suffix beside a number  (.readout-u, .n2 .of, .lane-of)
-       - an id or a rule code              (.ev-rid, .run-id, .ov-rule-id)
-       - the text inside a chip, pill or legend key
-                                           (.chip, .pt-tag, .rule-chip, .ov-nat-w)
-       - a count or axis annotation on a figure already drawn to scale
-                                           (.pt-bar-n, .pt-bar-v, .ov-occ-n)
-       - a caption or footnote             (.pt-caption, .ov-cite, .ev-cav)
-     Uppercase was never the test. Being SECONDARY to something larger is.
-
-     The real floor for a value. 11px is the floor of the whole product: no
-     rule in any stylesheet sets a font-size below it, by token or by literal
-     (the only other sub-12px literal is list.css:905's disclosure caret, also
-     11px, which carries no text). A value MAY be set at --t-micro, and many
-     are, on the one condition the code does keep: it must be secondary. The
-     primary numeral in a cell is --t-data; a figure at --t-micro is a suffix
-     on a larger number, or an annotation on a mark already drawn to scale, or
-     a repeat of something stated at size elsewhere. Do not set a figure here
-     that appears nowhere else larger, and do not set a value smaller than the
-     label beside it.
-
-     Do NOT raise this token. The ranked table's nine columns are measured to
-     the pixel -- NINE_COL_PX = 1716 against 302 of chrome, with two exact-fit
-     widths and zero spare -- and 11px to 12px reflows it. */
+  /* --- what --t-micro is for: the ANNOTATION step -- text attached to something
+     larger and never read on its own (eyebrows, units, ids, chip and legend
+     text, captions). Uppercase is not the test; being SECONDARY is. A value may
+     sit here, but the primary numeral in a cell is --t-data and nothing may be
+     smaller than the label beside it. 11px is also the product's floor.
+     Do NOT raise this token: the ranked table's nine columns are measured to the
+     pixel (NINE_COL_PX 1716 against 302 of chrome) and 12px reflows it. */
   --track-wide: 0.14em; /* the wordmark's letterspacing                     */
   --track-lab:  0.08em; /* uppercase eyebrows                               */
 
@@ -236,9 +98,8 @@
   --d1: 4px;  --d2: 8px;  --d3: 12px; --d4: 16px;
   --d5: 24px; --d6: 32px; --d7: 48px; --d8: 64px;
 
-  /* --- geometry: the mark, and everything derived from it -----------------
-     tus-aite-mark-navy.svg is viewBox 0 0 52 70: a 5-wide stem at x=24 with
-     four 21x5 bars alternating left and right. Those ratios drive the spine. */
+  /* --- geometry, from tus-aite-mark-navy.svg (viewBox 0 0 52 70: a 5-wide stem
+     with four 21x5 bars alternating). Those ratios drive the spine. */
   --spine-w:      5px;    /* stem width  */
   --spine-bar:    5px;    /* bar height  */
   --spine-reach:  21px;   /* bar length at rest */
@@ -258,9 +119,7 @@
   --t-settle:  600ms;   /* rows arriving at a rank */
 }
 
-/* --- DARK: the rail and the showpieces ------------------------------------
-   Scoped, never a document theme: the rail is dark while the table beside it is
-   light, so both sets have to be live on the same page at the same time. */
+/* --- DARK: the rail and the showpieces. Scoped, never a document theme. ---- */
 [data-surface="dark"] {
   --bg:         #0B1436;
   --bg-sunk:    #070F2A;
@@ -273,35 +132,30 @@
   --rule-firm:  rgba(196, 182, 166, 0.32);
   --accent:     #C4B6A6;    /* taupe is the accent on dark, per the kit */
   --focus:      #C4B6A6;
-  /* the dark half of the four --cat-*-wash tints went with the light half; see
-     the note beside the triage hues above. */
 
-  /* Severity on ink. The two solid steps stay solid and gain lightness rather
-     than losing it, because on a dark ground a darker fill would vanish. */
-  --sev-1-fg:   #A9B0C6;   /* text 6.56  fill-vs-ground  1.27 */
+  /* Severity on ink. The two solid steps gain lightness rather than losing it:
+     on a dark ground a darker fill vanishes. Text on fill must stay monotonic --
+     6.56 / 7.03 / 7.43 / 11.05. */
+  --sev-1-fg:   #A9B0C6;
   --sev-1-bg:   #1C2758;
   --sev-1-edge: rgba(196, 182, 166, 0.32);
 
-  /* was #C9AE9F, published as 6.90 and actually 6.47 -- which put step 2 BELOW
-     step 1 (6.56) and broke the monotonicity this whole file claims. */
-  --sev-2-fg:   #CFB6A7;   /* text 7.03  fill-vs-ground  1.33 */
+  --sev-2-fg:   #CFB6A7;
   --sev-2-bg:   #3A2A2E;
   --sev-2-edge: #7A5B4D;
 
-  --sev-3-fg:   #0B1436;   /* text 7.43  fill-vs-ground  7.43 */
+  --sev-3-fg:   #0B1436;
   --sev-3-bg:   #C0A091;
   --sev-3-edge: #C0A091;
 
-  --sev-4-fg:   #0B1436;   /* text 11.05 fill-vs-ground 11.05 */
+  --sev-4-fg:   #0B1436;
   --sev-4-bg:   #E0C6B4;
   --sev-4-edge: #E0C6B4;
 }
 
-/* --- glass. depth through blur, never light through glow. -----------------
-   Exactly five uses, all of them chrome floating OVER something: a panel over
-   the graph, the run pill, the override scrim, a sticky tab bar, the graph
-   legend. Never behind a number: WCAG contrast is measured against whatever is
-   actually behind the text, and on a graph that moves. */
+/* --- glass. depth through blur, never light through glow. Chrome floating OVER
+   something only -- never behind a number, because contrast is measured against
+   whatever is actually behind the text, and on a graph that moves. */
 .glass {
   background: rgba(11, 20, 54, 0.74);
   backdrop-filter: blur(20px) saturate(140%);

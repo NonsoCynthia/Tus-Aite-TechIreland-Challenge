@@ -12,8 +12,7 @@ import { crtDays, isRefusedPaediatric, ruleStatement, specialtyName } from '../l
 import { plantedCase } from '../lib/planted'
 import { sevBreach, sevReadingAge, sevWaitRatio } from '../lib/severity'
 import type { Sev } from '../lib/severity'
-/** Median wait. ONE home, lib/stats.ts, shared with Overview.tsx -- the two
- *  surfaces used to hold a copy each and printed 141 against 142 on 2026-08-21. */
+/** Median wait. ONE home, lib/stats.ts, shared with Overview.tsx: two copies drift. */
 import { median } from '../lib/stats'
 import { Aside } from '../components/Aside'
 import { SevChip, SevLegend } from '../components/Severity'
@@ -24,26 +23,13 @@ import type {
 } from '../lib/types'
 import './list.css'
 
-/** The ranked list.
- *
- *  The page used to open with a six-line paragraph explaining the sort order.
- *  A sort key is a structure, so it is drawn as one: six numbered steps, with
- *  the hidden third tier (past target first, before any score is compared)
- *  carrying the composition's one clay accent, because that tier is the thing
- *  readers kept missing and the thing that makes adjacent rows look wrong.
- *
- *  Everything the cohort payload carries is now on screen. triage_status,
- *  days_awaiting_triage and currently_suspended had never been rendered
- *  anywhere; neither had a rule ID, though the coordinator has produced 776
- *  rule checks since the first run.
- */
+/** The ranked list. The sort key is drawn as a structure (SortKeyLadder); step 3,
+ *  past target before any score, carries the one clay accent. */
 
 const fmt = (n: number) => n.toLocaleString('en-IE')
 const pct = (n: number) => `${Math.round(n * 100)}%`
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
-/** A date that will not parse prints as the no-value placeholder, never as
- *  "Invalid Date": evidence keys are strings from another service and may not
- *  be dates at all. */
+/** Never "Invalid Date": evidence keys may not be dates at all. */
 const dmy = (s: string | null | undefined) => {
   const d = s ? new Date(s) : null
   return d && !Number.isNaN(d.getTime())
@@ -63,17 +49,12 @@ const dmyt = (s: string | null | undefined) => {
  *  these would imply 305 independent verdicts where the coordinator made one. */
 const WHOLE_LIST = new Set(['RULE-ORDER', 'RULE-TIEBREAK'])
 
-/** How far past target, as a numeral. 31x rounds, 1.2x keeps its decimal, and
- *  the numeral always carries the true value whatever the bar does with it. */
+/** The numeral always carries the true value, whatever the bar does with it. */
 const ratioText = (r: number) => (r >= 10 ? String(Math.round(r)) : r.toFixed(1))
 
-/** NEWS2 typeset so that a 7 does not look like a 0.
- *
- *  Weight and size, no band and no colour. NEWS2 TOTAL is deliberately outside
- *  the severity scale (lib/severity.ts: 148 of 308 tie at exactly 0, so a
- *  graded scale on it would be flat across half the list), and any threshold
- *  drawn here would be an invented one. This is a continuous map from the value
- *  to its weight: a magnitude channel, not a claim. */
+/** NEWS2 typeset so a 7 does not look like a 0: weight and size, no colour. The
+ *  total is outside the severity scale by design, so a threshold here would be
+ *  invented. A magnitude channel, not a claim. */
 const n2Type = (n: number | null): CSSProperties => {
   if (n == null) return {}
   const t = clamp01(n / 17)
@@ -84,72 +65,34 @@ const UNPLACED = 1e9
 
 /* ------------------------------------------------------------- geometry -- */
 
-/** The table's column widths, in ONE place, because the table's own min-width
- *  has to be derived from them.
+/** The table's column widths, in ONE place: min-width is derived from them.
  *
- *  `table-layout: fixed` gives the elastic column whatever is left after every
- *  specified width is honoured. The specified widths summed to 1154px while the
- *  table's min-width was 1120px, so the one auto column (Referral) was allotted
- *  -34px, which is to say 0. td overflow is `visible`, so the pathway number,
- *  the planted chip and the override badge painted straight over the Waited
- *  column at every width from 1440 up. That is the "compact version overlaps"
- *  report, and 1440x900 and 1536x864 are both inside it.
- *
- *  min-width is now the fixed sum PLUS a reserved minimum for Referral, so the
- *  elastic column can never be squeezed to nothing again. The worst case is
- *  that .lst-vp scrolls sideways, which is what .lst-vp is for. */
+ *  TRAP: `table-layout: fixed` gives the elastic Referral column what is left
+ *  after every specified width, and td overflow is `visible` -- so a min-width
+ *  below the fixed sum plus COL_REF allots it a negative width and its contents
+ *  paint over the Waited column. Never write min-width down as a literal. */
 const COL = {
   pos: 76, spine: 140, wait: 200, rule: 240, news: 180,
   triage: 144, ctx: 132, exp: 42,
 } as const
 
-/** Referral's floor. "Otolaryngology (ENT) · 0600" beside a pathway number and
- *  a planted chip does not fit in less. */
+/** Referral's floor: a specialty name, a pathway number and a chip on one line. */
 const COL_REF = 260
 
-/** Nine columns need 1414px of table, seven need 1138:
+/** The viewport at which the ninth column first fits. THREE chrome terms, and
+ *  the third gets forgotten: the table gets what is inside .lst-vp, which has a
+ *  1px border of its own on each side (list.css). The rail's border-right is not
+ *  a fourth -- `box-sizing: border-box` keeps it inside the 236px grid track.
  *
  *    9 cols  76+140+200+240+180+144+132+42 = 1154 + 260 Referral = 1414
  *    7 cols  76+140+200+240+180+42         =  878 + 260 Referral = 1138
+ *    chrome  rail 236 + .pad 2x32 + .lst-vp 2x1 = 302  ->  1414 + 302 = 1716
+ *            rail  64 + .pad 2x16 + .lst-vp 2x1 =  98  (app.css @1439)
  *
- *  The chrome between the viewport and the table is THREE terms, and this
- *  comment used to count two. It stopped at "300px at 1440 and above (rail 236
- *  + 2x32)", which is the content column -- but the table does not get the
- *  content column, it gets what is inside .lst-vp, and .lst-vp has a 1px border
- *  on each side (list.css). That third term is where 1714 came from:
- *
- *    >= 1440   rail 236 + .pad 2x32 + .lst-vp 2x1 = 302px
- *    <  1440   rail  64 + .pad 2x16 + .lst-vp 2x1 =  98px   (app.css @1439)
- *
- *  The rail's own border-right is NOT a fourth term: `* { box-sizing:
- *  border-box }` (tokens.css) keeps it inside the 236px grid track. Measured in
- *  the running app at a 1716px viewport, .main starts at x=236 and is 1480 wide,
- *  not 1479.
- *
- *  Measured at each width -- .lst-vp clientWidth, and whether it actually grew a
- *  horizontal scrollbar:
- *
- *    viewport  rail  .pad  chrome  .lst-vp inner  cols  needs  result
- *      1280      64  2x16      98           1182     7   1138  44px spare
- *      1440     236  2x32     302           1138     7   1138  fits exactly
- *      1715     236  2x32     302           1413     9   1414  1px SHORT
- *      1716     236  2x32     302           1414     9   1414  fits exactly
- *      1920     236  2x32     302           1618     9   1414  204px spare
- *
- *  So the ninth column first fits at 1716 and the old 1714 switched it on two
- *  pixels early: at 1714 and 1715 the table was 1414px inside a 1412/1413px box,
- *  and .lst-vp grew a sideways scrollbar at the exact width that added the
- *  column. Confirmed on the running build at 1715: scrollWidth 1414 against
- *  clientWidth 1413.
- *
- *  One thing this constant cannot model: on a platform with classic rather than
- *  overlay scrollbars, .lst-vp's own VERTICAL scrollbar takes ~15px more of that
- *  inner width, and the fit moves with it. The measurements above are macOS
- *  overlay scrollbars, where it takes none.
- *
- *  Triage and Context are the two that go below the breakpoint: Triage reads
- *  "triaged" on 307 of 308, Context's subline was identical on every row, and
- *  both are in the expander in full. */
+ *  One pixel low and .lst-vp grows a sideways scrollbar at the very width that
+ *  adds the column. Classic (non-overlay) scrollbars are not modelled: a vertical
+ *  bar takes ~15px more of the inner width. Triage and Context are the two to
+ *  drop below it, both nearly constant down the column and both in the expander. */
 const NINE_COL_PX = 1716
 
 const tableMin = (narrow: boolean): number =>
@@ -171,9 +114,8 @@ type Row = CohortReferral & {
   clin?: Clin
   /** The override that stands for this pathway, if any. */
   ovr?: OverrideRecord
-  /** True only when that override was recorded against the decision on screen.
-   *  An override from an earlier decision names a position in a list that no
-   *  longer exists, so it is shown but never allowed to move a row. */
+  /** True only for an override recorded against the decision on screen: an older
+   *  one names a position in a list that no longer exists, so it never moves a row. */
   ovrLive: boolean
   exclusion?: string
   /** Index in the displayed order: the system's, with live overrides applied. */
@@ -208,7 +150,7 @@ function useList(hospital: string, date: string) {
     queryKey: ['operations', hospital, date], queryFn: () => api.operations(hospital, date),
     staleTime: Infinity,
   })
-  // 404 until a run has produced one. That is a normal state, not an error.
+  // 404 until a run has produced one: a normal state, not an error.
   const decision = useQuery<Decision>({
     queryKey: ['decision', hospital, date], queryFn: () => api.decision(hospital, date),
     retry: false, staleTime: 5_000,
@@ -218,9 +160,8 @@ function useList(hospital: string, date: string) {
     retry: false,
   })
 
-  /** The displayed order: the coordinator's positions, then every override that
-   *  belongs to THIS decision applied oldest first, so the newest one wins.
-   *  Nothing is interpolated: a row is either in a slot or it is not. */
+  /** The coordinator's positions, then this decision's overrides applied oldest
+   *  first so the newest wins. Nothing interpolated: a row is in a slot or not. */
   const seqOf = useMemo(() => {
     const m = new Map<string, number>()
     const d = decision.data
@@ -242,13 +183,9 @@ function useList(hospital: string, date: string) {
     return m
   }, [decision.data, overrides.data])
 
-  /** The displayed order as a list, so the override dialog can decide whether a
-   *  move crosses a category boundary IN THE LIST THE CLINICIAN IS LOOKING AT.
-   *  Computed against decision.rankings it was answering about a different list:
-   *  after one override, displayed position N is a different person, so the
-   *  warning could stay silent for a move that visibly crosses a boundary, and
-   *  rule_warning_accepted would then be stored false for a crossing that did
-   *  happen. */
+  /** So the override dialog judges a boundary crossing IN THE LIST THE CLINICIAN
+   *  SEES: after one override decision.rankings is a different list, and stores
+   *  rule_warning_accepted false for a crossing that did happen. */
   const displayedOrder = useMemo(() => {
     const arr: string[] = []
     for (const [pw, i] of seqOf) arr[i] = pw
@@ -304,11 +241,8 @@ function metric(r: Row, key: SortKey, ref: Reference | undefined): number | null
   switch (key) {
     case 'wait': return r.adjusted_wait_days
     case 'over': return ratioOf(r, ref)
-    // Ordering is a channel. The Outside tab IS the refused set, its three cells
-    // all read "not applied · adult scale", and the NEWS2 header sorts in every
-    // tab -- so sorting there ranked three children by the adult scores the
-    // product had just refused to show them by. Nulls sort last and the
-    // pathway_number tiebreak keeps the tab deterministic.
+    // The NEWS2 header sorts in every tab, so a score returned in Outside would
+    // rank children by the adult scale just refused.
     case 'news2': return isRefusedPaediatric(r.specialty_hipe) ? null : (r.clin?.news2 ?? null)
     case 'age': return r.clin?.reading_age_days ?? null
     case 'priority': return r.rank?.priority ?? null
@@ -343,21 +277,11 @@ function comparator(sort: { key: SortKey; dir: 1 | -1 }, ranked: boolean, ref: R
 
 /* ------------------------------------------------------------ tied priority -- */
 
-/** Two rows, adjacent in the suggested order, whose priorities print the same.
- *
- *  On 9001/2026-08-30 twelve adjacent in-band pairs differ only from the fourth
- *  decimal: positions 18 and 19 are 0.282693 and 0.282539, and both print
- *  0.283. Sixteen further pairs are equal to the last bit and correctly fall
- *  through to referral date. At three decimals the two kinds are indis-
- *  tinguishable, and the surface then says priority decided the order. So the
- *  pair is named, the margin is printed at the precision that carries it, and
- *  the term that carries it is named as well.
- *
- *  In every near-tie in this decision the two terms pull in OPPOSITE
- *  directions: alpha x urgency puts one row ahead by ~0.061 while
- *  (1 - alpha) x wait_normalised puts the other ahead by ~0.061, and the
- *  residue is the margin. Naming the winner without naming that is a half
- *  truth, so both differences travel. */
+/** Two rows, adjacent in the suggested order, whose priorities print the same. At
+ *  three decimals a pair separated from the fourth decimal looks like one equal to
+ *  the last bit, and the surface then claims priority decided an order referral
+ *  date decided. Both term differences travel with the margin: they pull opposite
+ *  ways and the margin is their residue, so a winner alone is a half truth. */
 type Tie = {
   hi: string; lo: string
   hiPos: number; loPos: number
@@ -369,21 +293,14 @@ type Tie = {
   /** (1 - alpha) x wait_normalised, hi less lo. */
   dw: number
   exact: boolean
-  /** The term pulling in the direction the pair actually resolved. Null when
-   *  nothing resolved it and referral date had to. */
+  /** The term that resolved the pair. Null when referral date had to. */
   carries: 'urgency' | 'wait' | null
 }
 
 const term = (t: Tie['carries']) => (t === 'urgency' ? 'how unwell' : 'how long waited')
 
-/** Every such pair in a decision, keyed by both of its pathway numbers.
- *
- *  Computed from the coordinator's own positions rather than from what is on
- *  screen, so the fact survives a filter, a page and a different sort: it is a
- *  property of the decision, not of the view. Only pairs in the same breach
- *  tier are compared, because priority is only reached once that tier has tied
- *  (step 3 of the key), so two rows either side of the boundary were never
- *  separated by a score at all. */
+/** Every such pair, keyed by both pathway numbers, from the coordinator's own
+ *  positions so it survives a filter, a page or a sort. Same breach tier only. */
 function findTies(rankings: Ranking[]): Map<string, Tie> {
   const m = new Map<string, Tie>()
   const byBand: Record<string, Ranking[]> = {}
@@ -406,8 +323,7 @@ function findTies(rankings: Ranking[]): Map<string, Tie> {
         hiP: hi.priority, loP: lo.priority,
         delta, du, dw,
         exact: delta === 0,
-        // delta is positive by construction, so the larger of the two
-        // differences is the positive one and is the term that carried it.
+        // delta is positive by construction, so the larger difference carried it.
         carries: delta === 0 ? null : du > dw ? 'urgency' : 'wait',
       }
       if (!m.has(a.pathway_number)) m.set(a.pathway_number, t)
@@ -471,11 +387,8 @@ export function List({ hospital, date, reference, onOpen }: {
       || specialtyName(reference, r.specialty_hipe).toLowerCase().includes(needle))
   }, [rows, needle, reference])
 
-  // Union of what the decision refused and what the SPECIALTY refuses. ADR-007
-  // refuses 0601 unconditionally (urgency-agent scoring.py:88), so this must hold
-  // on the 13 days that have no decision at all -- otherwise the Outside tab is
-  // empty and a child's adult NEWS2 renders under "How unwell" on every one of
-  // them, which is exactly the pre-ranking view this round built.
+  // Union of what the decision refused and what the SPECIALTY refuses: ADR-007
+  // refuses 0601 unconditionally, and this must hold on days with no decision.
   const refused = useMemo(() => {
     const set = new Set(decision?.refused_paediatric ?? [])
     for (const r of rows) if (isRefusedPaediatric(r.specialty_hipe)) set.add(r.pathway_number)
@@ -492,8 +405,7 @@ export function List({ hospital, date, reference, onOpen }: {
     return g
   }, [visible, refused, sort, ranked, reference])
 
-  // Breaches are always of the referrals that HAVE a target. 143 of 308 have
-  // none at all, so "130 of 308" would be a different and untrue statement.
+  // A breach is always of the referrals that HAVE a target, never of the list.
   const figures = useMemo(() => {
     const withTarget = rows.filter((r) => targetOf(r, reference) != null)
     return {
@@ -504,22 +416,10 @@ export function List({ hospital, date, reference, onOpen }: {
     }
   }, [rows, reference])
 
-  /** The state before ranking, which the client asked for by name: how many
-   *  are waiting, and with what, so that running the agents is a step the
-   *  reader chooses rather than a screen they arrive at. Everything here is
-   *  counted from the cohort, so it is true of a day nothing has scored.
-   *
-   *  WORDING. Every figure in this panel is counted off `rows`, which is the
-   *  cohort's referrals -- so the headline counts ROWS and says referrals.
-   *  Landing.tsx made the same change first and argues it at length: this
-   *  screen can see a list, not a population, and the dataset plants
-   *  PW-DEMO-06/07 (one pair of referrals across two hospitals) and
-   *  PW-COLLIDE-01 (the same pathway number at two hospitals) precisely so
-   *  that a list holding more rows than it holds people is representable.
-   *  This is NOT a hedge and must not become one: the numeral is as large and
-   *  as immediate as it was, nothing qualifies it, and the synthetic-data
-   *  label the client had removed does not come back. The fix is in the noun,
-   *  and it costs the screen nothing. */
+  /** The state before ranking, counted from the cohort, so it holds on a day
+   *  nothing has scored. WORDING TRAP: every figure counts ROWS and must say
+   *  referrals, never people -- pathway numbers deliberately collide across
+   *  hospitals here. Not a hedge: no qualifier, no synthetic-data label. */
   const pre = useMemo(() => {
     if (ranked || !rows.length) return null
     const waits = rows.map((r) => r.adjusted_wait_days ?? 0).sort((a, b) => a - b)
@@ -528,12 +428,10 @@ export function List({ hospital, date, reference, onOpen }: {
     const steps = rows.map((r) => sevReadingAge(r.clin?.reading_age_days ?? null))
     const n2 = rows.map((r) => r.clin?.news2).filter((x): x is number => x != null)
     return {
-      // lib/stats.ts, the same call Overview.tsx makes. Sorted here already for
-      // min/max; median() sorts its own copy, so the two cannot drift.
+      // lib/stats.ts, the same call Overview.tsx makes; median() sorts its own copy.
       median: median(waits), min: waits[0], max: waits[n - 1],
       worst: ratios.length ? Math.max(...ratios) : null,
-      // graded by the frozen scale rather than by a threshold invented here:
-      // sevReadingAge answers what a year-old and a two-year-old reading are.
+      // graded by the frozen scale, never a threshold invented here
       year: steps.filter((x) => x >= sevReadingAge(365)).length,
       twoYear: steps.filter((x) => x >= sevReadingAge(730)).length,
       noReading: rows.filter((r) => r.clin?.obs_datetime == null).length,
@@ -544,8 +442,7 @@ export function List({ hospital, date, reference, onOpen }: {
     }
   }, [rows, ranked, reference])
 
-  /** Adjacent pairs the printed priority cannot separate. Computed from the
-   *  decision's own positions, so the fact holds under any filter or sort. */
+  /** From the decision's own positions, so it holds under any filter or sort. */
   const ties = useMemo(
     () => (decision ? findTies(decision.rankings) : new Map<string, Tie>()),
     [decision])
@@ -587,7 +484,7 @@ export function List({ hospital, date, reference, onOpen }: {
 
   return (
     <div className="pad lst">
-      {/* mounted unconditionally: a polite region has to be observed BEFORE its
+      {/* mounted unconditionally: a polite region must be observed BEFORE its
           text changes, or the first announcement is dropped */}
       <div className="flash" role="status" aria-live="polite" aria-atomic="true"
            hidden={!flash}>{flash}</div>
@@ -659,12 +556,8 @@ export function List({ hospital, date, reference, onOpen }: {
                 </SevChip>
               )}
             </PreFig>
-            {/* /api/operations takes 3.255s cold and 0.003s warm. Until it
-                lands, r.clin is undefined on all 308 rows and `pre` is computed
-                from nulls -- so this panel used to assert "No observation has
-                been read on this hospital-day", an absolute, for three seconds,
-                on the panel the client asked for by name. It is 308 of 308 on
-                the real data. */}
+            {/* TRAP: /api/operations takes ~3s cold, so until it lands `pre` is
+                computed from nulls and this asserts an absolute for that long. */}
             <PreFig k={opsPending
               ? 'carry a NEWS2. Reading the observations…'
               : pre.n2max == null
@@ -674,15 +567,8 @@ export function List({ hospital, date, reference, onOpen }: {
               <b className="num">{fmt(pre.n2n)}</b>
             </PreFig>
           </div>
-          {/* STATE, so it is rewritten shorter and stays visible rather than
-              going behind a toggle: it says what this hospital-day is, and it
-              carries the only instruction on a pre-run screen. 331 characters to
-              268. Nothing was cut except a repetition -- .lst-sub, two figures
-              above and also only drawn when nothing has scored, already says "in
-              referral-date order: a display order, not a ranking", so this line
-              no longer says it a second time. What is left is what nothing else
-              on this screen says: no rule has been tested yet, how to run the
-              agents, and what comes back when you do. */}
+          {/* STATE, so it stays visible. .lst-sub above already says "a display
+              order, not a ranking", so this must not. */}
           <p className="pre-p">
             Referral-date order carries no clinical claim: nothing below has been scored,
             placed or tested against a rule.{' '}
@@ -703,11 +589,7 @@ export function List({ hospital, date, reference, onOpen }: {
         </div>
       )}
 
-      {/* Both of these are reference material: true, worth having, and read
-          once. Left open they pushed the actual list below the fold on a
-          1080-tall screen, which is the opposite of what a working surface
-          should do. They open on demand and remember nothing, because the
-          answer does not change. */}
+      {/* Reference material: left open it pushes the list below the fold. */}
       <details className="lst-fold">
         <summary>
           <span className="lst-fold-t">The sort key</span>
@@ -853,8 +735,7 @@ function Fig({ n, k, w, accent }: { n: number; k: string; w: string; accent?: bo
   )
 }
 
-/** One figure in the before-ranking summary. The value is a node rather than a
- *  number because some of these are graded and arrive as a severity chip. */
+/** The value is a node, not a number: some arrive as a severity chip. */
 function PreFig({ k, children }: { k: string; children: ReactNode }) {
   return (
     <div className="pre-f">
@@ -866,15 +747,8 @@ function PreFig({ k, children }: { k: string; children: ReactNode }) {
 
 /* ----------------------------------------------------- the sort key, drawn -- */
 
-/** The order used to be explained in a paragraph. A sort key is a structure, so
- *  it is drawn as one: six ordered steps, each naming the rule it comes from.
- *  Step 3 is the tier readers kept missing (everyone past target ranks above
- *  everyone within it, before any score is compared), so it takes the one clay
- *  accent this composition is allowed.
- *
- *  Steps 4 and 5 carry what the printed order cannot show on its own: how many
- *  pairs the priority column cannot separate at the precision it prints, and
- *  how many are genuinely equal and reach step 5. */
+/** Six ordered steps, each naming its rule; step 3 takes the one clay accent.
+ *  Steps 4 and 5 count the pairs priority cannot separate as printed. */
 function SortKeyLadder({ alpha, ranked, reference, ties }: {
   alpha: number | null; ranked: boolean; reference: Reference | undefined
   ties: { near: number; exact: number }
@@ -936,20 +810,12 @@ function SortKeyLadder({ alpha, ranked, reference, ties }: {
             <span className="key-k">{s.k}</span>
             <span className="key-w">{s.w}</span>
             {s.note && <span className="key-note">{s.note}</span>}
-            {/* The rule a step comes from, and what it SAYS. The statement
-                was a `title` on this span and nowhere else, so the ladder --
-                the surface whose whole job is explaining the order -- named
-                RULE-CRT-URGENT and left the sentence under a pointer. Step 3
-                cites two rules and only the first one's statement was even on
-                the tooltip. */}
+            {/* The rule a step comes from, and what it SAYS: in a `title` alone
+                the ladder names an ID and hides the sentence under a pointer. */}
             {s.rule && (
               <span className="key-r">
                 {s.rule.split(' · ').map((id) => {
-                  // ruleStatement falls back to the ID itself while
-                  // core.ref_rules is still loading, and printing the ID twice
-                  // says nothing: the step shows the ID alone on the first
-                  // paint, as it always did, and gains the sentence when the
-                  // reference lands.
+                  // ruleStatement falls back to the ID while core.ref_rules loads
                   const st = ruleStatement(reference, id)
                   return (
                     <span className="key-r-1" key={id}>
@@ -975,10 +841,8 @@ function SortKeyLadder({ alpha, ranked, reference, ties }: {
 
 /* ------------------------------------------------------- reconciliation D4 -- */
 
-/** The four not-ranked buckets, separately labelled and reconciled by set
- *  union. They overlap: the three paediatric referrals are refused by the
- *  urgency agent AND recorded by the coordinator as missing_urgency_score, so
- *  adding them reads as 311 of 308 and loses what each bucket means. */
+/** The four not-ranked buckets, reconciled by set union. They OVERLAP -- a refused
+ *  referral is also unplaceable -- so a sum over-counts and loses what each means. */
 function Reconciliation({ decision, total }: { decision: Decision; total: number }) {
   const placed = new Set(decision.rankings.map((r) => r.pathway_number))
   const paed = new Set(decision.refused_paediatric)
@@ -1044,8 +908,8 @@ function Reconciliation({ decision, total }: { decision: Decision; total: number
 
 type BandProps = {
   rows: Row[]
-  /** The whole cohort, so the Outside tab can reconcile its counts against
-   *  the Overview's without hardcoding a number that is wrong on 9002. */
+  /** The whole cohort, so the Outside tab reconciles against the Overview's
+   *  without a hardcoded number that is wrong at another hospital. */
   onList: number
   bandKey: string
   ranked: boolean
@@ -1071,13 +935,10 @@ type BandProps = {
 
 function Band(p: BandProps) {
   const [page, setPage] = useState(0)
-  // Nine columns need 1414px of table and only have it from a 1716px viewport
-  // up (rail 236 + .pad 2x32 + .lst-vp's own 2x1 border = 302px of chrome), so
-  // below that the table drops Triage and Context rather than paint the Referral
-  // cell over the Waited column. See COL and NINE_COL_PX above.
+  // Below this, Triage and Context go rather than the Referral cell paint over
+  // the Waited column. See COL and NINE_COL_PX above.
   const narrow = useNarrow(NINE_COL_PX)
-  // a new sort, a new filter or a new category always starts at the top of the
-  // category, never mid-list
+  // a new sort, filter or category starts at the top, never mid-list
   useEffect(() => { setPage(0) }, [p.rows, p.size])
 
   const target = p.outside ? null : bandTarget(p.bandKey, p.reference)
@@ -1086,10 +947,8 @@ function Band(p: BandProps) {
     && r.ovr.to_position !== r.ovr.from_position).length
 
   if (!p.rows.length) {
-    // A filter that matches only in another category left the reader looking at
-    // "nothing matches" while a tab two inches away showed a count. The counts
-    // were right; the dead end was the problem. Name where the matches are and
-    // offer to go there.
+    // A filter matching only in another category otherwise reads "nothing
+    // matches" while a tab two inches away shows a count. Name where they are.
     const elsewhere = (p.elsewhere ?? []).filter(([, n]) => n > 0)
     return (
       <p className="muted lst-empty">
@@ -1123,11 +982,8 @@ function Band(p: BandProps) {
       && slice[i - 1].crt_breached === true && r.crt_breached !== true)
     : -1
 
-  /* One clause, three branches, and it can no longer live inside the <p>: the
-     Outside tab's note is an <Aside> now, whose root is a <div>, and a <div>
-     inside a <p> is invalid. Written once here and placed in both, so the two
-     copies cannot drift. It is a STATE -- how many rows on this page sit where a
-     clinician put them -- so it stays on the visible line in both. */
+  /* Hoisted out of the <p>: the Outside tab's note is an <Aside> whose root is a
+     <div>, and a <div> inside a <p> is invalid. A STATE, so it stays visible. */
   const movedNote = moved > 0 ? (
     <> · <strong className="num">{moved}</strong> row{moved > 1 ? 's' : ''} here sit
     where a clinician placed {moved > 1 ? 'them' : 'it'}, not where the system did.</>
@@ -1135,34 +991,11 @@ function Band(p: BandProps) {
 
   return (
     <>
-      {/* THE ONE SPLIT ON THIS SURFACE, and the only <Aside> it places.
-          712 characters, the longest block here, and it was never one thing: it
-          is a CLAIM with the ARGUMENT for it attached.
-
-          THE CLAIM STAYS ON THE LINE, open or shut. "Not scored, not placed.
-          This is not a low position." is the sentence that stops a reader taking
-          the Outside tab for the bottom of the ranking, and the counts clause is
-          what stops this tab's number being read against the Overview's, which
-          bands all 308 by CPC and so counts these same rows inside a clinical
-          band. Both change how a number already on screen reads, so neither can
-          be one click away.
-
-          THE ARGUMENT GOES BEHIND THE TOGGLE: why NEWS2 is refused rather than
-          applied, why the record's own fields are printed in full anyway, and
-          the band-by-band breakdown of where these rows would otherwise sit. A
-          reader who has taken the claim does not need it argued twice.
-
-          139 characters visible against the 140 asideMismatch allows. movedNote
-          can add to that, and on this tab it has nothing to add: an override is
-          recorded against a position in a ranking, and a refused row has no
-          position, so `moved` is 0 here for every override this product can
-          create. If a stored record ever made it non-zero the visible line would
-          still be right and the DEV audit would say the line is long, which is
-          the correct order of those two.
-
-          This is OUTSIDE .lst-table. The Aside is barred from inside that table
-          by its own contract, and the row expander below is the table's own
-          disclosure. */}
+      {/* The only <Aside> here. Both halves of the summary change how a number
+          already on screen reads -- "not a low position", and why this tab's
+          counts differ from the Overview's -- so both stay on the line, and only
+          the argument goes inside. It sits OUTSIDE .lst-table: Aside bars itself
+          from that table, whose own disclosure is the row expander. */}
       {p.outside ? (
         <Aside
           className="lst-note"
@@ -1209,24 +1042,16 @@ function Band(p: BandProps) {
         </p>
       )}
 
-      {/* The scale, once, immediately above the rows it grades. Every graded
-          mark in the table below -- the wait bar, the wait-against-target step,
-          the reading's age, the rule that fired -- is drawn from this one
-          four-step ladder, and the ladder had never been stated anywhere on the
-          surface that spends it. It belongs to components/Severity.tsx; this
-          surface places it and does not redraw it. */}
+      {/* The scale, once, above the rows it grades. It belongs to
+          components/Severity.tsx: placed here, never redrawn. */}
       <SevLegend className="lst-legend" />
 
       <div className={'scroll-x lst-vp' + (p.tight ? ' is-tight' : '')}>
         {/* min-width is DERIVED, never written down: the specified widths plus
-            Referral's reserved minimum. Written down it was 1120 against a
-            1154 sum, and `table-layout: fixed` handed the elastic column its
-            remainder of -34px. */}
+            Referral's reserved minimum. See COL. */}
         <table className="lst-table" style={{ minWidth: tableMin(narrow) }}>
-          {/* Referral is the one elastic column: specialty names vary, and the
-              rule chip must never wrap onto a second line inside a row. It is
-              the column with no width here, so it takes what is left, and the
-              table is never allowed to be narrower than COL_REF past the rest. */}
+          {/* Referral is the one elastic column -- the <col> with no width -- and
+              tableMin never lets what is left fall below COL_REF. */}
           <colgroup>
             <col style={{ width: COL.pos }} />
             <col style={{ width: COL.spine }} />
@@ -1234,10 +1059,8 @@ function Band(p: BandProps) {
             <col style={{ width: COL.wait }} />
             <col style={{ width: COL.rule }} />
             <col style={{ width: COL.news }} />
-            {/* Triage reads "triaged" on 307 of 308 and Context's subline was
-                identical on every row, with both facts in full in the expander.
-                They are the two columns to lose when the width will not take
-                nine, and never the balance, the wait or the rule. */}
+            {/* The two to lose when the width will not take nine: both nearly
+                constant, both in the expander. Never balance, wait or rule. */}
             {!narrow && <col style={{ width: COL.triage }} />}
             {!narrow && <col style={{ width: COL.ctx }} />}
             <col style={{ width: COL.exp }} />
@@ -1336,8 +1159,7 @@ function Band(p: BandProps) {
   )
 }
 
-/** 16 numbered buttons for 308 rows is a wall, so the pager keeps the ends, the
- *  neighbours and an ellipsis for the rest. -1 is the ellipsis. */
+/** Ends, neighbours and an ellipsis for the rest. -1 is the ellipsis. */
 function pageWindow(page: number, pages: number): number[] {
   if (pages <= 9) return Array.from({ length: pages }, (_, i) => i)
   const out = new Set<number>([0, pages - 1, page, page - 1, page + 1])
@@ -1350,10 +1172,8 @@ function pageWindow(page: number, pages: number): number[] {
   return withGaps
 }
 
-/** A header with two sorts: the column's value, and the qualifier underneath it.
- *  A reading's age is as sortable as the reading, and a wait against its target
- *  is a different question from a wait in days. Putting both in one header keeps
- *  every sort key reachable without a second row of controls. */
+/** Two sorts per header, the column's value and the qualifier under it: a
+ *  reading's age is as sortable as the reading. */
 function Th({ k, label, sub, sort, onSort, align, k2, sub2 }: {
   k: SortKey; label: string; sub: string
   sort: { key: SortKey; dir: 1 | -1 }; onSort: (k: SortKey) => void
@@ -1392,11 +1212,9 @@ function Th({ k, label, sub, sort, onSort, align, k2, sub2 }: {
 
 /* --------------------------------------------------------------- one row -- */
 
-/* `outside` is a TAB fact (this row is not in the ranking). Whether NEWS2 may be
-   shown as acuity is a SPECIALTY fact. They coincide today only because the
-   grouping at :483 checks refusal before band, which a reviewer flagged as the
-   one line standing between this and a third escape of the same leak. So the
-   NEWS2 cell reads its own derivation and the coincidence stops being load-bearing. */
+/* `outside` is a TAB fact; whether NEWS2 may be shown as acuity is a SPECIALTY
+   fact. They coincide only because the grouping tests refusal before band, so
+   the NEWS2 cell derives its own answer. */
 function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expanded, onToggle, onOpen }: {
   r: Row; i: number; ranked: boolean; outside: boolean; narrow: boolean
   reference: Reference | undefined; tight: boolean; expanded: boolean
@@ -1411,37 +1229,26 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
   const age = r.clin?.reading_age_days ?? null
 
   // Two graded states, both from lib/severity.ts and neither invented here.
-  // The wait is the one number on this row with a real spread (0.036x to
-  // 31.1x); the reading's age is the one that says a number cannot be trusted.
   const waitSev = sevWaitRatio(ratio)
   const ageSev = sevReadingAge(age)
 
-  // NEWS2 may not be shown as acuity for a refused specialty. `outside` alone
-  // would be enough only while refusal is grouped before band; this is the same
-  // derivation the refused set and the patient page use, so the cell is right
-  // whatever tab it is drawn in.
+  // NEWS2 may not be shown as acuity for a refused specialty. Same derivation as
+  // the refused set and the patient page, so the cell is right in any tab.
   const naNews2 = outside || isRefusedPaediatric(r.specialty_hipe)
 
   const moved = !!r.ovr && r.ovrLive && r.ovr.to_position !== r.ovr.from_position
-  // The ORDINAL is the row's place in the displayed order, not the coordinator's
-  // stored position. Printing the stored position meant that the moment a
-  // clinician moved anyone, the column stopped enumerating: with one override
-  // the Urgent tab read 1, 1, 2, 3 ... 20, 22, 23 -- position 1 printed twice
-  // and 21 absent, with every row between the old and new slot one place away
-  // from the number beside it. `seq` is the index in the spliced order, so it is
-  // always a true 1..n enumeration of what is on screen.
+  // The ORDINAL is the row's place in the DISPLAYED order: print the stored
+  // position and the column stops enumerating the moment anyone is moved.
   const shownPos = r.seq < UNPLACED ? r.seq + 1 : r.rank?.position
   // the system's own number is kept whenever it differs from where the row now sits
   const systemPos = r.rank?.position
   const displaced = systemPos != null && shownPos != null && systemPos !== shownPos
 
-  // The rule ID has never appeared in this product. It is the first thing a
-  // reviewer looks for, and the coordinator has always computed it.
+  // The rule ID is the first thing a reviewer looks for.
   const fired = (r.rank?.rule_checks ?? [])
     .filter((c) => !c.passed && !WHOLE_LIST.has(c.rule_id))
-  // A row can fire a CRT rule AND RULE-TRIAGE-TURNAROUND. Compact used to clip
-  // the second one with `overflow: hidden` and no ellipsis, which is silent
-  // loss; it is now counted out loud instead.
+  // A row can fire a CRT rule AND RULE-TRIAGE-TURNAROUND. Compact has room for
+  // one, so the rest are counted out loud rather than clipped silently.
   const shownRules = tight && fired.length > 1 ? fired.slice(0, 1) : fired
   const hiddenRules = fired.length - shownRules.length
 
@@ -1450,18 +1257,12 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
       className={'lst-row is-clickable'
         + (expanded ? ' is-open' : '')
         + (r.ovr && r.ovrLive ? ' is-overridden' : '')}
-      // NOT role="button". ARIA gives button "children presentational", so
-      // every <td> was stripped from the accessibility tree -- position, days
-      // waited, ratio to target, NEWS2 and CRITICALLY the reading's age were
-      // all unreachable, and a screen-reader user heard only the pathway
-      // number. Age must travel with the reading for every reader. The row
-      // stays a row; the pathway link in the first cell is the named control,
-      // and the click handler is a convenience on top of it.
+      // TRAP: never role="button" here -- ARIA makes a button's children
+      // presentational, stripping every <td>, the reading's age included.
       initial={still ? false : { opacity: 0, y: 3 }}
       animate={{ opacity: 1, y: 0 }}
       transition={still ? { duration: 0 } : {
-        // a stagger across one page only. 305 rows arriving in sequence reads
-        // as slow, not as considered.
+        // a stagger across one page only, or the list reads as slow
         delay: Math.min(i, 18) * 0.012, duration: 0.22, ease: [0.2, 0, 0, 1],
       }}
       onClick={() => onOpen(r.pathway_number)}>
@@ -1472,10 +1273,9 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
           <span className={'pos num' + (moved ? ' is-moved' : '')}>
             {outside ? '—' : shownPos != null ? shownPos : '·'}
           </span>
-          {/* the clinician's position is the one shown; the system's stays beside it */}
-          {/* 76px of column is 56px of content, and "system said 12" wrapped to
-              three lines in it. The phrase moves to the tooltip, where the
-              expander repeats it in full. */}
+          {/* the clinician's position is shown; the system's stays beside it */}
+          {/* COL.pos leaves ~56px of content, so the phrase is in the tooltip,
+              where the expander repeats it in full. */}
           {displaced
             ? <span className="pos-was lab"
                     title={`the system placed this referral at ${systemPos}`}>
@@ -1488,9 +1288,8 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
         </div>
       </td>
 
-      {/* the spine: both terms, α-weighted. When the row is one half of a pair
-          the printed priority cannot separate, the numeral goes to six decimals
-          and the term that carried the margin is named underneath. */}
+      {/* both terms, α-weighted. Half of a pair the printed priority cannot
+          separate goes to six decimals, with the term that carried it named. */}
       <td className="c-spine">
         {r.rank
           ? (
@@ -1506,13 +1305,10 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
 
       {/* referral */}
       <td className="c-ref">
-        {/* .cell and .ovbadge are SIBLINGS, and compact lays them on one line.
-            Without a flex parent they are inline boxes in a table-cell: neither
-            can shrink, so a 208px badge started 290px into a 304px column and
-            painted 194px over the wait bar next door -- the overlap the client
-            reported in compact. The wrapper makes them real flex items, and the
-            two min-width:0 rules in list.css are what let the phrase give way
-            while the pathway number keeps its width. */}
+        {/* TRAP: .cell and .ovbadge are SIBLINGS that compact lays on one line.
+            Without this flex wrapper they are unshrinkable inline boxes and the
+            badge paints over the wait bar; list.css's two min-width:0 rules
+            decide which gives way. */}
         <div className="ref-wrap">
         <div className="cell">
           <span className="pw-line">
@@ -1520,9 +1316,8 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
                     onClick={(e) => { e.stopPropagation(); onOpen(r.pathway_number) }}>
               {r.pathway_number}
             </button>
-            {/* Eight of the 308 are planted fixtures the dataset track keeps at
-                fixed pathway numbers because the demo depends on them. Unlabelled
-                they read as leftover test data in a clinical list. */}
+            {/* Planted fixtures the dataset track keeps at fixed pathway numbers.
+                Unlabelled they read as leftover test data in a clinical list. */}
             {plantedCase(r.pathway_number) && (
               <span className="planted" title={plantedCase(r.pathway_number)!.why}>
                 demo fixture · {plantedCase(r.pathway_number)!.what}
@@ -1535,10 +1330,8 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
           </span>
         </div>
         {r.ovr && r.ovrLive && (
-          // One flex item, not four. Bare text nodes inside an inline-flex each
-          // become an anonymous flex item, so in a narrow column the phrase, the
-          // name and the reason wrapped into three stacked fragments. The reason
-          // moves to the tooltip and the expander, where there is room for it.
+          // One flex item, not four: a bare text node inside an inline-flex
+          // becomes an anonymous item of its own and wraps separately.
           <span className="ovbadge" title={`${r.ovr.clinician_id}: ${r.ovr.reason}`}>
             <PenLine className="ico-chr" strokeWidth={1.75} aria-hidden="true" />
             <span className="ovbadge-t">
@@ -1560,9 +1353,7 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
         </div>
       </td>
 
-      {/* Waited, drawn against target. The multiple past target is the graded
-          state: .sub.is-over used to restate the base class verbatim, so a
-          referral 31x past its target was typeset exactly like one at 1.04x. */}
+      {/* The multiple past target is the graded state: .sub.is-over must differ. */}
       <td className="c-wt">
         <div className="cell">
           <span className="wait-n num">{fmt(wait)}<span className="of"> days</span></span>
@@ -1571,10 +1362,8 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
             {target == null ? 'no target for this category'
               : over ? (
                 <>
-                  {/* No chip here. The bar immediately above carries the graded
-                      channel for this exact fact, and drawing it twice 2mm apart
-                      was 20 of the 77 severity marks on the first screen. The
-                      numeral stays, so the value is never colour-only. */}
+                  {/* No chip: the bar above carries the graded channel for this
+                      exact fact. The numeral stays, so it is never colour-only. */}
                   <b className="num wait-x"
                      title={`${fmt(wait)} days against a ${target}-day target`}>
                     {ratioText(ratio!)}×
@@ -1587,27 +1376,16 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
         </div>
       </td>
 
-      {/* The rule that fired. sevBreach has only two values, so every chip here
-          would be the SAME solid block -- on 130 of the 165 rows that can breach.
-          That is a field, not an accent, and it was the largest single
-          contributor to the table's saturation. Quiet keeps the escalation in
-          hue and withholds the fill; the wait bar beside it still carries the
-          graded channel, because THAT one varies row to row. */}
+      {/* Drawn QUIET: sevBreach has two values, so a solid chip is the same block
+          on most rows that can breach -- a field, not an accent. */}
       <td className="c-rule">
         {fired.length > 0 ? (
           <div className="rulez">
             {shownRules.map((c) => (
               <span className="rule-chip" key={c.rule_id}>
-                {/* The rule ID is a CONTROL, not a label with a tooltip.
-                    What the rule SAYS -- ruleStatement, from core.ref_rules --
-                    used to exist only as a `title` on a non-focusable span, so
-                    a mouse could read it and nothing else could: on a keyboard
-                    and on every touch screen the cell was an opaque
-                    RULE-CRT-URGENT. The expander one row below already carries
-                    every statement in full (.ev-rst), so the ID opens it, and
-                    the statement is the control's accessible name. The visible
-                    text is the first thing in that name, which is what SC 2.5.3
-                    asks for. */}
+                {/* The rule ID is a CONTROL: a `title` on a non-focusable span is
+                    unreachable by keyboard and touch. The statement is this
+                    control's accessible name, visible text first. */}
                 <button
                   type="button" className="rule-open"
                   aria-expanded={expanded}
@@ -1623,15 +1401,12 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
                     <b className="num">{c.rule_id}</b>
                   </SevChip>
                 </button>
-                {/* the detail ellipsises rather than wrapping the row onto a
-                    second line, so it carries its own full text */}
+                {/* ellipsises rather than wrapping, so it carries its full text */}
                 {c.detail && <span className="rule-d num" title={c.detail}>{c.detail}</span>}
               </span>
             ))}
             {hiddenRules > 0 && (
-              // Same fault, same fix: this named the rules it stands in for in a
-              // `title` and nowhere else. It opens the expander, which lists all
-              // of them with their statements.
+              // Same reason as the chip above: a `title` alone is unreachable.
               <button
                 type="button" className="rule-more num"
                 aria-expanded={expanded}
@@ -1663,15 +1438,8 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
         )}
       </td>
 
-      {/* NEWS2, and the reading's age, always together.
-
-          On a refused row the number is NOT shown as acuity. NEWS2 is validated
-          in adults; the urgency agent refuses specialty 0601 rather than score a
-          child on an adult scale, and printing the observation's stored total
-          under a column headed "how unwell" would contradict that two inches
-          below the panel note that states it. The reading and its age still
-          travel, because a clinician recorded those. This mirrors what the
-          patient page already does (Vitals.tsx, applied={false}). */}
+      {/* NEWS2 and the reading's age, always together. On a refused row the total
+          is NOT acuity, but reading and age still travel. Cf. Vitals.tsx. */}
       <td className="c-news">
         <div className="cell">
           <span className={'n2 num' + (naNews2 ? ' is-na' : '')}>
@@ -1687,15 +1455,13 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
               )}
           </span>
           {/* The age is the flex item that never shrinks: it travels with the
-              reading for every reader, and the date truncates before it does.
-              The stale marker used to be a 1px dashed underline at 1.75:1. */}
+              reading for every reader, and the date truncates before it does. */}
           <span className="sub is-split">
             {r.clin?.obs_datetime == null ? 'no reading' : (
               <>
                 <span className="sub-t">{dmy(r.clin.obs_datetime)}</span>
-                {/* one flex item, always: at sev 0 SevChip renders its children
-                    bare, and a loose text node in a flex row becomes an
-                    anonymous item of its own that cannot truncate. */}
+                {/* one flex item, always: at sev 0 SevChip renders children bare,
+                    and a loose text node cannot truncate. */}
                 {age != null && (
                   <span className="sub-age">
                     <SevChip sev={ageSev}
@@ -1734,9 +1500,7 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
               ? <>MTS <b>{r.clin.mts_category}</b></>
               : <span className="muted">no MTS</span>}
           </span>
-          {/* "not scored" was on every one of 305 rows AND in the column
-              header directly above, so the subline said nothing and truncated
-              while doing it. Only pain varies. */}
+          {/* Only pain varies; the header above already says "not scored". */}
           {r.clin?.pain != null && (
             <span className="sub">pain <span className="num">{r.clin.pain}</span>/10</span>
           )}
@@ -1759,18 +1523,10 @@ function PatientRow({ r, i, ranked, outside, reference, tight, narrow, tie, expa
   )
 }
 
-/** The mark's geometry, carrying the two terms that decide the order.
- *
- *  A 5-wide stem with a bar high on one side and a bar low on the other, which
- *  is the mark's own alternation. BOTH bars are α-weighted: drawing the raw
- *  urgency score against the raw wait percentile overstates waiting time by up
- *  to six times, because α is 0.81 here. The two lengths sum to the priority
- *  the coordinator actually used, and share one scale, so comparing them by eye
- *  is a true comparison.
- *
- *  `precise` prints six decimals instead of two. Two decimals is the right
- *  density for a column of 305, and exactly the wrong one for the pairs it
- *  cannot separate. */
+/** The mark's geometry, carrying the two terms that decide the order. BOTH bars
+ *  are α-weighted: raw urgency against a raw wait percentile overstates waiting
+ *  time several times over. Weighted, they sum to the priority the coordinator
+ *  used, so comparing them by eye is true. `precise` prints six decimals. */
 function RankSpine({ urgency, wait, alpha, priority, tight, precise }: {
   urgency: number; wait: number; alpha: number; priority: number; tight: boolean
   precise?: boolean
@@ -1793,12 +1549,8 @@ function RankSpine({ urgency, wait, alpha, priority, tight, precise }: {
   )
 }
 
-/** What the priority column cannot say on its own: this row and one of its
- *  neighbours print the same number, and here is what actually separates them.
- *
- *  Both halves of the pair carry the line, each showing its own value, so the
- *  two six-decimal numerals sit one above the other and the difference is
- *  visible rather than asserted. */
+/** What the priority column cannot say: this row and a neighbour print the same
+ *  number. Both halves of the pair carry the line, so the difference is seen. */
 function TieLine({ tie, self }: { tie: Tie; self: string }) {
   const other = self === tie.hi ? tie.loPos : tie.hiPos
   const word = tie.exact
@@ -1825,13 +1577,10 @@ function TieLine({ tie, self }: { tie: Tie; self: string }) {
   )
 }
 
-/** Waiting time against target, drawn. The target sits at a fixed mark; the
- *  overflow past it is compressed, because a 31× overrun and a 1.2× one have to
- *  share an axis without either becoming invisible. The numeral beside the bar
- *  always carries the true value. A missing target is an open tick, not a zero.
- *
- *  The overflow segment takes its colour from the same severity step as the
- *  chip beside it, so the bar and the numeral cannot disagree. */
+/** Waiting time against target. The target sits at a fixed mark and the overflow
+ *  past it is compressed, so a 31× and a 1.2× overrun share one axis; the numeral
+ *  beside the bar always carries the true value. A missing target is an open tick,
+ *  never a zero. */
 function WaitBar({ ratio, sev }: { ratio: number | null; sev: Sev }) {
   if (ratio == null) {
     return (
@@ -1853,13 +1602,8 @@ function WaitBar({ ratio, sev }: { ratio: number | null; sev: Sev }) {
 
 /* -------------------------------------------------- the inline expander D3 -- */
 
-/** Evidence in place, one interaction away.
- *
- *  NFR5: no score is ever rendered without its cited evidence attached. The row
- *  above renders NEWS2 and the two weighted terms; this is where the six cited
- *  vitals, the one or two cited capacity rows, every rule the coordinator
- *  tested and its own rationale line live. The full patient page is still one
- *  click away on the row itself: this is the quick look, not a replacement. */
+/** Evidence in place, one interaction away. NFR5: no score is rendered without
+ *  its cited evidence attached, which is what this panel is. */
 function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }: {
   r: Row; hospital: string; reference: Reference | undefined
   ops: ReturnType<typeof useList>['ops']
@@ -1884,22 +1628,18 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
     ?? ctx.data?.observations[0]
 
   const wardKey = capCites.find((c) => c.evidence_type === 'bed_status')
-  // Same derivation as List's `refused` set (:475) and Patient's (:87): the
-  // SPECIALTY, never a decision -- /api/decision 404s on 13 of 14 days.
+  // Same derivation as List's `refused` set and Patient's: the SPECIALTY, never
+  // a decision -- /api/decision 404s on most days.
   const evRefused = isRefusedPaediatric(r.specialty_hipe)
   const clinicKey = capCites.find((c) => c.evidence_type === 'clinic_session')
   const ward = wardKey ? ops?.wards.find((w) => w.ward_id === keyParts(wardKey.evidence_key)[1]) : undefined
   const clinic = clinicKey
     ? ops?.clinics.find((c) => c.clinic_code === keyParts(clinicKey.evidence_key)[1])
     : undefined
-  /** `slots_booked / slots_total / slots_available` on the clinic row are the
-   *  FIVE-SESSION SERIES totals. `cited_pressure` is booked / total for the ONE
-   *  session the agent actually read. Printing both on one line made this
-   *  surface refute itself: General Surgery read "15 free - pressure 1.000"
-   *  while the session cited was 11 of 11 with nothing free. Resolve the cited
-   *  row so its own numbers can stand beside its own pressure.
-   *  Same resolution as Overview.tsx:569 citedSession(); kept local because
-   *  Overview.tsx is another agent's file this week. */
+  /** TRAP: `slots_booked / slots_total / slots_available` are SERIES totals, while
+   *  `cited_pressure` is booked / total for the ONE session the agent read. On one
+   *  line they refute each other ("15 free · pressure 1.000"), so the cited session
+   *  is resolved here. Same resolution as Overview.tsx citedSession(). */
   const citedSess = clinic && clinic.cited_session_date
     ? clinic.sessions.find((s) => s.session_date === clinic.cited_session_date)
     : undefined
@@ -1921,32 +1661,21 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
           {r.rank ? (
             <>
               <p className="ev-p">{r.rank.rationale_summary ?? 'No rationale was recorded.'}</p>
-              {/* The sentence names a capacity score, which pairs it with the
-                  urgency score as if both placed this person. They did not:
-                  capacity is specialty-level and sets alpha only. And the
-                  patient page states this text is template output while this
-                  panel did not, so a reader could take it for a model's
-                  opinion. Both said here, next to it.
+              {/* The rationale names a capacity score, which reads as if it
+                  placed this person; it did not, and the text is template output,
+                  not a model's opinion. Both said here, beside it.
 
-                  A DEFINITION, and it prints once per expanded row, so the rule
-                  would send it behind an <Aside> -- except that this panel is
-                  rendered inside <tr className="ev-row"> inside .lst-table, and
-                  Aside.tsx bars itself from that table by contract: the row
-                  expander a reader has already opened IS this table's
-                  disclosure, and a second idiom inside it teaches two. So it is
-                  rewritten shorter in place instead: 210 characters to 180.
-                  "written by the coordinator from the numbers above" went,
-                  because "template text from the coordinator" says the same in
-                  a third of the words. Nothing else could: each of the three
-                  remaining claims is the only thing saying it here. */}
+                  A DEFINITION printing once per expanded row, so it belongs behind
+                  an <Aside> -- but Aside bars itself from inside .lst-table by
+                  contract, since this expander IS the table's disclosure. Kept
+                  short in place instead. */}
               <p className="ev-p ev-p-meta">
                 Deterministic template text from the coordinator: no model wrote this
                 sentence. The capacity score it names belongs to the whole specialty and
                 set <span className="num">α</span>; it did not move this referral.
               </p>
-              {/* Six decimals, not three. Three is where twelve adjacent pairs
-                  in this decision become indistinguishable, and it is also
-                  where the two terms stop reconciling with their own sum. */}
+              {/* Six decimals: at three, adjacent pairs become indistinguishable
+                  and the two terms stop reconciling with their own sum. */}
               <dl className="ev-terms">
                 <div><dt>how unwell</dt>
                   <dd className="num">{r.rank.urgency_score.toFixed(3)} × α {r.rank.alpha.toFixed(3)}
@@ -2009,10 +1738,8 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
             <ul className="ev-rules">
               {checks.map((c) => (
                 <li key={c.rule_id} className={c.passed ? '' : 'is-bad'}>
-                  {/* A pass and a breach used to share one background, separated
-                      by a text step and a 1.55:1 ring. A breach is a solid
-                      block now; "holds" is not an attention state and keeps the
-                      neutral pill it always had. */}
+                  {/* A breach is a solid block; "holds" is not an attention state
+                      and keeps the neutral pill. */}
                   <span className="ev-vd">
                     {c.passed ? (
                       <span className="ev-ok">
@@ -2087,13 +1814,11 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
               </div>
             ))}
           </div>
-          {/* The refusal is derived HERE from the specialty rather than taken from
-              a prop. Evidence is reachable from every tab, and the NEWS2 column's
-              own gate is per-TAB (`outside={k === 'Outside'}`), correct only while
-              the grouping at :483 puts refusal before band. Deriving it at the
-              point of use means reordering that ternary can never re-open this
-              sentence. The vitals themselves stay: a clinician recorded them, and
-              a refusal is a statement about the INSTRUMENT, not about the record. */}
+          {/* Derived HERE from the specialty, not taken from a prop: Evidence is
+              reachable from every tab, and the NEWS2 column's gate is per-TAB and
+              only correct while the grouping puts refusal before band. The vitals
+              stay -- a clinician recorded them, and a refusal is about the
+              INSTRUMENT, not the record. */}
           <p className="ev-cav">
             {evRefused
               ? <>These are the vitals a NEWS2 would be built from. NEWS2 is validated in
@@ -2113,9 +1838,8 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
           <h3 className="ev-h">
             Cited capacity
             <span className="ev-hn">
-              {/* "rows" counted citations and read as lines on screen; the
-                  clinic citation now needs two lines to stop contradicting
-                  itself, so the count names what it actually counts. */}
+              {/* "citations", not "rows": the clinic citation takes two lines on
+                  screen, so a line count would be a different number. */}
               {capCites.length
                 ? `${capCites.length} citation${capCites.length === 1 ? '' : 's'} · specialty-level`
                 : 'no citations'}
@@ -2128,11 +1852,10 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
                   <div className="ev-cap-r">
                     <span className="lab">bed status</span>
                     <span className="ev-cap-k num">{ward.ward_id}</span>
-                    {/* occupancy_pct is measured against the CENSUS, not the
-                        nominal allocation, so the two are never divided into
-                        one another here. TrolleyGAR keeps its letter and its
-                        word; its green/amber/red is the HSE's own vocabulary
-                        and stays out of the triage palette. */}
+                    {/* occupancy_pct is against the CENSUS, not the nominal
+                        allocation, so the two are never divided into one another.
+                        TrolleyGAR's green/amber/red is the HSE's vocabulary, not
+                        the triage palette. */}
                     <span className="ev-cap-v">
                       <b className="num">{ward.occupancy_pct.toFixed(1)}%</b> occupied ·{' '}
                       <span className="num">{ward.occupied ?? '—'}</span> of{' '}
@@ -2148,26 +1871,22 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
                 )}
                 {clinic && clinicKey && (
                   <>
-                    {/* The cited session, and nothing else, on the line that
-                        carries the cited pressure. booked / total here divides
-                        into the pressure printed beside it, every clinic, every
-                        day. */}
+                    {/* The cited session and nothing else on the line carrying the
+                        cited pressure: booked / total here must divide into it. */}
                     <div className="ev-cap-r">
                       <span className="lab">clinic session</span>
                       <span className="ev-cap-k num">{clinic.clinic_code ?? '\u2014'}</span>
                       <span className="ev-cap-v">
                         {citedSess == null ? (
-                          /* The cited date is not among the sessions returned,
-                             so its slots cannot be shown and its pressure
-                             cannot be checked here. Absence, stated. */
+                          /* The cited date is not among the sessions returned, so
+                             its pressure cannot be checked here. Absence, stated. */
                           <>slots for that session were not returned · pressure{' '}
                             <span className="num">{clinic.cited_pressure.toFixed(3)}</span>{' '}
                             cannot be reconciled on this screen</>
                         ) : citedSess.slots_total === 0 ? (
-                          /* scoring.py returns exactly 1.0 when slots_total is
-                             0, so "every slot taken" and "no clinic sat" are
-                             the same number. Only the session tells them apart,
-                             and this one says no clinic sat. */
+                          /* scoring.py returns exactly 1.0 when slots_total is 0,
+                             so "every slot taken" and "no clinic sat" are one
+                             number; only the session tells them apart. */
                           <>no clinic sat that day · <span className="num">0</span> slots offered ·
                             pressure <span className="num">{clinic.cited_pressure.toFixed(3)}</span>{' '}
                             is the value the agent uses when there is no session to divide into</>
@@ -2182,10 +1901,8 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
                         the one session cited: {clinic.cited_session_date ?? keyParts(clinicKey.evidence_key)[2]}
                       </span>
                     </div>
-                    {/* The series totals are worth keeping and were the whole
-                        of this line before. They are context around the cited
-                        row, never the arithmetic behind its pressure, so they
-                        get their own line and say so. */}
+                    {/* Context around the cited row, never the arithmetic behind
+                        its pressure, so it gets its own line and says so. */}
                     <div className="ev-cap-r">
                       <span className="lab">clinic series</span>
                       <span className="ev-cap-k num">
@@ -2248,23 +1965,8 @@ function Evidence({ r, hospital, reference, ops, decision, tie, onMove, onOpen }
             <div><dt>Pain</dt>
               <dd className="num">{r.clin?.pain ?? '—'}</dd></div>
           </dl>
-          {/* A DEFINITION -- ADR-004, and a data-model quirk true on all 14
-              hospital-days -- printed once per expanded row, so twelve rows
-              opened is twelve printings. The rule sends it behind an <Aside>,
-              and it cannot go: this panel renders inside <tr className="ev-row">
-              inside .lst-table, which Aside.tsx bars by contract. Rewritten
-              shorter in place instead, 311 characters to 230.
-
-              What went is what the <h3> two lines above already prints. It reads
-              "Recorded, not scored" over "record fields", so "and is not scored"
-              and "a record field" were the same words twice, an inch apart.
-              "which would collide with the triage categories, so it is shown as
-              a word in a neutral register" is the same claim as "shown as a word
-              and never in triage hues", in half the words.
-
-              What stays is what the heading cannot say: MTS keeps its own colour
-              vocabulary and is therefore given none here, and the condition code
-              is a random draw and never a finding. */}
+          {/* A DEFINITION (ADR-004) that would belong behind an <Aside>, which
+              bars itself from inside .lst-table. Kept short in place instead. */}
           <p className="ev-cav">
             MTS keeps its own red/orange/yellow/green/blue vocabulary, so it is shown as a
             word and never in triage hues (ADR-004). The condition code is a weighted random

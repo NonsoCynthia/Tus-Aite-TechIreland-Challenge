@@ -13,34 +13,18 @@ const GraphCanvas = lazy(() =>
  *  SPARQL: retrieval's `_resolve_iri` writes each predicate into a plain dict,
  *  so a Score citing six observations reads back as ONE arbitrary citation.
  *  `GET /runs/.../scores` comes from Postgres and returns proper lists.
- *
- *  ON RECORD — what exists about this person regardless of any run. Every
- *  hospital-day has this; only the newest can be scored, because evidence is
- *  date-blind and ranking an older day would cite readings taken after it. A
- *  view-only day used to show nothing at all here, which read as a missing
- *  feature rather than as a deliberate limit.
- *
- *  Neither shows why one patient outranks another. That is the contribution
- *  bars' job and this must never be read as the ordering argument.
- */
-/** The graph palette. The SAME ramp CohortGraph.tsx draws, value for value, so
- *  a reader who learns the classes on the cohort graph reads them here.
- *
- *  Two rounds of the same fault. First #2F5D45 for observations and #8A5A12 for
- *  ward and clinic nodes, which are exactly --cat-routine and --cat-semi: a
- *  patient's own reading drawn in Routine green and their ward in Semi-Urgent
- *  amber, on the same page whose header chip uses those hues for the real CPC
- *  band. Then #B5765F and #D2A07E, which CohortGraph's own comment records as
- *  having been REMOVED for being red-orange and amber next to --cat-urgent, and
- *  which this file went on shipping. #D2A07E measures 2.32:1 on white.
- *
- *  reagraph needs literals, which is why these are not tokens. That exception
- *  covers where the values LIVE; it has never licensed which hues are allowed.
- *  This is paper, taupe, two clays and three ink steps, and nothing on it can
- *  be read as a severity:
+ *  ON RECORD — what exists regardless of any run, on every hospital-day. Only
+ *  the newest can be scored: evidence is date-blind, so ranking an older day
+ *  would cite readings taken after it. Neither shows why one patient outranks
+ *  another -- that is the contribution bars' job. */
+/** The graph palette: the SAME ramp CohortGraph.tsx draws, value for value.
+ *  reagraph needs literals, which is why these are not tokens -- that exception
+ *  covers where the values LIVE, never which hues are allowed. Nothing here may
+ *  collide with --cat-* or read as a severity: a reading in Routine green, or a
+ *  ward in Semi-Urgent amber, contradicts the header chip on the same page.
  *
  *    #FAFAF8 paper   #C4B6A6 taupe   #9C7C6B clay-light   #7A5B4D clay
- *    #8C93AD ink-3   #6E6559 stone   #5B6480 ink-2 */
+ *    #8C93AD ink-3   #6E6559 stone   #5B6480 ink-2  */
 const PALETTE = {
   decision: '#FAFAF8',
   placement: '#C4B6A6',
@@ -189,8 +173,7 @@ export function Provenance({ pathway, decision, scores, context, height = 380 }:
 
 
 /** Isolated so a lost WebGL context remounts rather than leaving a black
- *  rectangle. It was observed being lost in this project simply by navigating
- *  away and back, which mid-demo would look like a broken product. */
+ *  rectangle. It is lost here simply by navigating away and back. */
 function Stage({ nodes, edges, height }: { nodes: GraphNode[]; edges: GraphEdge[]; height: number }) {
   const host = useRef<HTMLDivElement | null>(null)
   const [gen, setGen] = useState(0)
@@ -199,10 +182,9 @@ function Stage({ nodes, edges, height }: { nodes: GraphNode[]; edges: GraphEdge[
   useEffect(() => {
     const el = host.current?.querySelector('canvas')
     if (!el) return
-    // Same guard as CohortGraph's stage. react-three-fiber calls
+    // Same guard as CohortGraph's stage: react-three-fiber calls
     // forceContextLoss() on a canvas React has already discarded, 500ms after
-    // it unmounts, which dispatches webglcontextlost on a DEAD element. That
-    // loss is not this surface's loss.
+    // unmount, dispatching webglcontextlost on a DEAD element.
     const onLost = (e: Event) => {
       if (!el.isConnected) return
       e.preventDefault(); setLost(true)
@@ -235,9 +217,8 @@ function Stage({ nodes, edges, height }: { nodes: GraphNode[]; edges: GraphEdge[
       {lost && (
         <div className="prov-lost">
           The graphics context dropped.{' '}
-          {/* clears the latch as well as remounting: webglcontextrestored can
-              never fire on the canvas this replaces, so without setLost(false)
-              the banner outlives every redraw */}
+          {/* Clears the latch as well as remounting: webglcontextrestored can
+              never fire on the canvas this replaces. */}
           <button onClick={() => { setLost(false); setGen((g) => g + 1) }}>Redraw</button>
         </div>
       )}

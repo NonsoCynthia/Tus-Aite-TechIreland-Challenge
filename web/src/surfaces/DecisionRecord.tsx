@@ -13,26 +13,10 @@ const fmt = (n: number) => n.toLocaleString('en-IE')
 
 type WholeListVerdict = (d: Decision) => boolean
 
-/** Rules whose subject is the WHOLE list rather than one referral, each keyed
- *  to the decision field that carries its single verdict.
- *
- *  This was a Set of two IDs and a two-way branch:
- *
- *      id === 'RULE-ORDER' ? d.rule_order_passed : d.rule_tiebreak_passed
- *
- *  so a THIRD whole-list rule added to core.ref_rules would have silently taken
- *  RULE-TIEBREAK's verdict and reported it as its own, on the surface a
- *  reviewer trusts most. Keyed by rule ID there is no else-branch to fall into:
- *  a rule with no entry here is not a whole-list rule, and is tallied from its
- *  own per-referral checks like every other rule.
- *
- *  A per-referral count is deliberately not shown for these. RULE-ORDER and
- *  RULE-TIEBREAK do arrive on all 305 rows, but they are one verdict about one
- *  ordering; printing "305 tested" would imply 305 independent judgements.
- *
- *  The `| undefined` is load-bearing. Without it TS types every lookup as a
- *  function and calls the "is this a whole-list rule" test always-true, which
- *  is the same assumption this replaced. */
+/** Rules whose subject is the WHOLE list, keyed to the decision field carrying
+ *  each one's verdict -- keyed, so a new one has no else-branch to borrow another
+ *  rule's verdict from. The `| undefined` is load-bearing: without it TS types
+ *  every lookup as a function and the whole-list test is always true. */
 const WHOLE_LIST: Record<string, WholeListVerdict | undefined> = {
   'RULE-ORDER':    (d) => d.rule_order_passed,
   'RULE-TIEBREAK': (d) => d.rule_tiebreak_passed,
@@ -41,52 +25,20 @@ const WHOLE_LIST: Record<string, WholeListVerdict | undefined> = {
 /** How many override rows to draw at once, and how many each click adds. */
 const OVR_PAGE = 25
 
-/** `dec-40afec5c-a8d5-4af1-ab39-c198d24458e3` -> `dec-40afec5c`.
- *
- *  Only for the log's provenance column, and only because seven nowrap columns
- *  of 40-character identifiers is a table nobody can read across. The full id
- *  is on the cell's title, this decision's own is printed in full in .rec-meta
- *  at the top of the page, and what the column has to do is let a reviewer see
- *  that two rows came from two different decisions. */
+/** `dec-40afec5c-a8d5-4af1-ab39-c198d24458e3` -> `dec-40afec5c`, for the log's
+ *  provenance column only. The full id stays on the cell's title. */
 const shortDec = (id: string) => (id.length > 12 ? id.slice(0, 12) : id)
 
 /** The decision as an auditable record.
  *
- *  README feature 10 promises "evidence-backed rule-violation output for
- *  review". The coordinator has always produced it and none of it reached a
- *  screen, because the orchestrator served rank_cohort's raw output rather than
- *  the enriched rows that carry the checks.
+ *  Nothing here counts rules for itself: the table is drawn from reference.rules
+ *  and totalled from what came back. It cannot infer a NEW WHOLE-LIST rule --
+ *  that needs a verdict field and an entry in WHOLE_LIST above.
  *
- *  Nothing on this surface counts rules or checks for itself: the table is
- *  drawn from reference.rules and the totals are summed from what actually came
- *  back, so core.ref_rules can gain or lose rows without a line changing here.
- *  The one thing it cannot infer is a NEW WHOLE-LIST rule, which needs a
- *  verdict field on the decision payload and therefore an entry above; until it
- *  gets one such a rule reports "not tested" rather than borrowing a verdict.
- *
- *  Two things here refuse to be tidy on purpose. Every rule keeps its ID, so a
- *  reviewer can find it in core.ref_rules. And the not-ranked buckets are never
- *  summed into one "excluded" figure: a whole specialty leaving the list is a
- *  coverage statement, a missing observation is a data-quality incident, and
- *  adding them together loses the difference.
- *
- *  THE OVERRIDE LOG NAMES ITS DECISION, ROW BY ROW.
- *
- *  GET /api/overrides is scoped to a hospital-DAY, not to a decision, and a
- *  hospital-day accumulates one decision per run: 30 rows came back for
- *  9001/2026-08-30 and 29 of them were recorded against 27 other decision ids.
- *  The log drew all 30 identically, so a From of 21 and a To of 1 -- a position
- *  in an ordering some earlier run produced -- sat in a table on the page of
- *  the decision that produced neither, with nothing on the row to say so. On
- *  the one surface whose whole job is to be checkable, that is another run's
- *  ordering presented as this one's.
- *
- *  Every row now carries the decision it was recorded against, and the section
- *  states how the count splits before the table is read. Nothing is withheld:
- *  the log is the record of what people did on this hospital-day, and dropping
- *  the rows this decision cannot explain would make the record say less than it
- *  knows. What it may not do is let them pass as this decision's.
- */
+ *  THE OVERRIDE LOG NAMES ITS DECISION, ROW BY ROW: /api/overrides is scoped to a
+ *  hospital-DAY, which holds one decision per run, so most rows can belong to
+ *  earlier ones and their From/To name positions in another ordering. Kept, never
+ *  allowed to pass as this decision's. See BUILD_LEDGER.md. */
 export function DecisionRecord({ hospital, date, reference }: {
   hospital: string; date: string; reference: Reference | undefined
 }) {
@@ -101,8 +53,8 @@ export function DecisionRecord({ hospital, date, reference }: {
     queryKey: ['overrides', hospital, date],
     queryFn: () => api.overrides(hospital, date), retry: false,
   })
-  // The log is the full history and api.overrides takes no limit, so the cap is
-  // held here. Declared before the early returns: hooks cannot be conditional.
+  // api.overrides takes no limit, so the cap is here -- before the early
+  // returns, because hooks cannot be conditional.
   const [ovrShown, setOvrShown] = useState(OVR_PAGE)
 
   if (dec.isError) {
@@ -118,23 +70,16 @@ export function DecisionRecord({ hospital, date, reference }: {
       </div>
     )
   }
-  // BOTH, not just the decision. /api/decision returns in 9-22ms and
-  // /api/cohort in 19-55ms, so the decision ALWAYS wins the race -- and for that
-  // window `total` was 0 while the union held 308, which rendered
-  // "308 distinct referrals accounted for, of 0 on the list · 308 unexplained"
-  // under the loudest severity step the product owns, on the one surface whose
-  // whole job is to say the counts close. One keystroke on the date picker was
-  // enough to fire it.
+  // TRAP: gate on BOTH. /api/decision always wins the race against /api/cohort,
+  // and in that window `total` is 0 while the union is full, which fires the
+  // "N unexplained" integrity alarm.
   if (!dec.data || cohort.isPending) {
     return <div className="pad"><p className="muted">Reading the decision…</p></div>
   }
   const d = dec.data
   // A 404 from /api/overrides is normal: it means nobody has acted yet.
   const ovrRows = ovr.data?.overrides ?? []
-  // Counted, never asserted, and in three groups rather than two: a row with no
-  // decision_id at all is not the same thing as a row from another decision,
-  // and a log that quietly folded the first into the second would be making up
-  // a provenance it does not have.
+  // Three groups: a row with no decision_id is not a row from another decision.
   const ovrOwn = ovrRows.filter((o) => o.decision_id === d.decision_id).length
   const ovrNone = ovrRows.filter((o) => !o.decision_id).length
   const ovrElsewhere = ovrRows.length - ovrOwn - ovrNone
@@ -143,8 +88,7 @@ export function DecisionRecord({ hospital, date, reference }: {
       .map((o) => o.decision_id),
   ).size
 
-  // Every rule the coordinator tested, tallied. RULE-ORDER and RULE-TIEBREAK
-  // come from the decision's own whole-list booleans, not from counting rows.
+  // Whole-list rules come from the decision's own booleans, never from rows.
   const tally = new Map<string, { tested: number; failed: number }>()
   for (const r of d.rankings) {
     for (const c of r.rule_checks ?? []) {
@@ -155,20 +99,14 @@ export function DecisionRecord({ hospital, date, reference }: {
     }
   }
   const rules = reference?.rules ?? []
-  // Both derived, never counted in the copy: the header used to read "plus 2
-  // whole-list" as a literal.
+  // Both derived, never written as literals in the header copy.
   const wholeRules = rules.filter((r) => r.rule_id in WHOLE_LIST)
   const perReferralChecks = [...tally.entries()]
     .filter(([id]) => !(id in WHOLE_LIST))
     .reduce((a, [, b]) => a + b.tested, 0)
 
-  // Reconciliation by SET UNION, never by sum.
-  //
-  // The three paediatric referrals appear in BOTH refused_paediatric and
-  // excluded: the urgency agent refuses them deliberately, so the coordinator
-  // then cannot place them and records them as "missing_urgency_score". Adding
-  // the buckets gives 311 of 308. Worse, the coordinator's own reason loses the
-  // point -- it reads as a data-quality gap when it is a coverage decision.
+  // SET UNION, never a sum: a refused referral is also unplaceable, so it is in
+  // BOTH refused_paediatric and excluded.
   const total = cohort.data?.referrals.length ?? 0
   const placedSet = new Set(d.rankings.map((r) => r.pathway_number))
   const paedSet = new Set(d.refused_paediatric)
@@ -176,10 +114,8 @@ export function DecisionRecord({ hospital, date, reference }: {
   const excSet = new Set(d.excluded.map((e) => e.pathway_number))
   const bothPaedExc = [...paedSet].filter((p) => excSet.has(p))
 
-  // Each bucket carries its MEMBERS, not a count, so the union and the naive sum
-  // below are computed from this list rather than from four named variables. The
-  // four are what the decision payload exposes; the arithmetic is N-ary, so a
-  // fifth bucket is one entry here and nothing else.
+  // Members, not counts: the arithmetic below is N-ary, so a fifth bucket is one
+  // entry here and nothing else.
   const buckets: Array<{ k: string; ids: Set<string>; why: string; note?: string }> = [
     {
       k: 'Placed', ids: placedSet,
@@ -244,21 +180,17 @@ export function DecisionRecord({ hospital, date, reference }: {
               </tr>
             </thead>
             <tbody>
-              {/* the table is drawn from core.ref_rules, so it has a state
-                  where the reference has not arrived and there is nothing to
-                  draw. It is not the same as a decision with no checks. */}
+              {/* drawn from core.ref_rules, so "the reference has not arrived"
+                  is a state, and not the same as a decision with no checks */}
               {rules.length === 0 && (
                 <tr><td className="c-st" colSpan={6}>Reading core.ref_rules…</td></tr>
               )}
               {rules.map((r) => {
                 const wholeVerdict = WHOLE_LIST[r.rule_id]
                 const t = tally.get(r.rule_id)
-                // THREE states, not two. A rule that exists in core.ref_rules
-                // but was never tested has no tally at all, and `(t?.failed ??
-                // 0) === 0` read that absence as zero failures and drew a green
-                // check against "0 tested". An untested rule reported as
-                // passing, on the surface a reviewer trusts. `undefined` here
-                // means "no verdict was reached", and says so.
+                // THREE states, not two: `(t?.failed ?? 0) === 0` reads an untested
+                // rule's absent tally as zero failures and draws a green check
+                // against "0 tested". `undefined` is "no verdict reached".
                 const verdict: boolean | undefined =
                   wholeVerdict ? wholeVerdict(d) : t ? t.failed === 0 : undefined
                 const sev = verdict == null ? NONE : sevBreach(verdict)
@@ -283,10 +215,8 @@ export function DecisionRecord({ hospital, date, reference }: {
                           <Check size={12} strokeWidth={2.5} aria-hidden />holds
                         </span>
                       ) : (
-                        // sevBreach: a pass/fail rule has no magnitude, so it
-                        // goes straight to the "high" step rather than pretending
-                        // to a gradation it does not have. The count travels in
-                        // the chip, so colour is never the only channel.
+                        // No magnitude in a pass/fail rule, so sevBreach goes
+                        // straight to "high"; the count travels in the chip.
                         <SevChip sev={sev}>
                           <TriangleAlert size={12} strokeWidth={2.25} aria-hidden />
                           {wholeVerdict ? 'violated' : breachPhrase(r.rule_id, t?.failed ?? 0)}
@@ -299,13 +229,8 @@ export function DecisionRecord({ hospital, date, reference }: {
             </tbody>
           </table>
         </div>
-        {/* A DEFINITION of the ordering: it says what a breach MEANS, it is the
-            same on all 14 hospital-days, and a reviewer who has read it once
-            reads past it on every later visit. The visible line keeps the claim
-            a reader must not get wrong -- a breach is not a fault in the
-            ranking -- and the toggle holds what follows from it. No count is
-            hidden: the Breached column above is per rule and per referral, and
-            nothing here divides by a cohort. */}
+        {/* The claim a reader must not get wrong stays visible -- a breach is not
+            a fault in the ranking -- and the definition goes inside. */}
         <Aside className="p-note measure" label="how a breach changes the order"
                summary="A breached timeframe rule is not a fault in the ranking: it records a referral already outside its category's window.">
           The window is the one the health service set for that category. The order places every
@@ -327,19 +252,15 @@ export function DecisionRecord({ hospital, date, reference }: {
             </div>
           ))}
         </div>
-        {/* Reconciled on the UNION of the buckets, because they overlap. Summing
-            them double-counts every referral that sits in two at once. */}
+        {/* UNION, because the buckets overlap: a sum double-counts. */}
         <div className={'ledger-sum' + (union.size === total ? '' : ' is-off')}>
           <strong className="num">{fmt(union.size)}</strong> distinct referrals accounted
           for, of <strong className="num">{fmt(total)}</strong> on the list
           {union.size !== total && (
             <>
               {' '}
-              {/* SEV_INTEGRITY, the loudest step the product has. A referral on
-                  the list that no bucket accounts for means the reconciliation
-                  itself cannot be trusted, which outranks any clinical state:
-                  a clinician can act on a bad number. Its only signal before
-                  this was a 3px --rule-firm left edge at 1.55:1. */}
+              {/* SEV_INTEGRITY, the loudest step there is: a referral no bucket
+                  accounts for means the reconciliation cannot be trusted. */}
               <SevChip sev={SEV_INTEGRITY}
                        title="on the list and in no bucket: the reconciliation does not close">
                 {fmt(unexplained)} unexplained
@@ -370,9 +291,8 @@ export function DecisionRecord({ hospital, date, reference }: {
         </h2>
         {ovrRows.length > 0 ? (
           <>
-            {/* Said BEFORE the table, not under it: the numbers in From and To
-                are unreadable until a reader knows which ordering each row is
-                counting in. */}
+            {/* BEFORE the table: From and To are unreadable until a reader knows
+                which ordering each row counts in. */}
             <p className="p-note measure">
               The log is scoped to this hospital-day, and a hospital-day holds one decision per
               run.{' '}
@@ -397,21 +317,14 @@ export function DecisionRecord({ hospital, date, reference }: {
                   {ovrNone === 1 ? 'its' : 'their'} positions belong to is not on the record.</>
               )}
             </p>
-            {/* The log is the FULL history and it was drawn in full: no slice,
-                no cap. A Reason column at white-space: normal makes a row about
-                55px, so 200 overrides is ~11,000px of table and a year of a busy
-                list is ~110,000px. Capped, paged, and bounded by a viewport so
-                the header has something to stick to. */}
+            {/* Capped, paged, and in a viewport the header can stick to. */}
             <div className="ovr-vp">
               <table className="rules ovr-log">
                 <thead>
-                  {/* Decision sits AFTER Reason on purpose. record.css wraps
-                      and width-caps the log's Reason column by position
-                      (.ovr-log td:nth-child(5)), so a column inserted ahead of
-                      it would silently hand those rules to the wrong column and
-                      leave the reasons nowrap. Provenance and clinician also
-                      belong together: they are the two columns that say who
-                      and against what. */}
+                  {/* TRAP: Decision sits AFTER Reason. record.css wraps and
+                      width-caps Reason BY POSITION (.ovr-log td:nth-child(5)),
+                      so a column inserted ahead of it hands those rules to the
+                      wrong column and leaves the reasons nowrap. */}
                   <tr>
                     <th>When</th><th>Referral</th><th className="c-n">From</th>
                     <th className="c-n">To</th><th>Reason</th><th>Decision</th>
@@ -420,11 +333,8 @@ export function DecisionRecord({ hospital, date, reference }: {
                 </thead>
                 <tbody>
                   {ovrRows.slice(0, ovrShown).map((o) => {
-                    // The one comparison the log turns on. Positions are held
-                    // in the quieter ink when it is false, so a reader scanning
-                    // the From/To columns alone cannot pick up another
-                    // ordering's numbers as this one's -- but the word in the
-                    // Decision column is what carries it, never the tone.
+                    // The one comparison the log turns on. It dims the From/To
+                    // ink, but the Decision column's word carries it, not tone.
                     const own = !!o.decision_id && o.decision_id === d.decision_id
                     const pos = 'c-n num' + (own ? '' : ' muted')
                     return (

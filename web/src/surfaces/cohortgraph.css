@@ -1,8 +1,6 @@
-/* The cohort graph. Full-bleed, panels floating over it.
-
-   This is the one surface where glass earns itself: a panel here has to be
-   readable AND let the graph show through, which is what translucency is for.
-   No number a clinician acts on appears on this surface. */
+/* The cohort graph. Full-bleed, panels floating over it. The one surface where
+   glass earns itself: a panel here has to be readable AND let the graph show
+   through, and no number a clinician acts on appears on it. */
 
 .cg {
   position: relative; height: calc(100vh - var(--topbar-h));
@@ -14,11 +12,8 @@
   position: absolute; inset: 0; display: grid; place-items: center;
   color: var(--text-3); font-size: var(--t-small); background: var(--bg-sunk);
 }
-/* Above the panels and the camera controls, which are z-index 5. The scrim had
-   no z-index at all, so those painted OVER it: a reviewer could keep zooming,
-   refitting and switching layout through a veil that never lifted, which is
-   worse than the dropped context it was reporting. A scrim that does not cover
-   is not a scrim. */
+/* Above the panels and camera controls, which are z-index 5: without this they
+   paint OVER it and a reviewer keeps working through a veil that never lifts. */
 .cg-lost { background: var(--scrim-deep); gap: var(--d3); z-index: 6; }
 .cg-lost button {
   margin-left: var(--d2); background: var(--accent); color: var(--ink-deep);
@@ -44,11 +39,8 @@
   font-size: var(--t-small); color: var(--text-2);
 }
 .cg-nums strong { color: var(--text); font-size: var(--t-data); }
-/* The figures above are counts of the DRAWN subset. This line is what stops the
-   heading from being read as a claim about the whole run, so it sits directly
-   under them, in the same quiet register as .cg-note, and is not optional
-   chrome: at the default limit it is the only thing on the panel that says 150
-   is not 305. */
+/* The figures above count the DRAWN subset, and this line is the only thing on
+   the panel that says so. Not optional chrome. */
 .cg-scope {
   /* no max-width: the panel is already 320px, and a measure inside it would
      set a second, narrower column for no reason */
@@ -68,21 +60,16 @@
 .cg-lg-bar { height: 3px; background: var(--taupe-14); }
 .cg-lg-bar b { display: block; height: 100%; }
 .cg-lg-c { text-align: right; color: var(--text-3); font-size: var(--t-micro); }
-/* The two counting notes are one <Aside> now, so this class dresses its root
-   <div> rather than two <p>s: one rule above the group instead of two, and one
-   toggle instead of a second paragraph. Nothing here sizes the toggle -- the
-   cancelling margin .aside-t derives holds at 11px, so the summary's line box
-   is the line box it had as a paragraph. */
+/* The two counting notes are one <Aside>, so this dresses its root <div>. It
+   must not size the toggle: .aside-t's cancelling margin already holds at 11px. */
 .cg-note {
   margin: var(--d2) 0 0; padding-top: var(--d3);
   border-top: 1px solid var(--rule);
   font-size: var(--t-micro); line-height: 1.55; color: var(--text-2);
 }
-/* The revealed half is two paragraphs. Their gap is the panel's own spacing
-   step, not the UA's 1em, which at 11px would open an 11px hole inside a 296px
-   panel. aside.css already zeroes the first and last edge; this is more
-   specific than that rule, so the first child is restated rather than relied
-   on. */
+/* The panel's own spacing step, not the UA's 1em, which at 11px opens an 11px
+   hole in a 296px panel. More specific than aside.css's first/last-child rules,
+   so the first child is restated rather than relied on. */
 .cg-note .aside-b p { margin: var(--d2) 0 0; }
 .cg-note .aside-b p:first-child { margin-top: 0; }
 

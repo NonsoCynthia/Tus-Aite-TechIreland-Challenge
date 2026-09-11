@@ -9,9 +9,8 @@
 }
 @keyframes runlay-in { from { opacity: 0 } to { opacity: 1 } }
 
-/* The border stays full-bleed; the CONTENTS share the body's measure. The title
-   started at x=49 while the readouts, the lanes and the button all started at
-   x=362 -- a 313px offset between a heading and everything it introduces. */
+/* The border stays full-bleed; the CONTENTS share the body's measure, so the
+   heading starts where the readouts and lanes it introduces do. */
 .runlay-head {
   border-bottom: 1px solid var(--rule);
   padding: var(--d6) var(--d7) var(--d4);
@@ -36,10 +35,8 @@
   max-width: 1100px; width: 100%; margin: 0 auto;
 }
 
-/* --- before / after -------------------------------------------------------
-   Two columns of the same width, so neither state is the bigger claim. The
-   hairline runs BETWEEN them rather than around each, which is what makes them
-   read as one sentence with a hinge instead of two panels. */
+/* --- before / after. Two columns of the same width, so neither state is the
+   bigger claim, with the hairline BETWEEN them rather than around each. */
 .run-ba {
   display: grid; grid-template-columns: 1fr 1fr;
   background: var(--surface); border: 1px solid var(--rule);
@@ -106,9 +103,8 @@
 .lane-of { font-size: var(--t-micro); color: var(--text-3); }
 .lane-idle { font-size: var(--t-micro); color: var(--text-3); letter-spacing: 0.06em; }
 
-/* --- the total -----------------------------------------------------------
-   Rows committed to agent.agent_scores, polled from the endpoint the
-   coordinator reads. No interpolation: it steps when data arrives. */
+/* --- the total: rows committed to agent.agent_scores, polled from the endpoint
+   the coordinator reads. No interpolation -- it steps when data arrives. */
 .run-total { display: grid; gap: var(--d2); }
 .run-bar { height: 3px; background: var(--bg-sunk); overflow: hidden; }
 .run-bar i { display: block; height: 100%; background: var(--accent); }
@@ -156,8 +152,5 @@
   .runlay-body, .runlay-head { padding-left: var(--d4); padding-right: var(--d4); }
 }
 
-/* There used to be `.runlay-body.is-idle { align-content: center }` here,
-   because before a run there were three blocks and a button and top-aligning
-   them left two thirds of the overlay empty. The before/after panel fills that
-   space now, and centring content taller than a scroll container clips its top
-   beyond reach, so the rule is gone rather than made conditional. */
+/* Do not centre .runlay-body: centring content taller than a scroll container
+   clips its top beyond reach. The before/after panel fills the space instead. */

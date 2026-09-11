@@ -16,24 +16,12 @@ import type { AgeStats } from '../components/Vitals'
 import type { Decision, Overrides, Ranking, Reference, RuleCheck } from '../lib/types'
 import './patient.css'
 
-/** One referral, answering one question: why is this person here?
- *
- *  The page used to answer it in prose. Three notes did the real work ("add the
- *  six by hand and you get the same number", "it does not mean this person is
- *  near normal now", "the condition code is a weighted random draw") and every
- *  one of them was a sentence standing in for an instrument that had not been
- *  built. This is a system, not a notebook, so each of the three is now a thing
- *  on screen: the NEWS2 sub-scores drawn against their bands, a staleness meter
- *  on the reading, and a limits panel whose chips carry their provenance.
- *
- *  The order follows the question. Where this person sits, then why, then what
- *  each agent actually read, then the shape of the wait, then the recorded
- *  citation chain, and last what the instrument never looked at.
- */
+/** One referral, answering one question: why is this person here? Section order
+ *  is the question's -- where this person sits, then why, then what each agent
+ *  read, then the shape of the wait, then the chain, then what was never seen. */
 
-/** --icon-sm from tokens.css, and lucide's stroke passed rather than inherited:
- *  the default of 2 renders heavier than the 1.75 hairline chrome beside it.
- *  V_ICON is the verdict register, matched to the three others in the product. */
+/** --icon-sm from tokens.css. Stroke is passed, not inherited: lucide's default
+ *  of 2 renders heavier than the 1.75 hairline chrome beside it. */
 const ICON_SM_PX = 14
 const STROKE = 1.75
 const V_ICON = 12
@@ -79,12 +67,10 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
   const c = ops.data?.clinical?.[pathway]
   const row = cohort.data?.referrals.find((r) => r.pathway_number === pathway)
   const placed = dec.data?.rankings.find((r) => r.pathway_number === pathway)
-  // ADR-007 refuses specialty 0601 on the SPECIALTY, not on a run. Reading this
-  // out of the decision alone made a standing clinical guarantee conditional on
-  // a run artifact, and /api/decision 404s on 13 of the 14 days -- so a child was
-  // scored on the adult scale on every unscored day. The decision's list is
-  // unioned on top rather than replaced, so a refusal it records for any other
-  // reason still counts.
+  // TRAP: derive the refusal from the SPECIALTY (ADR-007), never from the decision
+  // alone -- /api/decision 404s on most days, and a run-conditional test scores a
+  // child on the adult scale on every unscored one. The decision's list is
+  // unioned on top, never substituted.
   const refused = isRefusedPaediatric(row?.specialty_hipe)
     || (dec.data?.refused_paediatric.includes(pathway) ?? false)
   const skipped = dec.data?.skipped.includes(pathway) ?? false
@@ -118,9 +104,8 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
   const obs = ctx.data?.observations?.[0]
   const capacity = ctx.data?.capacity as CapacityContext | undefined
   const band = bandOf(row.cpc)
-  // Reading age per pathway, for the neighbour comparison. Ages in this cohort
-  // run from days to 871 days, so two equal-looking NEWS2 scores are routinely
-  // not equal evidence.
+  // Reading age per pathway, for the neighbour comparison: ages here run from
+  // days to years, so two equal NEWS2 scores are not equal evidence.
   const ages: Record<string, number | null> = Object.fromEntries(
     Object.entries(ops.data?.clinical ?? {}).map(([pw, c]) => [pw, c.reading_age_days]))
   const wait = row.adjusted_wait_days ?? 0
@@ -128,10 +113,8 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
   // copy is only the fallback if the reference has not loaded yet.
   const target = crtDays(reference, row.cpc) ?? row.crt_threshold_days
   const overdueBy = target != null ? wait - target : null
-  // How far past target, as a multiple. This bar used not to change colour AT
-  // ALL when the wait went past the target: only the words underneath changed,
-  // which on a referral 31x past its target is the least of the three channels
-  // doing the work. 143 of the 308 have no target at all and score nothing.
+  // How far past target, as a multiple. Null where no target applies, which is
+  // every Routine and Uncategorised referral.
   const waitRatio = target != null && target > 0 ? wait / target : null
   const waitSev = sevWaitRatio(waitRatio)
 
@@ -164,11 +147,9 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
     c?.referral_received_date ? { key: 'rec', date: c.referral_received_date, label: 'received by the hospital' } : null,
     c?.obs_datetime ? {
       key: 'obs', date: c.obs_datetime.slice(0, 10), label: 'vital signs taken', clinical: true,
-      // The refusal has to reach HERE too. This was the one place on the page
-      // where the total appeared without the 'not applied' label that Vitals
-      // attaches to the identical number, so the page contradicted itself about
-      // a child within two sections. The reading's AGE still travels either way:
-      // a refusal is a statement about the instrument, not about the record.
+      // The refusal has to reach here too, or this line prints a total that
+      // Vitals labels 'not applied' two sections away. The reading's AGE travels
+      // either way: a refusal is about the instrument, not about the record.
       detail: refused
         ? `NEWS2 not applied${c.reading_age_days != null ? ` · ${fmt(c.reading_age_days)} days ago` : ''}`
         : `NEWS2 ${c.news2 ?? '—'} of 17${c.reading_age_days != null ? ` · ${fmt(c.reading_age_days)} days ago` : ''}`,
@@ -178,11 +159,9 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
       key: 'tri', date: c.triage_date, label: `triaged ${band}`,
       detail: c.turnaround_days != null ? `${c.turnaround_days}-day turnaround` : undefined,
     } : null,
-    // The target falls `target` days into the WAIT, and the wait is measured
-    // from the date the referral was received -- not from the triage date. Built
-    // from triage_date it landed days later than the header and the rule chip
-    // said, and on five referrals it put the target in the future while the
-    // header said the referral was already past it.
+    // TRAP: the target falls `target` days after the referral was RECEIVED, not
+    // after triage. Built from triage_date it disagrees with the header and the
+    // rule chip. See BUILD_LEDGER.md.
     c?.referral_received_date && target ? {
       key: 'tgt',
       date: new Date(new Date(c.referral_received_date).getTime() + target * 86_400_000)
@@ -241,10 +220,9 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
                     ? (
                       <SevChip sev={waitSev}>
                         past target by {fmt(overdueBy)} days
-                        {/* The multiple only once it says something the day
-                            count does not: under 2x it rounds to "1.0x" and
-                            reads as "exactly at target", which is the opposite
-                            of what the words beside it mean. */}
+                        {/* The multiple only once it says something the day count
+                            does not: under 2x it rounds to "1.0x" and reads as
+                            "exactly at target", the opposite of what it means. */}
                         {waitRatio != null && waitSev >= 2 && <> · {waitRatio.toFixed(1)}&times; the target</>}
                       </SevChip>
                     )
@@ -262,11 +240,8 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
       <div className="flash" role="status" aria-live="polite" aria-atomic="true"
            hidden={!flash}>{flash}</div>
 
-      {/* Eight of the 308 are fixtures the dataset track plants at fixed pathway
-          numbers because the demo depends on them existing. Saying what each one
-          is for turns the most obvious challenge ("why is there test data in
-          your clinical list?") into the answer: each is a claim the system can
-          be tested against, and the test that plants it is named. */}
+      {/* Fixtures the dataset track plants at fixed pathway numbers, labelled
+          with what each proves and the test that plants it. */}
       {plantedCase(pathway) && (
         <aside className="pt-planted">
           <span className="lab">Planted case · {plantedCase(pathway)!.what}</span>
@@ -326,10 +301,9 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
           specialty={specialtyFull(reference, row.specialty_hipe)}
           alpha={placed?.alpha ?? dec.data?.alpha ?? null}
           peers={peers}
-          /* The capacity lane's evidence is served date-blind -- the same ward
-             snapshot and clinic series on all 14 hospital-days -- so it needs
-             the day selected to be able to say it is not that day. Nothing in
-             the lane is fetched or filtered by it. */
+          /* The capacity lane's evidence is date-blind, so it needs the day
+             selected only in order to say it is not that day. Nothing in the
+             lane is fetched or filtered by it. */
           date={date}
         />
       </section>
@@ -339,21 +313,17 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
         <section className="p-sec">
           <h2 className="sec-h">The journey
             <span className="sec-note">recorded dates only, nothing here is computed</span></h2>
-          {/* The axis's overdue span is the same fact as the header's bar, so
-              it reads the same scale. Journey draws the span; the step comes
-              down as a class on its root because the span's magnitude is the
-              header's ratio, not something the axis can compute for itself. */}
+          {/* Same fact as the header's bar, so it must read the same scale. The
+              severity step comes down as a class: the span's magnitude is the
+              header's ratio, not something the axis can compute. */}
           <Journey events={events} today={date}
                    className={'pt-journey' + (waitSev ? ` is-sev-${waitSev}` : '')}
                    waitDays={wait} targetDays={target} />
         </section>
       )}
 
-      {/* 5: the chain. Cited where a run exists; on-record everywhere else.
-             A view-only day used to render nothing here at all, which read as a
-             missing feature rather than as the deliberate limit it is: evidence
-             is date-blind, so only the newest day can honestly be ranked, but
-             the referral and everything hanging off it exists on all 28. */}
+      {/* 5: the chain. Cited where a run exists; on-record everywhere else --
+             a day with no run still has the referral and everything under it. */}
       {dec.data && placed ? (
         <section className="p-sec">
           <h2 className="sec-h">The chain behind this position
@@ -376,18 +346,15 @@ export function Patient({ hospital, date, pathway, reference, onBack }: {
 }
 
 
-/** Three fields that were on the record and did not enter the score, each
- *  carrying where it came from, and the one statistic that explains why the
- *  instrument cannot do the discriminating on its own. */
+/** Three fields on the record that did not enter the score, each carrying where
+ *  it came from, plus the statistic showing why NEWS2 cannot discriminate here. */
 function Limits({ pathway, clinical, news2, cohort, refused }: {
   pathway: string
   clinical: { pain: number | null; mts_category: string | null; icd10am_code: string | null } | null
   news2: Record<string, { news2: number | null }> | undefined
   cohort: Array<{ pathway_number: string; cpc: number | null }> | undefined
   /** Specialty 0601. The urgency agent refuses it unconditionally, so there is
-      no score for this person -- only an adult instrument's reading of a child.
-      Round 1 vetoed exactly this sentence in Vitals; the flag never reached
-      here, so it came back one screen lower in a component the fix missed. */
+      no score for this person -- only an adult instrument's reading of a child. */
   refused: boolean
 }) {
   // Counted from this hospital-day, never typed in as a sentence.
@@ -395,10 +362,8 @@ function Limits({ pathway, clinical, news2, cohort, refused }: {
   const low = vals.filter((v) => v <= 2).length
   const urgent = (cohort ?? []).filter((r) => r.cpc === 1)
   const urgentZero = urgent.filter((r) => news2?.[r.pathway_number]?.news2 === 0).length
-  // Gated, not merely unlabelled: a refused referral has no score to place on
-  // this axis, so it gets no `is-mine` bar and no 'scores N' strip. The
-  // histogram itself stays -- it is a statement about the INSTRUMENT across the
-  // hospital-day, not a claim about this person.
+  // A refused referral has no score to place on this axis: no `is-mine` bar, no
+  // 'scores N' strip. The histogram stays -- it is about the INSTRUMENT.
   const mine = refused ? null : (news2?.[pathway]?.news2 ?? null)
   const buckets: number[] = []
   for (const v of vals) buckets[v] = (buckets[v] ?? 0) + 1
@@ -417,11 +382,8 @@ function Limits({ pathway, clinical, news2, cohort, refused }: {
         <LimitChip k="Manchester triage" v={clinical?.mts_category ?? null}
                    tag="read but not scored · ADR-004"
                    note="MTS carries its own red/orange/yellow/green/blue vocabulary, which is not this product's, so the category is shown as a word." />
-        {/* The one chip whose note is a DEFINITION rather than a description of
-            this record: a data-model quirk true on all 14 hospital-days and on
-            every one of the 308 pages. What the code IS stays visible, because
-            a reader who takes it for a finding has misread the panel; how the
-            page then treats it is the argument for that and goes behind. */}
+        {/* The one chip whose note is a DEFINITION, not a fact about this record:
+            what the code IS stays visible, how the page treats it goes behind. */}
         <LimitChip k="Condition" v={clinical?.icd10am_code ?? null}
                    tag="record field · not evidence"
                    note="in this dataset the code is a weighted random draw over the specialty's case mix, statistically independent of acuity"
@@ -477,10 +439,8 @@ function Limits({ pathway, clinical, news2, cohort, refused }: {
   )
 }
 
-/** `note` is the line that stays, open or shut. `detail` is optional and only
- *  the chips whose note is a DEFINITION carry one: two of the three are short
- *  statements about this record and a toggle for either would be more chrome
- *  than the paragraph. */
+/** `note` is the line that stays, open or shut. Only a chip whose note is a
+ *  DEFINITION carries a `detail`. */
 function LimitChip({ k, v, tag, note, label, detail }: {
   k: string; v: string | null; tag: string; note: string
   label?: string; detail?: string
@@ -500,16 +460,10 @@ function LimitChip({ k, v, tag, note, label, detail }: {
 }
 
 
-/** Why this person sits here, as arithmetic rather than assertion.
- *
- *  The order inside a band is (past target first, then priority), and priority
- *  is alpha*urgency + (1-alpha)*wait-percentile. Both facts are shown, because
- *  showing only the blend contradicts the rows either side of a tier boundary.
- *
- *  The rule checks the coordinator recorded now travel with it: every one keeps
- *  its ID so it can be found in core.ref_rules, and its statement comes from the
- *  reference layer rather than from a string in this file.
- */
+/** Why this person sits here, as arithmetic rather than assertion. Inside a band
+ *  the order is past-target first, then priority; both are shown, because the
+ *  blend alone contradicts the rows either side of a tier boundary. Every rule
+ *  check keeps its ID, and its statement comes from the reference layer. */
 function WhyHere({ placed, decision, reference, ages, compare, onCompare, onCloseCompare }: {
   placed: Ranking; decision: Decision; reference: Reference | undefined
   /** Reading age per pathway, so a neighbour comparison cannot present two
@@ -560,11 +514,8 @@ function WhyHere({ placed, decision, reference, ages, compare, onCompare, onClos
           <span className="why-k">priority</span>
           <span className="why-b" />
           <span className="why-v num">{n3(placed.priority)}
-            {/* The two terms above are each rounded to 3 d.p., so on 38 of 305
-                rows they do not visibly add to this figure -- always by 0.001.
-                Priority is the ranking key and is shown exactly; the note says
-                which of the three is the rounded one rather than leaving a
-                reader to find an arithmetic error that is not there. */}
+            {/* The two terms above are rounded to 3 d.p. and need not add to this
+                figure, which is the ranking key and is shown exactly. */}
             {Math.abs(Math.round(uTerm * 1000) / 1000 + Math.round(wTerm * 1000) / 1000
                       - Math.round(placed.priority * 1000) / 1000) > 1e-9 && (
               <span className="why-round">the two terms are rounded; this is exact</span>
@@ -572,14 +523,9 @@ function WhyHere({ placed, decision, reference, ages, compare, onCompare, onClos
         </div>
       </div>
 
-      {/* A SPLIT, not a full conversion. The percentile and where the split
-          comes from are definitions: true on every hospital-day and on all 308
-          of these pages. The GUARANTEE is not. ADR-007 says capacity is
-          pressure, sets alpha for the hospital-day and never appears to move an
-          individual -- and alpha is multiplied into this person's own urgency
-          score three rows above. So the claim that it is one number for
-          everyone and moves nobody between categories is the line that stays,
-          and only the argument for it goes behind the toggle. */}
+      {/* The GUARANTEE stays visible -- one alpha for everyone, moving nobody
+          between categories -- because alpha is multiplied into this person's own
+          urgency score three rows above (ADR-007). Definitions go inside. */}
       <Aside className="p-note" label="how these two terms are computed"
              summary={<>The {Math.round(a * 100)}/{Math.round((1 - a) * 100)} split is set once for
                the whole hospital-day. It is the same number for all{' '}
@@ -603,10 +549,8 @@ function WhyHere({ placed, decision, reference, ages, compare, onCompare, onClos
               <span className="pt-check-id num">{ch.rule_id}</span>
               <span className="pt-check-st">{ruleStatement(reference, ch.rule_id)}</span>
               <span className="pt-check-d num">{ch.detail ?? '—'}</span>
-              {/* The only one of four verdict registers in the product with no
-                  icon, and a breach carried by a 1px inset hairline. Now the
-                  same word, the same icon and the severity a breach gets
-                  everywhere else. */}
+              {/* One of four verdict registers in the product: same word, same
+                  icon and the same severity a breach gets everywhere else. */}
               <span className={'pt-verdict' + (ch.passed ? ' is-ok' : '')}>
                 {ch.passed
                   ? <><Check size={V_ICON} strokeWidth={2.5} aria-hidden />holds</>
@@ -671,12 +615,8 @@ function NeighbourRow({ r, label, self, onCompare }: {
 }
 
 
-/** The honest empty states. Three of them, and they are different things.
- *
- *  A paediatric refusal is a coverage statement. A skip is a data-quality
- *  incident. No decision at all is a day nobody has run. Collapsing them into
- *  one "unavailable" loses the difference that matters most to a reviewer.
- */
+/** Three empty states, and they differ: a refusal is a coverage statement, a skip
+ *  is a data-quality incident, and no decision is a day nobody has run. */
 function NotScoredYet({ refused, skipped, error }: {
   refused: boolean; skipped: boolean; error: boolean
 }) {

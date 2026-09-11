@@ -1,66 +1,10 @@
-/* Where clay is spent on this surface, and why it is spent so rarely.
-
-   The kit: "Clay marks ONE element per composition. Used everywhere it stops
-   meaning anything." An earlier version of this file used it 26 times -- about
-   five marks on every row, and since 75 of 84 Urgent rows are breached, clay was
-   true of nine rows in ten. A property shared by nine rows in ten is a field,
-   not an accent. It also carried three different claims at once: past target,
-   reading too old to trust, and clock suspended. Those are not the same thing
-   and must not be the same colour.
-
-   Three survive, each in a different composition:
-     .tier-*     the breach boundary, drawn once per table
-     .ev-v.is-cited  in the expander, the vital the agent actually read
-     .fig.is-accent  one figure in the headline row
-
-   .wb-over used to be the fourth. It is now driven by --sev-*, because the
-   overflow past target is a GRADED state and clay could only ever draw it at
-   one weight: a referral 1.01x past its target and one 31x past it were the
-   same colour, and the class that was supposed to separate them, .sub.is-over,
-   restated the base class verbatim and did nothing at all. The severity scale
-   (tokens.css, lib/severity.ts) is where every attention state on this surface
-   now lives, and clay is left to mean only "this is what did the work".
-*/
-/* The ranked list.
- *
- * Every colour is a token; there is not one literal in this file.
- *
- * Two rules govern the palette here:
- *   - --cat-* is reserved for triage categories and appears in exactly one
- *     place on this surface: the five tab swatches, each of which also carries
- *     its word, so colour is never the only channel.
- *   - clay is the composition's single accent and carries a single meaning:
- *     THIS IS WHAT DID THE WORK. The past-target tier, the rule that fired, the
- *     overflow past a target, the vitals the urgency agent actually cited. It
- *     never marks anything else.
- *
- * Depth is hairlines and wells, never a gradient, a glow or a drop shadow. The
- * inset box-shadows below are 1–3px rules, which is how the rest of the product
- * draws an edge that has to be seen.
- *
- * One type rule, added late and applied narrowly. tokens.css says --t-micro
- * (11px) is for "uppercase labels ONLY, never a value" and --t-small (12px) is
- * "the floor. nothing carrying meaning goes below." This file spent --t-micro
- * on 39 declarations and only a handful were label-shaped. Raising the TOKEN is
- * not the fix: it would move all 39 at once and re-break column widths measured
- * to the pixel, four days before a demo.
- *
- * What is raised instead is the distance-reading channel, and only that: the
- * priority numeral (.spn-n), which is the product's core output, and the
- * severity chip's own text in the table's two graded cells (.rule-chip .sev and
- * .lst-table .sub .sev). Each was measured in the running app against the
- * column it sits in, and each is paid for out of its own padding rather than
- * out of the table's width -- .lst-vp's scrollWidth is 1414 before and after,
- * and no row grew by a pixel in either density.
- *
- * Everything else stays at 11px on purpose: the uppercase labels the token is
- * for (.lst-th-l, .tb-x, .lab), the qualifier register (.sub, .of, .ev-cav),
- * and the expander's caption grid, which is read up close a row at a time and
- * is not the channel this file has to carry across a room. The declaration
- * count is still 39 -- one came off .spn-n and one went on .key-r-w, the
- * ladder's new rule statement, which sits in the same register as the .key-w
- * prose beside it and would be louder than its own step at any other size.
- */
+/* The ranked list. Every colour is a token; there is not one literal here.
+   --cat-* is reserved for triage and appears in one place only: the five tab
+   swatches, each of which also carries its word. clay is the single accent with
+   ONE meaning -- THIS IS WHAT DID THE WORK -- in three compositions: .tier-*,
+   .ev-v.is-cited and .fig.is-accent. A GRADED state is never clay, which can
+   only draw it at one weight; it goes on the severity scale (lib/severity.ts).
+   Depth is hairlines and wells: no gradient, glow or drop shadow. */
 
 .lst { display: block; }
 
@@ -75,7 +19,6 @@
   clip-path: inset(50%); white-space: nowrap;
 }
 
-/* --- the header: what this screen is, and the four figures ---------------- */
 .lst-top {
   display: flex; align-items: flex-end; justify-content: space-between;
   gap: var(--d6); flex-wrap: wrap; margin-bottom: var(--d5);
@@ -113,16 +56,8 @@
 }
 .lst-warn svg { flex: none; margin-top: 2px; color: var(--text-2); }
 
-/* --- before any run: the list, and what is in it -------------------------
-   The client asked for this state by name: "you would want to see a state
-   before running ranking, that there are these number of patients who have
-   been waiting with these issues, and then when we run you see the ranking."
-
-   It was two sentences of disclaimer, which reads as an absence. It is the
-   count, the spread and the two graded states now, so that running the agents
-   is a step the reader chooses rather than a screen they arrive at. Every
-   figure is counted from the cohort, so all of it is true of a day nothing has
-   scored. */
+/* --- before any run. Every figure is counted from the cohort, so all of it is
+   true of a day nothing has scored. */
 .lst-pre {
   border: 1px solid var(--rule-firm); border-left: 3px solid var(--clay);
   background: var(--surface); padding: var(--d4);
@@ -180,12 +115,8 @@
 }
 .key-k { font-size: var(--t-body); color: var(--text); font-weight: 550; }
 .key-w { font-size: var(--t-micro); color: var(--text-2); line-height: 1.45; }
-/* The rule a step comes from, and WHAT IT SAYS. The statement used to be a
-   `title` on this span and nowhere else, so on a keyboard or a touch screen the
-   step named RULE-CRT-URGENT and stopped there. core.ref_rules states every one
-   of them in a single short line ("An urgent referral should be seen within 28
-   days"), the ladder is reference material inside a fold, and there is room --
-   so it is on the surface rather than under a pointer. */
+/* The rule a step comes from, and WHAT IT SAYS (core.ref_rules). On the surface
+   rather than in a `title`, which a keyboard or touch screen cannot reach. */
 .key-r { display: grid; gap: var(--d1); margin-top: 3px; min-width: 0; }
 .key-r-1 { display: grid; gap: 1px; min-width: 0; }
 .key-r-id {
@@ -193,15 +124,14 @@
   overflow-wrap: anywhere;
 }
 .key-r-w { font-size: var(--t-micro); color: var(--text-2); line-height: 1.45; }
-/* A step that needs a caveat gets one under it. Step 4 is where twelve pairs
-   print the same number and are still separated by it; step 5 is where the
-   sixteen that are genuinely equal are placed. */
+/* A step that needs a caveat gets one under it: step 4 separates pairs that
+   print the same number, step 5 places the ones that are genuinely equal. */
 .key-note {
   font-size: var(--t-micro); color: var(--text-3); line-height: 1.45;
   margin-top: var(--d1); padding-top: var(--d1); border-top: 1px solid var(--rule);
 }
 
-/* step 3 is the tier readers kept missing: it is the one accented element */
+/* the tier boundary is this composition's one accented element */
 .key-s.is-tier {
   border-top-color: var(--clay); background: var(--surface-2);
 }
@@ -278,10 +208,9 @@
 .lst-reset strong { color: var(--text); }
 .lst-reset:hover { border-color: var(--text-3); border-left-color: var(--text-3); }
 
-/* --- category tabs. the only place --cat-* appears on this surface. --------
-   Sticky BELOW the top bar, which is itself sticky at 0. Opaque, not glass:
-   tokens.css spends glass on five pieces of chrome floating over something
-   moving, and a tab bar over a table of numerals is not one of them. */
+/* --- category tabs. the only place --cat-* appears on this surface. Sticky
+   BELOW the top bar, which is itself sticky at 0. Opaque, not glass: glass is
+   for chrome over something that moves, and a table of numerals does not. */
 .lst-tabs {
   display: flex; flex-wrap: wrap; gap: 0;
   border-bottom: 1px solid var(--rule-firm); margin-bottom: var(--d3);
@@ -310,47 +239,27 @@
 }
 .lst-note strong { color: var(--text); }
 
-/* The Outside tab's note is the one SPLIT on this surface, so .lst-note is now
-   also the class the <Aside> root carries (components/Aside.tsx merges it). The
-   caller owns the typography, which is the whole point of that merge: the
-   font-size, colour, line-height and max-width above already reach the summary
-   line and the revealed half alike, and aside.css kills the summary <p>'s own
-   margin. Nothing about the note's appearance changes when it is shut.
-
-   These two rules are the only thing this surface has to add, and they do one
-   job: give the revealed paragraphs the note's own rhythm. Written as `margin: 0`
-   plus `p + p` rather than as a first/last-child pair, so they never have to out-
-   specify aside.css's own `.aside-b > :first-child` and `> :last-child` -- there
-   is no margin left for those to zero. No colour, no ground, no border: the one
-   rule line down the left of the revealed half is aside.css's, and it is a
-   border, not a shadow. */
+/* .lst-note is also the <Aside> root's class (Aside.tsx merges it), so the
+   typography above reaches both halves. `margin: 0` plus `p + p` rather than a
+   first/last-child pair, so these never out-specify aside.css's own. */
 .lst-note .aside-b p { margin: 0; }
 .lst-note .aside-b p + p { margin-top: var(--d2); }
 
 .lst-empty { padding: var(--d5) 0; }
 
-/* The severity scale, once, immediately above the rows it grades -- inside the
-   category panel rather than up in the toolbar, so it sits with the table and
-   not with the page furniture. The legend itself belongs to
-   components/Severity.tsx, which takes a className and merges it onto .sevleg:
-   this surface gives it a margin in the panel's own rhythm and nothing else. It
-   has no ground and no border here for the reason severity.css states -- the
-   swatches have to sit on the same surface as the marks they explain. */
+/* The legend is components/Severity.tsx's; this surface gives it a margin and
+   nothing else. No ground and no border -- see severity.css. */
 .lst-legend { margin: 0 0 var(--d3); }
 
-/* --- the table -----------------------------------------------------------
-   The viewport is bounded so the header can stick to it. .scroll-x keeps wide
-   content inside this box; the page body never scrolls sideways. */
+/* --- the table. The viewport is bounded so the header can stick to it, and
+   wide content stays inside this box: the page body never scrolls sideways. */
 .lst-vp {
   max-height: min(calc(100vh - 300px), 1180px); min-height: 420px; overflow: auto;
   border: 1px solid var(--rule); background: var(--surface);
 }
-/* min-width is set inline from List.tsx, where the column widths live: it has
-   to be the sum of the specified widths PLUS Referral's reserved minimum, and
-   written down here as a constant it drifted to 1120 against a 1154 sum. Under
-   `table-layout: fixed` that gave the one elastic column a remainder of -34px
-   and its content painted over the next column, which is the "compact version
-   overlaps" report. */
+/* min-width is set inline from List.tsx, where the column widths live, and must
+   be their sum PLUS Referral's reserved minimum. Duplicated here it drifts, and
+   `table-layout: fixed` then paints the elastic column over its neighbour. */
 .lst-table {
   width: 100%;
   table-layout: fixed; border-collapse: separate; border-spacing: 0;
@@ -411,9 +320,8 @@
 .lst-row.is-open td { background: var(--surface-2); }
 .lst-row.is-overridden td:first-child { box-shadow: inset 3px 0 0 var(--ink); }
 
-/* a cell is two stacked facts in comfortable density and two inline ones in
-   compact. Nothing is ever dropped -- a reading's age travels with the reading
-   in both states. */
+/* two stacked facts in comfortable density, two inline in compact. Nothing is
+   ever dropped: a reading's age travels with the reading in both. */
 .cell { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .cell.is-r { align-items: flex-end; }
 .lst-table .sub {
@@ -423,50 +331,21 @@
 .lst-table .sub b { color: var(--text); font-weight: 600; }
 .sub-code { color: var(--text-3); }
 
-/* A qualifier line carrying a GRADED value is a flex row, not one run of text:
-   the severity block never shrinks and the prose beside it truncates first.
-   That is what keeps a reading's age on screen at every width, and the age may
-   never be the thing that goes.
-
-   The two rules that used to live here were .sub.is-over (which restated .sub
-   verbatim, so a referral 31x past target was typeset exactly like one at
-   1.04x) and .sub.is-stale (a 1px dashed underline at 1.75:1 for a reading up
-   to 871 days old). Both are severity steps now. */
-/* `overflow: visible` is not cosmetic here. Step 4's escalation over step 3 is
-   `outline: 2px solid` grown OUTWARD (severity.css) -- the fix for the fifth
-   inversion, where an inset ring drawn in the step's own foreground made the
-   most severe step 1.7-1.9x LESS present than the one below it. An outline is
-   clipped by an ancestor's `overflow: hidden`, which `.lst-table .sub` sets, so
-   the escalation was being erased on exactly the rows that need it: the 12
-   readings over two years old, up to 871 days. Truncation is unaffected --
-   `.sub-t` below carries its own ellipsis, which is what actually shortens the
-   prose while the graded block stays. */
+/* A flex row, not one run of text: the severity block never shrinks and the
+   prose truncates first, so a reading's age is never what goes. */
 .lst-table .sub.is-split {
   display: flex; align-items: baseline; gap: 4px;
-  /* Step 4's escalation over step 3 is `outline: 2px solid` grown OUTWARD
-     (severity.css) -- the fix for the fifth inversion, where an inset ring in
-     the step's own foreground made the most severe step 1.7-1.9x LESS present
-     than the one below it. An outline is clipped by an ancestor's
-     `overflow: hidden`, so on the 12 readings over two years old, up to 871
-     days, step 4 drew identically to step 3.
-     `overflow: visible` fixed that and cost more than it bought: it also let
-     this row spill 44px into the next COLUMN, measured at 1280 in compact.
-     So the clip stays and the outline is given room instead -- 2px of padding
-     it can be drawn into, cancelled by an equal negative margin so no cell
-     resizes and the measured column arithmetic is untouched. */
+  /* TRAP: step 4 escalates with an `outline` grown OUTWARD (severity.css), and
+     an ancestor's `overflow: hidden` clips it -- so step 4 draws as step 3.
+     Dropping the clip instead spilled the row 44px into the next COLUMN, so the
+     clip stays and the outline is given 2px of padding to draw into, cancelled
+     by an equal negative margin so no cell resizes. */
   padding: 2px; margin: -2px; overflow: hidden;
 }
 .lst-table .sub.is-split > .sev, .lst-table .sub.is-split > .sub-age { flex: none; }
 .sub-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* The block keeps its fill and loses only the vertical padding, so a graded
-   qualifier costs a 46px row no height at all.
-
-   Its TEXT is raised to --t-small with the rest of the severity channel, and
-   the two pixels that pays for it come off the side padding (6px -> 4px) and
-   off .sub.is-split's gap (5px -> 4px). Measured at 1716 in the running app:
-   without that refund the reading date truncated on 6 of the 20 rows on screen;
-   with it, on none, and the chip grows 83.7px -> 84.9px. The age is flex: none
-   either way, so it is never the thing that goes. */
+/* Fill kept, vertical padding lost, so a graded qualifier costs the row no
+   height; the raised text is paid for out of side padding, not the column. */
 .lst-table .sub .sev { padding: 0 4px; font-size: var(--t-small); }
 
 .c-pos { text-align: right; }
@@ -478,11 +357,9 @@
 .pos.is-moved { color: var(--ink); box-shadow: inset 0 -2px 0 var(--ink); }
 .pos-was {
   display: block; max-width: 100%; line-height: 1.2;
-  /* .lab's uppercase + 0.08em tracking is wider than this column, so the word
-     overflowed left and clipped to "ONFIRMED". It keeps the label register but
-     drops the tracking. It no longer wraps either: 76px of column is 56px of
-     content, and "system said 12" wrapped to three lines (39.6px) in a 56px
-     box. The phrase is on the tooltip and in the expander in full. */
+  /* .lab's tracking is wider than this column (76px of column, 56px of
+     content), so the word clips. Label register kept, tracking dropped, no
+     wrapping; the phrase is in full in the expander. */
   letter-spacing: 0.02em; text-transform: none;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -491,12 +368,9 @@
 .lst-table .wait-n, .lst-table .n2 {
   font-size: var(--t-data); font-weight: 600; color: var(--text); line-height: 1.2;
 }
-/* NEWS2 carries its own magnitude. A 0 and a 7 were typeset identically here.
-   Size and weight are set inline from the value, as a continuous map with no
-   band in it: NEWS2 TOTAL is deliberately outside the severity scale
-   (lib/severity.ts -- 148 of 308 tie at exactly 0), so a graded colour would
-   claim a discrimination the number cannot make, and any threshold drawn here
-   would be an invented one. */
+/* Size and weight are set inline from the value, as a continuous map with no
+   band. NEWS2 TOTAL is deliberately outside the severity scale (lib/severity.ts)
+   -- a graded colour would claim a discrimination the number cannot make. */
 .n2-v { line-height: 1.1; }
 .lst-table .of { font-weight: 400; color: var(--text-2); font-size: var(--t-micro); }
 .tri { font-size: var(--t-small); color: var(--text); }
@@ -504,10 +378,8 @@
 .ctx-v { font-size: var(--t-small); color: var(--text-2); }
 .ctx-v b { color: var(--text); font-weight: 550; }
 
-/* --- the rank spine, from the mark ---------------------------------------
-   viewBox 0 0 52 70: a 5-wide stem with bars alternating left and right at
-   different heights. Here the high bar is how unwell and the low bar is how
-   long waited, both multiplied by their weight, both on one scale. */
+/* --- the rank spine, from the mark (viewBox 0 0 52 70). The high bar is how
+   unwell and the low bar is how long waited, both weighted, both on one scale. */
 .spn { display: flex; align-items: center; gap: var(--d2); }
 .spn-g { position: relative; display: block; flex: 1 1 auto; height: 22px; min-width: 0; }
 .spn-stem {
@@ -529,19 +401,14 @@
 .spn.is-tight .spn-g { height: 16px; }
 .spn.is-tight .spn-u { top: 1px; }
 .spn.is-tight .spn-w { bottom: 1px; }
-/* Six decimals when two would print the same number as the row above.
-   "0.282693" measures 52.30px at 11px, so the 52px box was already 0.3px short
-   before this numeral was raised at all; at --t-small it is 56.48px and the box
-   is 58. Widening it takes the 6px off .spn-g, which is elastic (flex 1 1 auto,
-   min-width 0) -- the column itself is untouched, so the table arithmetic in
-   List.tsx does not move. */
+/* Six decimals when two would print the row above's number. "0.282693" is
+   56.48px at --t-small, and the extra width comes off .spn-g, which is elastic,
+   so List.tsx's table arithmetic does not move. */
 .spn.is-precise .spn-n { width: 58px; }
 
-/* --- two rows the printed priority cannot separate ------------------------
-   Twelve adjacent in-band pairs in this decision differ only from the fourth
-   decimal and both print the same three. Both halves of the pair carry this
-   line: the numerals above it are what actually differ, and this names which
-   of the two terms carried the margin. */
+/* --- two rows the printed priority cannot separate. Adjacent in-band pairs can
+   differ only from the fourth decimal, so both halves carry this line, which
+   names which of the two terms carried the margin. */
 .tie { display: block; max-width: 100%; margin-top: 1px; font-size: var(--t-micro); }
 .tie-w {
   display: block; color: var(--text-2); line-height: 1.25;
@@ -549,60 +416,21 @@
 }
 .tie.is-exact .tie-w { color: var(--text-3); }
 
-/* --- waiting time against target ------------------------------------------
-   The target sits at a fixed mark at 62%. Everything past it is compressed, so
-   a 1.2x overrun and a 31x one share an axis without either disappearing. The
-   numeral above the bar always carries the true value. */
+/* --- waiting time against target. The target is a fixed mark at 62% and
+   everything past it is compressed, so a 1.2x and a 31x overrun share an axis.
+   The numeral above the bar always carries the true value. */
 .wb {
   position: relative; display: block; width: 100%; height: 5px;
   background: var(--bg-sunk); margin: 3px 0 2px;
 }
 .wb-in { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text-3); }
-/* The overflow past target takes the SAME severity step as the chip beside it,
-   so the bar and the numeral can never disagree. Steps 3 and 4 also grow the
-   fill area rather than only changing it: 2px of extra height (5px -> 7px),
-   drawn outside the track, so nothing reflows. */
-/* The SAME inversion the review caught in SevBar, in a second place: this bar
-   borrowed the chip's steps 1 and 2, which are a hairline and a tint because
-   they sit behind text. Against the track (--bg-sunk #F2F1EC) those two fills
-   measure 1.00 and 1.26, while the WITHIN-target segment beside them (--text-3)
-   is 4.30 -- so a referral 1.5x past its target drew an overflow 4.3x LESS
-   present than the part of the bar still inside the target, and step 1
-   (--sev-1-bg #F5F0E6 on #F2F1EC) was not distinguishable from the empty track
-   at all. An overflow must never be quieter than what it overflows.
-
-   This block previously published those three as 1.78 / 1.90 / 3.41, and not
-   one of them is a contrast against this track. 1.78 is --sev-1-edge, the
-   chip's hairline BORDER rather than its fill (1.7782 on --bg-sunk). 3.41 is
-   nearest --text-3 measured against --sev-2-bg, the step's own fill rather than
-   the track it sits on (3.4171). 1.90 is one of the three figures severity.css
-   withdrew from its bar table as wrong (severity.css:112). The conclusion they
-   were offered for was right and UNDERSTATED -- the true gap is wider than the
-   figures claimed -- which is exactly why a reviewer who trusted them would
-   have filed this as cosmetic. Recomputed against the track this bar actually
-   draws on, by WCAG relative luminance.
-
-   The ramp as it now stands. Contrast against --bg-sunk, and the drawn height
-   beside it, because a step that cannot add contrast adds AREA instead. Neither
-   column ever falls, and every step raises one of them:
-     within target  --text-3      4.30    5px
-     step 1         --clay        5.41    5px
-     step 2         --sev-3-bg    8.01    5px
-     step 3         --sev-3-bg    8.01    7px   <- same fill as step 2
-     step 4         --sev-4-bg   10.23    7px
-
-   Steps 2 and 3 are ONE colour, separated only by those 2px. Written down
-   rather than papered over. The only opaque token in the frozen palette that
-   falls between 8.01 and 10.23 is --sev-2-fg (9.06), which is step 2's TEXT
-   colour, not a fill: put it here and the bar would be 1.13:1 from --sev-3-bg,
-   a difference nobody sees, while a foreground token acquired a second job.
-   The numeral above the bar carries the true multiple and the chip beside it
-   names the step, so nothing rests on this colour alone -- but do not read this
-   bar's colour by itself and call it the step.
-
-   This surface is light-only (.wb renders inside .lst-table, and no
-   [data-surface="dark"] ancestor -- .boot, .rail, .prov, .runlay, .cg -- holds
-   one), so these are the only figures this bar is ever drawn at. */
+/* The overflow takes the SAME severity step as the chip beside it, so bar and
+   numeral can never disagree, and it never borrows the chip's steps 1 and 2 --
+   an overflow must not be quieter than what it overflows. Contrast against the
+   track with the drawn height beside it, because a step that cannot add contrast
+   adds AREA: 4.30/5px within target, then 5.41/5, 8.01/5, 8.01/7, 10.23/7.
+   Steps 2 and 3 are ONE colour separated only by those 2px, so do not read this
+   bar's colour by itself and call it the step. */
 .wb-over { position: absolute; top: 0; bottom: 0; background: var(--clay); }
 .wb[data-sev="2"] .wb-over { background: var(--sev-3-bg); }
 .wb[data-sev="3"] .wb-over { background: var(--sev-3-bg); top: -1px; bottom: -1px; }
@@ -618,33 +446,24 @@
   background: var(--rule-firm);
 }
 
-/* --- the rule that fired. No rule ID had ever reached a screen. ------------ */
+/* --- the rule that fired ------------------------------------------------- */
 .rulez {
   display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
   min-width: 0; max-width: 100%;
 }
-/* The chip is a wrapper now. The rule ID sits inside the severity block, which
-   at sevBreach(false) is a SOLID fill and is what carries across a room; the
-   detail stays outside it in the reading register, so the sentence is not
-   reversed out of a dark ground at 11px. */
+/* The rule ID sits inside the severity block, which at sevBreach(false) is a
+   SOLID fill; the detail stays outside, unreversed. */
 .rule-chip {
   display: inline-flex; align-items: baseline; gap: 5px;
   max-width: 100%; min-width: 0;
   color: var(--text); font-size: var(--t-micro); line-height: 1.4;
 }
-/* The severity block is one level deeper now -- .rule-open wraps it -- so this
-   is a descendant selector, not a child one. Written as `>` it stopped matching
-   the moment the ID became a control, and the chip silently lost its padding
-   and its flex: none. Its text is raised with the rest of the severity channel:
-   the chip goes 143.3px -> 152.3px inside a 240px column whose min-width is
-   unchanged, and .rule-d truncates as it already did on every row. */
+/* A DESCENDANT selector: .rule-open wraps the severity block, so written as `>`
+   this silently stops matching and the chip loses its padding and flex: none. */
 .rule-chip .sev { flex: none; padding: 1px 6px; font-size: var(--t-small); }
 
-/* The rule ID is a CONTROL. What a rule SAYS used to live only in a `title` on
-   a non-focusable span: a mouse could read it and nothing else could -- no
-   keyboard, no touch, no screen reader with the tooltip suppressed. The button
-   opens the row's expander, which carries every statement in full (.ev-rst).
-   It draws no chrome of its own, so the chip is still the only thing seen. */
+/* A CONTROL, not a `title` only a mouse can read: it opens the row's expander,
+   which carries every statement in full (.ev-rst). No chrome of its own. */
 .rule-open {
   flex: none; min-width: 0; max-width: 100%;
   display: inline-flex; align-items: baseline;
@@ -652,10 +471,8 @@
   background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
 }
 .rule-open:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-/* The hover affordance is an underline on the ID, exactly as .pw-open does it,
-   and NOT a change to the chip's border. The border at every severity step is
-   part of a measured ramp; re-tinting it on hover would put a colour into the
-   scale that the scale never agreed to. */
+/* Underline the ID, as .pw-open does; NEVER re-tint the chip's border, which is
+   part of a measured ramp at every severity step. */
 .rule-open:hover b { text-decoration: underline; text-underline-offset: 3px; }
 .rule-chip svg { align-self: center; flex: none; }
 .rule-chip b { font-weight: 650; letter-spacing: 0.01em; }
@@ -663,13 +480,8 @@
   color: var(--text-2); min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* A rule that will not fit is COUNTED, never dropped. Compact used to clip the
-   second chip with `overflow: hidden` and no ellipsis, which contradicted the
-   compact block's own promise not to hide one of the two facts in a cell.
-
-   It is a control for the same reason the rule ID is: it named the rules it was
-   standing in for in a `title` and nowhere else. It opens the expander, where
-   all of them are listed with their statements. */
+/* A rule that will not fit is COUNTED, never dropped or clipped without an
+   ellipsis. A control for the same reason the rule ID is. */
 .rule-more {
   flex: none; font: inherit;
   font-size: var(--t-micro); color: var(--text-2); line-height: 1.4;
@@ -709,7 +521,7 @@
 }
 .expb:hover { color: var(--text); border-color: var(--rule-firm); background: var(--surface); }
 
-/* --- the breach tier boundary, which the sort key has and copy kept losing - */
+/* --- the breach tier boundary -------------------------------------------- */
 .tier td {
   padding: 0; background: var(--surface-2);
   border-top: 2px solid var(--clay); border-bottom: 1px solid var(--rule);
@@ -776,10 +588,8 @@
 }
 .ev-rules li.is-bad .ev-rd { color: var(--text); font-weight: 600; }
 .ev-rw { grid-column: 2 / -1; font-size: var(--t-micro); color: var(--text-3); }
-/* A pass and a breach used to share one background, separated by a single text
-   step and a 1.55:1 ring. A breach is sevBreach(false) now, which is a solid
-   block; "holds" is not an attention state, so it keeps the neutral pill it
-   always had. Colour never travels alone either way: the word is in the chip. */
+/* A breach is sevBreach(false), a solid block; "holds" is not an attention
+   state and keeps the neutral pill. The word is in the chip either way. */
 .ev-vd {
   display: inline-flex; align-items: center; white-space: nowrap;
   font-size: var(--t-micro);
@@ -819,26 +629,10 @@
 .ev-vu { font-size: var(--t-micro); color: var(--text-3); }
 
 .ev-cap { display: grid; gap: 1px; background: var(--rule); }
-/* Four tracks, one fact each: the label, the identifier, the value, the note.
-   Every row here puts its children in that order, and the one row that has
-   only three of them is named below rather than left to auto-placement.
-
-   Track 1 was 96px. "CLINIC SESSION" measures 101.7px at 11px / 600 / 0.08em
-   (.lab, tokens.css:269) in SF, the first hit in the --font-data stack on this
-   machine -- so the label the clinic-session row just added wrapped to two
-   lines while "CLINIC SERIES" (90.8px) beside it and "BED STATUS" (79.1px)
-   above it each stayed on one, which is a ragged column nobody chose. 112px
-   carries the longest of the three and leaves room for a wider substitute
-   face. It is paid for out of track 3, which has slack to spare: measured
-   against the live 9001/2026-08-30 payload, the widest value any row draws is
-   the ward line at 345.4px in a track 526px wide at the NARROWEST width this
-   grid is ever laid out at.
-
-   That narrowest width is 1056px of content, and it is a floor rather than a
-   guess: the table's min-width is 1138px on seven columns (List.tsx COL), the
-   expander's td spans the whole table, and .ev + .ev-grid's border + .ev-b +
-   this row's own padding take 82px of it. Below a 1236px viewport .lst-vp
-   scrolls sideways rather than letting the table get narrower. */
+/* Four tracks, one fact each: label, identifier, value, note. Track 1 is 112px
+   because "CLINIC SESSION" measures 101.7px at .lab's 11px/600/0.08em. It is
+   paid for out of track 3, which has slack: the table's min-width holds this
+   grid at no less than 1056px of content and .lst-vp scrolls sideways. */
 .ev-cap-r {
   display: grid; grid-template-columns: 112px 128px 1fr auto;
   align-items: baseline; gap: var(--d3);
@@ -848,10 +642,8 @@
 .ev-cap-v { font-size: var(--t-small); color: var(--text-2); }
 .ev-cap-v b { color: var(--text); font-weight: 650; }
 /* The row drawn when operations has not loaded (List.tsx:2130) has three
-   children, not four: there is no identifier to print, so its value took the
-   identifier's 128px track by auto-placement and wrapped inside it -- 168px of
-   cited keys in 128px -- while the 1fr track beside it held a 170px note and
-   ~700px of nothing. It is given the two middle tracks by name instead. */
+   children, not four: with no identifier to print, the value auto-places into
+   the 128px identifier track and wraps. It takes the two middle tracks by name. */
 .ev-cap-r > .lab + .ev-cap-v { grid-column: 2 / -2; }
 .ev-cap-d { font-size: var(--t-micro); color: var(--text-3); }
 .ev-cap-sum {
@@ -883,24 +675,21 @@
 .lst-pager-b { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
 .lst-gap { color: var(--text-3); padding: 0 2px; font-size: var(--t-small); }
 
-/* --- compact density ------------------------------------------------------
-   The rows get shorter by putting each cell's two facts side by side, not by
-   hiding one of them. A reading's age is never the thing that goes. */
+/* --- compact density. Rows shorten by putting each cell's two facts side by
+   side, never by hiding one. A reading's age is never what goes. */
 .lst-vp.is-tight .lst-row { height: var(--row-h-tight); }
 .lst-vp.is-tight .lst-row td { padding: 2px 10px; }
 .lst-vp.is-tight .cell { flex-direction: row; align-items: baseline; gap: 6px; }
 .lst-vp.is-tight .cell.is-r { flex-direction: row-reverse; }
 .lst-vp.is-tight .pos { font-size: 16px; }
 .lst-vp.is-tight .wb { width: 56px; flex: none; margin: 0; align-self: center; }
-/* One line, and a count of whatever did not fit. NEVER `overflow: hidden` with
-   no ellipsis: a row can fire a CRT rule AND RULE-TRIAGE-TURNAROUND, and the
-   second chip was being cut off silently. */
+/* One line, and a count of what did not fit. NEVER `overflow: hidden` with no
+   ellipsis: a row can fire two rules and the second chip is cut off silently. */
 .lst-vp.is-tight .rulez {
   flex-direction: row; flex-wrap: nowrap; align-items: center; gap: var(--d2);
 }
 .lst-vp.is-tight .rule-chip { min-width: 0; white-space: nowrap; }
-/* The pathway number and the planted chip came to 47px wrapped inside a 36px
-   row. They sit on one line, and the chip truncates before the number does. */
+/* one line in a 36px row, and the chip truncates before the number does */
 .lst-vp.is-tight .pw-line { flex-wrap: nowrap; gap: 5px; }
 .lst-vp.is-tight .pw-open { flex: none; }
 .lst-vp.is-tight .planted { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -909,22 +698,13 @@
 .lst-vp.is-tight .c-ref .cell {
   display: inline-flex; flex-wrap: nowrap; vertical-align: middle; max-width: 100%;
 }
-/* min-width:0 is what makes the truncation actually happen. .ovbadge-t already
-   carried the ellipsis, but the BADGE is the flex item, and a flex item will
-   not shrink below its content unless min-width is cleared -- so in compact,
-   where .pw-line is nowrap and the badge cannot drop to a second line, a
-   208px badge sat in a 304px cell and painted 194px into the Waited column,
-   straight over the wait bar and its multiple. Measured in a browser at 1280
-   on PW-9001-000191. The pathway number keeps its width and the phrase gives
-   way, which is the order the comment above already intended. */
+/* min-width: 0 here and on the child are both load-bearing: .ovbadge-t carries
+   the ellipsis, but a flex item will not shrink below its content unless
+   min-width is cleared, and without this wrapper there is no flex parent at all.
+   The pathway number keeps its width; the phrase gives way. */
 .lst-vp.is-tight .ref-wrap {
   display: flex; align-items: center; flex-wrap: nowrap; min-width: 0; gap: var(--d2);
 }
-/* min-width:0 twice, and both are load-bearing. .ovbadge-t already carried the
-   ellipsis, but a flex item will not shrink below its content unless min-width
-   is cleared -- and before the wrapper above there was no flex parent at all,
-   so neither box could shrink and the badge simply painted into the next
-   column. The pathway number keeps its width; the phrase gives way. */
 .lst-vp.is-tight .ref-wrap > .cell { min-width: 0; flex: 1 1 auto; }
 .lst-vp.is-tight .ovbadge {
   margin-top: 0; margin-left: 0; vertical-align: middle;
@@ -935,9 +715,8 @@
 /* --- narrower screens ----------------------------------------------------- */
 @media (max-width: 1400px) {
   .key { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  /* Four figures wrapping to 2x2 costs ~90px of height, and on an 800-tall
-     screen that is two ranked rows. They stay in one row and lose the note
-     line (.fig-w) instead -- the figure and its label are what is scanned. */
+  /* Four figures wrapping to 2x2 costs ~90px, which is two ranked rows on an
+     800-tall screen. They keep one row and lose the note line instead. */
   .lst-figs { grid-auto-columns: minmax(0, 1fr); }
   .fig { padding: var(--d2) var(--d3); }
   .fig-w { display: none; }
@@ -946,32 +725,12 @@
   .recon { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ev-grid { grid-template-columns: minmax(0, 1fr); }
   .ev-vitals { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  /* Two tracks, and the rows still have four children, so BOTH of the last
-     two have to be told to span. Only .ev-cap-d was, and the value then
-     auto-placed into the label track -- 96px before the change above, 112px
-     now -- and its text was squeezed there: on the ward row already, and on
-     the clinic-session row as soon as that row landed.
-
-     Working the placement through rather than trusting it (CSS Grid 8.5, and
-     the flow is sparse because nothing here is `dense`): .lab takes r1c1, the
-     identifier takes r1c2, and the cursor is left in column 2 or past it. The
-     value's definite column-start of 1 is lower than that either way, so the
-     row advances and it takes row 2 entire; the note's column-start of 1 is
-     then NOT lower than the cursor's 1, so its row advances only while it
-     overlaps -- row 2 is taken, so it lands on row 3. Three stacked full-width
-     lines, nothing squeezed, whichever way the cursor is book-kept.
-     The three-child row needs the same full-width span for the same reason.
-     Its own rule above is the more specific selector and would otherwise keep
-     2 / -2 here, so it is restated in this selector list, where an equally
-     specific declaration later in the file is the one that lands.
-
-     Worth knowing before anything else in this block is trusted: the box these
-     rules reshape does not actually get narrower here. This grid sits inside
-     the table, whose min-width holds it at no less than 1056px of content at
-     any viewport (see .ev-cap-r above), so a 1100 viewport arrives here with
-     exactly the width a 1236 one does and .lst-vp scrolls sideways instead. The squeeze was a real defect
-     at any width and is fixed; the premise under the whole query is somebody
-     else's to unpick. */
+  /* Two tracks, four children per row, so BOTH of the last two must be told to
+     span; with only .ev-cap-d told, the value auto-places into the label track.
+     The three-child row's rule above is equally specific, so it is restated here
+     where the later declaration lands. (The box does not actually get narrower
+     at this breakpoint -- the table's min-width holds it -- but the squeeze was
+     a real defect at any width.) */
   .ev-cap-r { grid-template-columns: 112px 1fr; }
   .ev-cap-v, .ev-cap-r > .lab + .ev-cap-v { grid-column: 1 / -1; }
   .ev-cap-d { grid-column: 1 / -1; }
@@ -993,10 +752,8 @@
 }
 .ovr-after .num { color: var(--text); }
 
-/* --- foldable reference blocks -------------------------------------------
-   The sort key and the reconciliation are read once and then known. Open by
-   default they cost ~430px above the table, which put the list itself off
-   screen on a 1080-tall display. */
+/* --- foldable reference blocks: read once, then known. Open by default they
+   cost ~430px above the table, which is the list itself on a 1080-tall screen. */
 .lst-fold { border: 1px solid var(--rule); background: var(--surface); }
 .lst-fold + .lst-fold { border-top: 0; }
 .lst-fold > summary {
@@ -1015,23 +772,18 @@
 .lst-fold-s .num { color: var(--text); }
 .lst-fold > *:not(summary) { padding: 0 var(--d4) var(--d4); }
 
-/* A refused row carries a recorded observation but no acuity claim: NEWS2 is
-   validated in adults, so the score is never rendered as "how unwell" for a
-   paediatric referral. The reading and its age still show. */
+/* NEWS2 is validated in adults, so a paediatric row's score is never rendered
+   as "how unwell". The reading and its age still show. */
 .n2.is-na { font-weight: 500; }
 .n2-na { color: var(--text-2); font-size: var(--t-small); }
 
-/* Which columns the table carries is decided in List.tsx and NOT here. Under
+/* TRAP: which columns the table carries is decided in List.tsx, NOT here. Under
    `table-layout: fixed` with a <colgroup>, hiding a <td> in CSS while its <col>
-   and its <th> remain misaligns every row below it, so the cells and their cols
-   have to appear and disappear together. useNarrow(NINE_COL_PX) does that, and
-   the media query that used to hide .c-ctx alone has been removed. */
+   and <th> remain misaligns every row below it. */
 
-/* The row is not a button. ARIA's "children presentational" on role=button was
-   stripping every cell from the accessibility tree, so a screen-reader user got
-   the pathway number and nothing else -- not the wait, not the rule, and not the
-   reading's age, which must travel with the reading for every reader. The
-   pathway number is the named control instead. */
+/* The row is not a button: ARIA's "children presentational" on role=button
+   strips every cell from the accessibility tree. The pathway number is the
+   named control instead. */
 .pw-open {
   background: none; border: 0; padding: 0; margin: 0; font: inherit;
   font-size: var(--t-body); color: var(--text); cursor: pointer; text-align: left;
@@ -1039,9 +791,8 @@
 .pw-open:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* The coordinator's note names a capacity score, which reads as if capacity
-   placed this person. It did not: capacity is specialty-level and sets alpha.
-   The note is also template output, which the patient page said and this panel
-   did not. Both stated beside it rather than left to be inferred. */
+   placed this person; it is specialty-level and sets alpha. It is also template
+   output. Both stated beside it rather than left to be inferred. */
 .ev-p-meta {
   margin-top: var(--d2); padding-top: var(--d2);
   border-top: 1px solid var(--rule);
@@ -1056,21 +807,12 @@
   padding: 1px var(--d2); border: 1px dashed var(--rule-firm); border-radius: var(--radius);
 }
 
-/* --- icons, by role -------------------------------------------------------
-   tokens.css declares --icon and --icon-sm and nothing was spending them. The
-   same glyph appeared here at 11px/2.25, 12px/2.25, 14px/2 and 11px/2.5, and
-   at 12px and 13px on other surfaces. Three roles, two token sizes, one stroke:
-
-     .ico-sig  a signal: TriangleAlert, Check
-     .ico-chr  inline chrome: the sort arrows, the search glass, the pen
-     .ico-ctl  a control's own glyph on a 26px target: the expander chevron
-
-   Sized here rather than through lucide's `size` prop so the value comes from
-   the token; stroke is passed explicitly at every call site. */
+/* --- icons, by role: .ico-sig a signal, .ico-chr inline chrome, .ico-ctl a
+   control's own glyph on a 26px target. Sized here rather than through lucide's
+   `size` prop so the value comes from the token; stroke is set at the call. */
 .lst .ico-sig, .lst .ico-chr { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
 .lst .ico-ctl { width: var(--icon); height: var(--icon); flex: none; }
 
-/* A filter that matches only in another category used to dead-end here. */
 .lst-jump {
   background: none; border: 0; padding: 0; font: inherit; font-size: inherit;
   color: var(--text); cursor: pointer;
@@ -1078,7 +820,6 @@
 }
 .lst-jump:hover { color: var(--clay); }
 
-/* The ratio, in the reading register. The wait bar above it carries the graded
-   severity channel for the same fact; drawing it twice was 20 of the 77 marks
-   on the first screen. */
+/* The ratio in the reading register: the wait bar above carries the graded
+   channel for the same fact, and drawing it twice doubles the marks. */
 .wait-x { color: var(--text); font-weight: 600; }
