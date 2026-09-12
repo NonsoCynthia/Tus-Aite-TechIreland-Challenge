@@ -220,6 +220,10 @@ Docker invocations.
 | `make rationale-api-up` | Start the rationale HTTP API for frontend/backend integration. |
 | `make rationale-api-down` | Stop and remove the rationale HTTP API container. |
 | `make demo-run` | Run urgency, capacity, coordinator, then rationale in sequence. |
+| `make agent-benchmark` | Check urgency, capacity, and coordinator agents against controlled benchmark cases. |
+| `make kg-audit` | Check KG/RDF/SHACL assets and citation role contracts for auditability. |
+| `make evaluation-suite` | Run the agent benchmark and KG audit together. |
+| `make evaluation-run DECISION_ID=...` | Evaluate one written decision against CPC/CRT checks and the held-out answer key. |
 
 Common variables:
 

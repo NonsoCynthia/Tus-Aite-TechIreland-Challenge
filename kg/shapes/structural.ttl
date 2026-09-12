@@ -2,6 +2,7 @@
 @prefix eat:  <https://nonsocynthia.github.io/Tus-Aite-TechIreland-Challenge/kg/ns#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix sosa: <http://www.w3.org/ns/sosa/> .
 @prefix time: <http://www.w3.org/2006/time#> .
 
@@ -206,3 +207,35 @@ eat:RuleShape a sh:NodeShape ;
   sh:property [ sh:path eat:statement ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
   sh:property [ sh:path eat:appliesTo ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
   sh:property [ sh:path eat:thresholdDays ; sh:datatype xsd:nonNegativeInteger ; sh:maxCount 1 ] .
+
+eat:ScoreShape a sh:NodeShape ;
+  sh:targetClass eat:Score ;
+  sh:property [ sh:path eat:scored ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:scoreValue ; sh:datatype xsd:decimal ; sh:minCount 1 ; sh:maxCount 1 ;
+                sh:minInclusive 0.0 ; sh:maxInclusive 1.0 ] ;
+  sh:property [ sh:path eat:method ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:agentVersion ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path prov:wasGeneratedBy ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:cites ; sh:minCount 1 ] .
+
+eat:DecisionShape a sh:NodeShape ;
+  sh:targetClass eat:Decision ;
+  sh:property [ sh:path eat:hasPlacement ; sh:minCount 1 ] ;
+  sh:property [ sh:path prov:wasGeneratedBy ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+eat:RankedPlacementShape a sh:NodeShape ;
+  sh:targetClass eat:RankedPlacement ;
+  sh:property [ sh:path eat:position ; sh:datatype xsd:positiveInteger ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:ranks ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:or (
+    [ sh:property [ sh:path eat:citesUrgencyEvidence ; sh:minCount 1 ] ]
+    [ sh:property [ sh:path eat:citesCapacityEvidence ; sh:minCount 1 ] ]
+    [ sh:property [ sh:path eat:citesTimeframeEvidence ; sh:minCount 1 ] ]
+    [ sh:property [ sh:path eat:citesMultiListEvidence ; sh:minCount 1 ] ]
+  ) .
+
+eat:RuleCheckShape a sh:NodeShape ;
+  sh:targetClass eat:RuleCheck ;
+  sh:property [ sh:path eat:testedRule ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path eat:passed ; sh:datatype xsd:boolean ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path prov:wasGeneratedBy ; sh:minCount 1 ; sh:maxCount 1 ] .
