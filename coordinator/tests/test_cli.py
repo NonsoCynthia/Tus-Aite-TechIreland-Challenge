@@ -30,6 +30,7 @@ def _fixture_cohort() -> list[dict[str, Any]]:
             "crt_threshold_days": 28,
             "triage_status": "triaged",
             "days_awaiting_triage": None,
+            "referral_state_valid_from": "2026-01-01",
         },
         {
             "hospital_hipe": "9004",
@@ -42,6 +43,7 @@ def _fixture_cohort() -> list[dict[str, Any]]:
             "crt_threshold_days": None,
             "triage_status": "triaged",
             "days_awaiting_triage": None,
+            "referral_state_valid_from": "2026-01-02",
         },
     ]
 

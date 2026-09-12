@@ -12,9 +12,22 @@ export
 
 PROFILE ?= small
 FETCH_PROFILE ?= sample
+HOSPITAL ?= 9001
+AS_OF ?= 2026-08-30
+RUN_ID ?= run-local-001
+PATHWAY ?=
+DEMO_PATHWAY ?= PW-$(HOSPITAL)-000007
+CAPACITY_DIRECTION ?= pressure
+RATIONALE_STYLE ?= technical
+RATIONALE_ENGINE ?= deterministic
 
 .PHONY: up down build migrate seed fetch load generate calibrate verify \
         kg-views retrieval-build retrieval-test retrieval-lint retrieval-typecheck \
+        urgency-run capacity-run coordinator-run rationale-build rationale-run \
+        rationale-api-up rationale-api-down rationale-test rationale-lint \
+        rationale-typecheck rationale-check demo-run \
+        orchestrator-run orchestrator-ask orchestrator-chat \
+        orchestrator-test orchestrator-lint orchestrator-typecheck orchestrator-check \
         dataset-test test reset psql logs volumes
 
 ## --- Bring the stack up ---
@@ -30,7 +43,7 @@ down:
 	docker compose down
 
 build:
-	docker compose build loader retrieval
+	docker compose build loader retrieval rationale
 
 ## --- Dataset: Postgres load pipeline (see dataset/loader/) ---
 
@@ -76,12 +89,143 @@ retrieval-lint:
 retrieval-typecheck:
 	docker compose run --rm retrieval mypy app
 
+## --- Agent CLI jobs ---
+
+urgency-run:
+	docker run --rm \
+		--network container:triage_retrieval \
+		--env-file .env \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r urgency-agent/requirements.txt && PYTHONPATH=urgency-agent python -m urgency_agent --hospital $(HOSPITAL) --as-of-date $(AS_OF) --run-id $(RUN_ID)"
+
+capacity-run:
+	docker run --rm \
+		--network container:triage_retrieval \
+		--env-file .env \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r capacity-agent/requirements.txt && PYTHONPATH=capacity-agent python -m capacity_agent --hospital $(HOSPITAL) --as-of-date $(AS_OF) --run-id $(RUN_ID)"
+
+coordinator-run:
+	docker run --rm \
+		--network container:triage_retrieval \
+		--env-file .env \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r coordinator/requirements-dev.txt && python -m coordinator --hospital $(HOSPITAL) --as-of $(AS_OF) --run-id $(RUN_ID) --capacity-direction $(CAPACITY_DIRECTION)"
+
+## --- Rationale CLI ---
+
+rationale-build:
+	docker compose build rationale
+
+rationale-api-up:
+	docker compose up -d rationale-api
+
+rationale-api-down:
+	docker compose rm -f -s rationale-api
+
+rationale-run:
+	docker compose run --rm rationale \
+		--hospital $(HOSPITAL) \
+		--as-of $(AS_OF) \
+		$(if $(PATHWAY),--pathway $(PATHWAY),) \
+		--style $(RATIONALE_STYLE) \
+		--engine $(RATIONALE_ENGINE)
+
+rationale-test:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r rationale/requirements-dev.txt && python -m pytest rationale/tests/ -q"
+
+rationale-lint:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r rationale/requirements-dev.txt && python -m ruff check --config rationale/ruff.toml rationale/"
+
+rationale-typecheck:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r rationale/requirements-dev.txt && python -m mypy --config-file rationale/mypy.ini rationale"
+
+rationale-check: rationale-test rationale-lint rationale-typecheck
+
+demo-run: urgency-run capacity-run coordinator-run
+	$(MAKE) rationale-run \
+		HOSPITAL=$(HOSPITAL) \
+		AS_OF=$(AS_OF) \
+		PATHWAY=$(if $(PATHWAY),$(PATHWAY),$(DEMO_PATHWAY)) \
+		RATIONALE_STYLE=$(RATIONALE_STYLE) \
+		RATIONALE_ENGINE=$(RATIONALE_ENGINE)
+
+## --- Orchestrator agent (tool-calling: urgency -> capacity -> coordinator ->
+## rationale, orchestrator-agent/README.md) ---
+##
+## Runs on the HOST, not in a container: its tools shell out to the
+## *-run targets above, which themselves manage Docker -- containerising the
+## agent too would need Docker-in-Docker for no real benefit. Requires
+## `python3.12`, `make`, and OPENAI_API_KEY set (root .env).
+
+orchestrator-run:
+	cd orchestrator-agent && \
+	  ( [ -d .venv ] || python3.12 -m venv .venv ) && \
+	  .venv/bin/pip install -q -r requirements.txt && \
+	  .venv/bin/python -m orchestrator_agent run \
+	    --hospital $(HOSPITAL) --as-of-date $(AS_OF) --run-id $(RUN_ID)
+
+## Q&A mode: `make orchestrator-ask QUESTION="why is PW-1 ranked here?"`
+orchestrator-ask:
+	cd orchestrator-agent && \
+	  ( [ -d .venv ] || python3.12 -m venv .venv ) && \
+	  .venv/bin/pip install -q -r requirements.txt && \
+	  .venv/bin/python -m orchestrator_agent ask "$(QUESTION)"
+
+## Interactive Q&A session -- run this one directly, not through a pipe.
+orchestrator-chat:
+	cd orchestrator-agent && \
+	  ( [ -d .venv ] || python3.12 -m venv .venv ) && \
+	  .venv/bin/pip install -q -r requirements.txt && \
+	  .venv/bin/python -m orchestrator_agent chat
+
+orchestrator-test:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r orchestrator-agent/requirements-dev.txt && PYTHONPATH=orchestrator-agent:rationale python -m pytest orchestrator-agent/tests/ -q"
+
+orchestrator-lint:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r orchestrator-agent/requirements-dev.txt && python -m ruff check --config orchestrator-agent/ruff.toml orchestrator-agent/"
+
+orchestrator-typecheck:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r orchestrator-agent/requirements-dev.txt && python -m mypy --config-file orchestrator-agent/mypy.ini orchestrator-agent"
+
+orchestrator-check: orchestrator-test orchestrator-lint orchestrator-typecheck
+
 ## --- Everything ---
 
 dataset-test:
 	docker compose run --rm loader pytest tests/ -v
 
-test: dataset-test retrieval-test
+test: dataset-test retrieval-test rationale-test
 
 # Scoped to db + pgadmin's own named volumes only -- this project also owns
 # oxigraph_data, which a blanket `docker compose down -v` would remove too.

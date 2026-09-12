@@ -82,3 +82,10 @@ To score a hospital-day's whole cohort:
 ```bash
 python -m capacity_agent --hospital 9001 --as-of-date 2026-08-30 --run-id run-0001
 ```
+
+From the repo root, collaborators can run the same job through the root `Makefile` without setting up
+a local Python environment:
+
+```bash
+make capacity-run HOSPITAL=9001 AS_OF=2026-08-30 RUN_ID=run-0001
+```

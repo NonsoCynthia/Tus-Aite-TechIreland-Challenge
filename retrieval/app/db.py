@@ -444,6 +444,7 @@ def get_cohort(hospital_hipe: str, as_of_date: date) -> list[dict[str, Any]]:
             SELECT
                 rd.hospital_hipe, rd.pathway_number, rd.specialty_hipe,
                 rd.referral_date, rd.referral_received_date, rd.triage_status,
+                current_state.valid_from AS referral_state_valid_from,
                 rd.days_since_referral, rd.days_since_received,
                 rd.days_awaiting_triage, rd.adjusted_wait_days,
                 te.triage_category AS cpc,
@@ -456,6 +457,47 @@ def get_cohort(hospital_hipe: str, as_of_date: date) -> list[dict[str, Any]]:
                     AND (rd.suspension_end_date IS NULL OR rd.suspension_end_date > rd.as_of_date)
                 ) AS currently_suspended
             FROM core.referral_daily rd
+            JOIN LATERAL (
+                SELECT marked.as_of_date AS valid_from
+                FROM (
+                    SELECT
+                        previous.as_of_date,
+                        (
+                            previous.triage_status,
+                            previous.triage_event_id,
+                            previous.appointment_date,
+                            previous.arrived_date,
+                            previous.last_cancellation_date,
+                            previous.suspension_start_date,
+                            previous.suspension_end_date,
+                            previous.removal_date,
+                            previous.high_clinical_or_social_needs,
+                            previous.specialty_hipe
+                        ) AS cur,
+                        lag((
+                            previous.triage_status,
+                            previous.triage_event_id,
+                            previous.appointment_date,
+                            previous.arrived_date,
+                            previous.last_cancellation_date,
+                            previous.suspension_start_date,
+                            previous.suspension_end_date,
+                            previous.removal_date,
+                            previous.high_clinical_or_social_needs,
+                            previous.specialty_hipe
+                        )) OVER (
+                            PARTITION BY previous.hospital_hipe, previous.pathway_number
+                            ORDER BY previous.as_of_date
+                        ) AS prev
+                    FROM core.referral_daily previous
+                    WHERE previous.hospital_hipe = rd.hospital_hipe
+                        AND previous.pathway_number = rd.pathway_number
+                        AND previous.as_of_date <= rd.as_of_date
+                ) marked
+                WHERE marked.cur IS DISTINCT FROM marked.prev
+                ORDER BY marked.as_of_date DESC
+                LIMIT 1
+            ) current_state ON TRUE
             LEFT JOIN core.triage_events te ON te.triage_event_id = rd.triage_event_id
             LEFT JOIN core.ref_codes rc
                 ON rc.code_table = 'triage_category' AND rc.code_value = te.triage_category::text

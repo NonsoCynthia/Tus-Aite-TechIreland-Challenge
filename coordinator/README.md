@@ -45,6 +45,17 @@ python -m coordinator \
   --dry-run
 ```
 
+Collaborators can run the posted-decision path through the root `Makefile` without setting up a local
+Python environment:
+
+```bash
+make coordinator-run \
+  HOSPITAL=9001 \
+  AS_OF=2026-08-30 \
+  RUN_ID=run-0001 \
+  CAPACITY_DIRECTION=pressure
+```
+
 `--capacity-direction` is **required, with no default**, and the CLI refuses to start without it.
 `capacity_score` is a 0-1 float whose direction (does 1.0 mean "most capacity free" or "maximum
 pressure"?) is a choice, not a law of nature -- read backwards, the whole system's behaviour under
@@ -92,6 +103,18 @@ All four documented `POST /decisions` responses are handled distinctly: `200` ok
 committed but the graph projection failed -- reported as a **distinct, non-zero exit code**, never
 as success; `400` Postgres rejected the payload; `422` validation failed before either store was
 touched.
+
+## Rationale Layer Change
+
+The coordinator now uses `referral_state_valid_from` from `GET /hospitals/.../cohort/...` when building
+`referral_state` citations for the timeframe rationale. It no longer uses `referral_date` for that
+citation.
+
+The reason is graph identity: a `ReferralState` node is named as
+`referral-state/{hospital_hipe}/{pathway_number}/{valid_from}`. `referral_date` is the date the
+referral was made; it may not be the date the current waiting-list state began. Using
+`referral_state_valid_from` means rationale can dereference the exact state node cited by the ranked
+placement.
 
 ## Things this README needs you to know before you trust any output
 
