@@ -44,3 +44,12 @@ Four ADRs were added building it, two of them open and neither this track's to c
 
 ADR-005 (score the most recent observation) and ADR-006 (normalise through escalation breakpoints,
 not linearly) are accepted; ADR-006 is pending a distribution check against real data.
+
+**2026-09-12:** the rationale layer (merged separately, `rationale/`) gained an `llm` render
+engine (`rationale/llm_render.py`, ADR-010) — OpenAI Agents SDK, evidence-faithfulness enforced
+in code via a citation-IRI guardrail, additive alongside the existing deterministic default. On
+top of that, `orchestrator-agent/` adds a genuine tool-calling agent that runs the fixed
+urgency → capacity → coordinator → rationale sequence end to end and narrates the result
+(ADR-011) — its tools only trigger the existing packages' own `make *-run` targets or read what
+they already wrote, never computing a score or inventing a citation itself. Both verified against
+real OpenAI calls, not just mocked.

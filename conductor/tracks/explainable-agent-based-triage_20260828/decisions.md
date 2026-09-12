@@ -529,3 +529,71 @@ Engine" section, are the record of the deviation and why. The deterministic engi
 remains the default specifically so the `llm` engine can be treated as additive
 and optional, not a hard dependency for anyone running the demo without an OpenAI
 key.
+
+---
+
+### ADR-011: The orchestrator agent executes a fixed sequence, it does not discover one
+
+**Date:** 2026-09-12
+**Status:** accepted
+
+**Context:** Team brainstorm (recorded informally, not in this file until now) considered
+converting `urgency-agent`/`capacity-agent`/`coordinator` into tools an LLM agent calls
+"sequentially based on the agent's decision." Worth recording precisely what was built and
+what was deliberately rejected from that framing, since the difference is the whole reason
+this is safe to add on top of every determinism guarantee this track has already recorded
+(ADR-002 onward).
+
+**The problem with "the agent decides the sequence":** there is no real decision to make.
+`coordinator-run` needs both `agent.agent_scores` rows to exist first (`coordinating-agent
+_20260906` ADR-008 excludes any referral missing an urgency score rather than defaulting
+it) — the dependency is structural, not a judgement call. An LLM "choosing" urgency before
+capacity before coordinator is not exercising agency, it is executing the only order that
+works, with an added risk the model chooses wrong and nothing catches it. Spending an
+LLM's "agentic" credibility there, rather than somewhere a real choice exists, was the
+wrong trade for the compliance story every prior ADR in this file has been building.
+
+**Decision:** `orchestrator-agent/` implements a genuine OpenAI Agents SDK tool-calling
+loop (`agent.py`, `run.py`), but its system prompt (`agent.py::INSTRUCTIONS`) states the
+pipeline order explicitly and instructs the model never to reorder or skip a step. The
+agent's actual contribution is real work a fixed script would do worse:
+
+- One conversational entry point instead of four manual commands.
+- Turning each step's raw CLI output — paediatric exclusions, missing-evidence skips, a
+  `207` partial failure — into a plain-language summary, rather than a log line a human
+  has to go read.
+- The rationale step itself (`generate_rationale`, calling `rationale.llm_render`,
+  ADR-010) — genuinely LLM-authored prose, not template rendering.
+
+**The same bound every tool in this system already respects:** each of the four tools
+(`run_urgency_agent`/`run_capacity_agent`/`run_coordinator`/`generate_rationale`,
+`orchestrator-agent/orchestrator_agent/tools.py`) either *triggers* one of the existing
+deterministic packages exactly as its own CLI already runs it (shelling out to the root
+Makefile's `*-run` targets, unchanged — no duplicated execution logic), or *reads* what a
+package already wrote, via `rationale`'s already citation-IRI-guardrailed renderer. No
+tool lets the model compute a score, reorder a ranking, or invent a citation.
+
+**Relationship to `orchestrator/`+`web/` (branch `ui`, not yet merged):** that pipeline
+also runs urgency → capacity → coordinator, composed directly from each package's public
+functions (`orchestrator/app/runner.py`) — no LLM, no agent loop, built for the demo UI's
+own progress bar and error handling. `orchestrator-agent/` is deliberately named
+differently and does not touch that branch or its code: it is a second, complementary way
+to run the same pipeline — conversational and narrated instead of a UI progress bar — not
+a replacement. Both call the same underlying `make *-run` targets/packages; neither
+depends on the other.
+
+**Verified against a real OpenAI call, not just mocked:** ran the full agent with
+`subprocess.run` and `generate_rationale` faked to return realistic CLI output (no live
+infra touched, so this only tests the model's tool-selection behaviour, not the
+deterministic packages themselves — those are already verified elsewhere). The model
+independently produced the correct four-call sequence in order, and a final narrative
+that correctly stated "decision support only... clinical sign-off is required" without
+that exact phrase appearing in any tool output — confirming the instructions constrain
+the model's own summary, not just which tools it calls.
+
+**Trade-off accepted:** the trigger tools' `_MAKE_TIMEOUT_SECONDS` is 900s per step,
+since `make *-run` builds a fresh container and reinstalls dependencies on every
+invocation (unchanged from how a human already runs it) — a full pipeline run through
+this agent is therefore slower than calling each package directly in-process would be.
+Accepted because it reuses infrastructure the team already owns and maintains rather
+than this track inventing a second execution path for the same three packages.

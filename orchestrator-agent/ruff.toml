@@ -1,0 +1,15 @@
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "I", "UP"]
+
+[lint.isort]
+# tests import both this package and `rationale` (a sibling package this one
+# depends on at runtime, not a third-party dependency) -- without this,
+# ruff's known-first-party auto-detection gives a different (and differently
+# "correct") import order depending on whether it's invoked from inside this
+# directory or pointed at it from the repo root (as the root Makefile's
+# orchestrator-lint target does), which is exactly the ambiguity this
+# setting removes.
+known-first-party = ["orchestrator_agent", "rationale"]
