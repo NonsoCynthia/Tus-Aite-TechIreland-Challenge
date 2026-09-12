@@ -19,6 +19,7 @@ PATHWAY ?=
 DEMO_PATHWAY ?= PW-$(HOSPITAL)-000007
 CAPACITY_DIRECTION ?= pressure
 RATIONALE_STYLE ?= technical
+RATIONALE_ENGINE ?= deterministic
 
 .PHONY: up down build migrate seed fetch load generate calibrate verify \
         kg-views retrieval-build retrieval-test retrieval-lint retrieval-typecheck \
@@ -131,7 +132,8 @@ rationale-run:
 		--hospital $(HOSPITAL) \
 		--as-of $(AS_OF) \
 		$(if $(PATHWAY),--pathway $(PATHWAY),) \
-		--style $(RATIONALE_STYLE)
+		--style $(RATIONALE_STYLE) \
+		--engine $(RATIONALE_ENGINE)
 
 rationale-test:
 	docker run --rm \
@@ -161,7 +163,8 @@ demo-run: urgency-run capacity-run coordinator-run
 		HOSPITAL=$(HOSPITAL) \
 		AS_OF=$(AS_OF) \
 		PATHWAY=$(if $(PATHWAY),$(PATHWAY),$(DEMO_PATHWAY)) \
-		RATIONALE_STYLE=$(RATIONALE_STYLE)
+		RATIONALE_STYLE=$(RATIONALE_STYLE) \
+		RATIONALE_ENGINE=$(RATIONALE_ENGINE)
 
 ## --- Everything ---
 

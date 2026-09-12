@@ -116,6 +116,8 @@ services:
     environment:
       RETRIEVAL_BASE_URL: http://retrieval:8000
       RETRIEVAL_BEARER_TOKENS: ${RETRIEVAL_BEARER_TOKENS}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
     depends_on:
       retrieval:
         condition: service_started
@@ -138,6 +140,8 @@ services:
     environment:
       RETRIEVAL_BASE_URL: http://retrieval:8000
       RETRIEVAL_BEARER_TOKENS: ${RETRIEVAL_BEARER_TOKENS}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
     ports:
       - "${RATIONALE_PORT:-8010}:8010"
     depends_on:

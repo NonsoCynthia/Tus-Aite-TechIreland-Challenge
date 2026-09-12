@@ -31,12 +31,19 @@ def _load_dotenv(path: Path) -> None:
         os.environ.setdefault(key, value)
 
 
+DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
+
+
 @dataclass(frozen=True)
 class Settings:
-    """Configuration needed to call the retrieval service."""
+    """Configuration needed to call the retrieval service, plus the `llm`
+    render engine's OpenAI credentials (unused, and not required, by the
+    default `deterministic` engine -- see llm_render.py)."""
 
     retrieval_base_url: str
     bearer_token: str
+    openai_api_key: str | None = None
+    openai_model: str = DEFAULT_OPENAI_MODEL
 
 
 def load_settings() -> Settings:
@@ -57,4 +64,13 @@ def load_settings() -> Settings:
     token = os.environ.get("RETRIEVAL_BEARER_TOKENS", "").split(",")[0].strip()
     if not token:
         raise RuntimeError("RETRIEVAL_BEARER_TOKENS is not set in the environment or root .env")
-    return Settings(retrieval_base_url=base_url, bearer_token=token)
+
+    openai_api_key = os.environ.get("OPENAI_API_KEY", "").strip() or None
+    openai_model = os.environ.get("OPENAI_MODEL", "").strip() or DEFAULT_OPENAI_MODEL
+
+    return Settings(
+        retrieval_base_url=base_url,
+        bearer_token=token,
+        openai_api_key=openai_api_key,
+        openai_model=openai_model,
+    )

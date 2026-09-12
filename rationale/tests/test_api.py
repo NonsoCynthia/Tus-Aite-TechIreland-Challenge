@@ -3,6 +3,8 @@ from fastapi.testclient import TestClient
 
 from rationale.app import main
 from rationale.config import Settings
+from rationale.llm_render import RationaleGuardrailError
+from rationale.models import Rationale
 
 
 class FakeClient:
@@ -79,3 +81,53 @@ def test_rationale_endpoint_supports_technical_style() -> None:
     assert body["style"] == "technical"
     assert "Urgency evidence:" in body["text"]
     assert "score/run-1/9001/PW-9001-000007/urgency" in body["text"]
+
+
+def test_rationale_endpoint_engine_llm_calls_the_llm_renderer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_render_rationale_llm(pack: object, *, style: str, settings: object) -> Rationale:
+        captured["pack"] = pack
+        captured["style"] = style
+        return Rationale(pathway_number="PW-9001-000007", text="llm text", citation_iris=("x",))
+
+    monkeypatch.setattr(main, "render_rationale_llm", fake_render_rationale_llm)
+
+    response = TestClient(main.app).get(
+        "/rationale/9001/2026-08-30/PW-9001-000007?engine=llm"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["engine"] == "llm"
+    assert body["text"] == "llm text"
+    assert captured["style"] == "clinician"
+
+
+def test_rationale_endpoint_engine_llm_maps_guardrail_failure_to_503(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_render_rationale_llm(pack: object, *, style: str, settings: object) -> Rationale:
+        raise RationaleGuardrailError("citation_iris does not match")
+
+    monkeypatch.setattr(main, "render_rationale_llm", fake_render_rationale_llm)
+
+    response = TestClient(main.app).get(
+        "/rationale/9001/2026-08-30/PW-9001-000007?engine=llm"
+    )
+
+    assert response.status_code == 503
+    assert "citation_iris" in response.json()["detail"]
+
+
+def test_rationale_endpoint_engine_llm_without_api_key_is_500() -> None:
+    response = TestClient(main.app).get(
+        "/rationale/9001/2026-08-30/PW-9001-000007?engine=llm"
+    )
+
+    # fake_dependencies' Settings carries no openai_api_key -- the real
+    # render_rationale_llm (not mocked here) raises RuntimeError for that.
+    assert response.status_code == 500
+    assert "OPENAI_API_KEY" in response.json()["detail"]
