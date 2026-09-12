@@ -1,0 +1,55 @@
+/* The disclosure. Rationale for the OBJECT lives in Aside.tsx. Two guarantees:
+   1. IT CANNOT WIDEN ITS PARENT. A flex or grid item's automatic minimum size is
+      its CONTENT, not zero, so a caller's `flex: 1 0 100%` sets the basis and
+      nothing else; hence max-width: 100% on the body, min-width: 0 on the root.
+   2. NOTHING HERE IS POSITIONED and nothing overlays -- this product has no
+      reliable containing block (Aside.tsx). */
+
+.aside { min-width: 0; }
+
+/* The line that stays. The CALLER owns its typography, so this rule only kills
+   the <p> margin the caller is not expecting to have to kill. */
+.aside-s { margin: 0; }
+
+/* --- the toggle. TARGET SIZE: WCAG 2.2 SC 2.5.8 (Minimum, AA) is 24x24 CSS px,
+   a literal and not --d5, which is the same 24px but a SPACING step -- tying a
+   hit area to a gutter breaks when the spacing scale is re-rhythmed.
+   THE LINE BOX MUST NOT GROW, or the control reflows every line it sits on. An
+   inline-flex box is an atomic inline, so its MARGIN box is what the line
+   measures: the negative block margin is half the difference between the
+   button's line box and its border box, DERIVED rather than typed. */
+.aside-t {
+  display: inline-flex; align-items: center; gap: var(--d1);
+  min-height: 24px; padding: 0 var(--d2);
+  margin-block: -3px; /* exact at 12px prose; superseded on every engine with */
+  margin-block: calc((1.5em - max(24px, 1.5em + 2px)) / 2); /* CSS max() */
+  font: inherit; line-height: 1.5; color: var(--text-2);
+  background: none;
+  border: 1px solid var(--rule-firm); border-radius: var(--radius);
+  cursor: pointer;
+}
+/* The affordance is the border and the glyph, both present at rest: a control
+   that only looks like a control on hover is a mouse-only control. */
+.aside-t:hover { color: var(--text); border-color: var(--text-3); }
+/* Restated so it survives a future :focus-visible reset. `outline-offset` is
+   safe here: Aside.tsx bars this component from the table that clips outlines. */
+.aside-t:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Sized in em so the glyph tracks the prose it sits in; flex: none so a long
+   label never squeezes it. */
+.aside-i { width: 1.1em; height: 1.1em; flex: none; }
+
+/* --- the revealed half. In the DOM at all times; `hidden` takes it out of the
+   accessibility tree, find-in-page and the tab order. The rule below is the
+   explicit guard: a class-level `display` here would silently beat the UA's
+   `[hidden] { display: none }` and the disclosure would never close. */
+.aside-b[hidden] { display: none; }
+.aside-b {
+  max-width: 100%; min-width: 0;
+  margin-top: var(--d1);
+  padding-left: var(--d2); border-left: 1px solid var(--rule-firm);
+  /* the widening guard's other half: a URL in the revealed text breaks rather
+     than pushing the column out */
+  overflow-wrap: break-word;
+}
+.aside-b > :first-child { margin-top: 0; }
+.aside-b > :last-child { margin-bottom: 0; }

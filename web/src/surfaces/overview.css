@@ -1,0 +1,390 @@
+/* The hospital overview. An instrument panel, not a document: no gradient, glow
+   or drop shadow, depth is a hairline and a flat fill, every colour a token.
+   Three reservations held strictly -- --cat-* is triage and GAR only, so bars,
+   meters and sparklines are neutral; clay marks ONE element (.is-cited, the
+   session the capacity agent read); and severity is never drawn here, only
+   positioned -- every attention state renders through <SevChip> / <SevBar>. */
+
+.ov { display: grid; gap: var(--d5); align-content: start; }
+
+/* --- header --------------------------------------------------------------- */
+.ov-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--d5); flex-wrap: wrap;
+  padding-bottom: var(--d3); border-bottom: 1px solid var(--rule-firm);
+}
+.ov-head h1 { margin-top: 3px; }
+.ov-head-meta {
+  display: flex; gap: var(--d4); flex-wrap: wrap;
+  font-size: var(--t-small); color: var(--text-2);
+}
+.ov-head-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.ov-head-meta svg { color: var(--text-3); flex: none; }
+
+/* --- the severity primitives, positioned. Colour, weight and fill are the
+   contract's; only layout is set here. */
+.ov .sev svg { align-self: center; flex: none; }
+.ov .sev .ov-ro-u, .ov .sev .ov-mini-u { color: inherit; }
+.ov-inline .sevbar { flex: 1 1 auto; }
+
+/* --- reconciliation. Quiet while two independent counts agree; sev-4 the
+   moment they do not, because a clinician can act on a bad number. */
+.ov-recon {
+  display: flex; align-items: center; gap: var(--d2); flex-wrap: wrap;
+  margin: 0; font-size: var(--t-micro); color: var(--text-3);
+}
+.ov-recon svg { flex: none; }
+.ov-recon.is-broken {
+  align-items: flex-start; gap: var(--d3);
+  padding: var(--d3) var(--d4); background: var(--bg-sunk);
+  border: 1px solid var(--rule-firm);
+  box-shadow: inset 3px 0 0 var(--sev-4-bg);
+  font-size: var(--t-small); color: var(--text);
+}
+.ov-recon-b { display: grid; gap: 3px; min-width: 0; }
+.ov-recon-n { font-size: var(--t-micro); color: var(--text-2); }
+
+/* --- the day the figures were taken on. A ward snapshot and a clinic session
+   carry their own date; when it is not the day selected, it is the sev-4 mark. */
+.ov-asof {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin: 0 0 var(--d3); font-size: var(--t-micro); color: var(--text-3);
+}
+.ov-asof svg { flex: none; }
+.ov-asof.is-off {
+  align-items: flex-start; gap: var(--d2);
+  padding: var(--d2) var(--d3); background: var(--bg-sunk);
+  border: 1px solid var(--rule-firm);
+  box-shadow: inset 3px 0 0 var(--sev-4-bg);
+  font-size: var(--t-small); color: var(--text);
+}
+.ov-asof.is-off > span { min-width: 0; }
+/* Takes the rest of the row rather than shrinking to its longest line: the
+   revealed half is longer, so shrink-to-fit sets the column from the wrong one. */
+.ov-asof.is-off > .aside { flex: 1 1 auto; }
+
+/* --- before anything has been ranked. A 404 from /api/decision is the ordinary
+   state, not a failure, so this reads as a step not taken, never as an alarm. */
+.ov-before {
+  padding: var(--d3) var(--d4) var(--d4);
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-firm);
+}
+.ov-before-h {
+  display: flex; align-items: center; gap: var(--d2);
+  font-size: var(--t-section); margin-bottom: var(--d2);
+}
+.ov-before-h svg { flex: none; color: var(--text-3); }
+.ov-before p { margin: 0; font-size: var(--t-small); color: var(--text-2); max-width: 88ch; }
+.ov-before p.ov-before-cta {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  margin-top: var(--d3); color: var(--text); font-weight: 550;
+}
+.ov-before-cta svg { flex: none; align-self: center; }
+
+/* --- the key. <SevLegend> is imported, not redrawn, so the swatches ARE the
+   marks. It sets no margins by contract; --d3 here, not the --d5 between panels,
+   because a key belongs to what follows it. No ground, no border. */
+.ov-key { display: grid; gap: var(--d3); }
+
+/* --- the readout band -----------------------------------------------------
+   One hairline grid, no cards. The band fills the column at any width. */
+.ov-band {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  /* NOT the gap:1px-over-a-rule-background trick: a partial last row renders its
+     empty cells as a solid grey block. Hairlines live on the children. */
+  gap: 0; background: var(--surface); border: 1px solid var(--rule);
+}
+.ov-ro {
+  background: var(--surface); padding: var(--d3) var(--d4) var(--d4); min-width: 0;
+  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+}
+.ov-ro-k { display: flex; align-items: center; gap: 5px; }
+.ov-ro-k svg { flex: none; color: var(--text-3); }
+.ov-ro-v {
+  font-family: var(--font-brand); font-weight: 300; font-size: 27px;
+  line-height: 1.1; margin-top: 5px; color: var(--text);
+}
+.ov-ro-u { font-size: var(--t-small); font-family: var(--font-data); color: var(--text-2); }
+.ov-ro-n { font-size: var(--t-micro); color: var(--text-2); margin-top: 5px; line-height: 1.45; }
+
+/* --- layout. By specialty carries nine data columns and clips at two thirds of
+   the width, so it takes the full width. */
+.ov-cols {
+  display: grid; gap: var(--d4);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+.ov-thirds {
+  display: grid; gap: var(--d4);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  /* no align-items: start. .ov-panel is a column flex whose body grows, so the
+     panels stretch to a shared bottom edge. That edge is only affordable because
+     every panel on the row is bounded -- see .ov-rules. */
+}
+@media (max-width: 1180px) { .ov-cols { grid-template-columns: minmax(0, 1fr); } }
+
+/* --- panel ---------------------------------------------------------------- */
+.ov-panel {
+  background: var(--surface); border: 1px solid var(--rule);
+  display: flex; flex-direction: column; min-width: 0;
+}
+.ov-panel-h {
+  display: flex; align-items: center; gap: var(--d2); flex-wrap: wrap;
+  font-size: var(--t-section); padding: var(--d3) var(--d4);
+  border-bottom: 1px solid var(--rule); background: var(--surface-2);
+}
+.ov-panel-h svg { flex: none; color: var(--text-3); }
+.ov-panel-note {
+  font-family: var(--font-data); font-size: var(--t-small);
+  color: var(--text-3); font-weight: 400; margin-left: auto;
+}
+.ov-panel-b { padding: var(--d4); min-width: 0; flex: 1 1 auto; }
+/* Full bleed sideways always, flush to the panel head only when nothing
+   precedes it -- and the ward and clinic panels state their date first. */
+.ov-panel-b > .scroll-x {
+  margin-left: calc(var(--d4) * -1); margin-right: calc(var(--d4) * -1);
+}
+.ov-panel-b > .scroll-x:first-child { margin-top: calc(var(--d4) * -1); }
+.ov-panel-b > .scroll-x:last-child { margin-bottom: calc(var(--d4) * -1); }
+
+/* A caption, not a paragraph: where a number came from and what it may not do. */
+.ov-cite {
+  font-size: var(--t-micro); line-height: 1.5; color: var(--text-3);
+  padding: var(--d2) var(--d4) var(--d3);
+  border-top: 1px solid var(--rule); background: var(--bg-sunk);
+}
+/* NO RULE FOR THE CAPTION'S DISCLOSURE, deliberately: .ov-cite is 11px at
+   line-height 1.5, the geometry .aside-t derives its cancelling margin from. */
+
+.ov-quiet { font-size: var(--t-small); color: var(--text-2); margin: var(--d3) 0 0; }
+
+/* --- tables ---------------------------------------------------------------
+   The house table: sunk uppercase head, hairline rows, tabular numerals. */
+.ov-t { width: 100%; border-collapse: collapse; background: var(--surface); }
+.ov-t th {
+  text-align: left; font-size: var(--t-micro); letter-spacing: var(--track-lab);
+  text-transform: uppercase; color: var(--text-3); font-weight: 600;
+  padding: var(--d2) var(--d3); border-bottom: 1px solid var(--rule-firm);
+  background: var(--bg-sunk); white-space: nowrap;
+}
+.ov-t td {
+  padding: var(--d2) var(--d3); border-bottom: 1px solid var(--rule);
+  font-size: var(--t-small); vertical-align: middle; white-space: nowrap;
+}
+.ov-t tbody tr:hover { background: var(--surface-2); }
+.ov-t th:first-child, .ov-t td:first-child { padding-left: var(--d4); }
+.ov-t th:last-child, .ov-t td:last-child { padding-right: var(--d4); }
+.ov-t .c-n, .ov-t th.c-n { text-align: right; }
+/* whose number this is, under the column name: the agent's working is
+   labelled as the agent's, never left to look like a measurement */
+.ov-th-sub {
+  display: block; font-weight: 400; letter-spacing: 0;
+  text-transform: none; color: var(--text-3);
+}
+.ov-t .c-bar { min-width: 132px; }
+.ov-t .c-name { color: var(--text); font-weight: 550; white-space: normal; }
+.ov-t .c-dim { color: var(--text-3); }
+/* A list cell. Without this it INHERITS the nowrap above, and one ward backing
+   six specialties runs ~600px on a single unbreakable line. */
+.ov-t .c-wrap { white-space: normal; min-width: 140px; max-width: 240px; }
+.ov-t tfoot td {
+  border-top: 1px solid var(--rule-firm); border-bottom: 0;
+  background: var(--bg-sunk); color: var(--text-2); font-weight: 550;
+}
+/* A sentence, not a figure. td is nowrap for the numbers above, and a long foot
+   left nowrap does not overflow -- it WIDENS the table. */
+.ov-t tfoot td.ov-foot-wrap { white-space: normal; min-width: 320px; }
+.ov-of { color: var(--text-3); font-weight: 400; }
+.ov-none { color: var(--text-3); }
+.ov-sub {
+  display: block; font-size: var(--t-micro); color: var(--text-3);
+  font-weight: 400; white-space: normal;
+}
+/* The cited session's date, at --t-small rather than .ov-sub's --t-micro: it is
+   the value this line carries, not an annotation on something larger. */
+.ov-cited-on {
+  display: block; margin-top: 3px; font-size: var(--t-small);
+  color: var(--text-3); font-weight: 400; white-space: normal;
+}
+
+/* --- the neutral bar. the number always sits beside it. ------------------- */
+.ov-bar {
+  display: block; position: relative; height: 8px; min-width: 40px;
+  background: var(--bg-sunk); border: 1px solid var(--rule); flex: 1 1 auto;
+}
+.ov-bar-f { display: block; height: 100%; background: var(--text-3); }
+.ov-inline { display: flex; align-items: center; gap: var(--d2); }
+.ov-inline-n { color: var(--text-2); min-width: 34px; text-align: right; }
+
+/* --- against the national picture ---------------------------------------- */
+.ov-nat { display: grid; gap: var(--d3); }
+.ov-nat-row {
+  display: grid; gap: 3px; padding-bottom: var(--d3);
+  border-bottom: 1px solid var(--rule);
+}
+.ov-nat-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.ov-nat-k { font-size: var(--t-small); font-weight: 550; color: var(--text); }
+.ov-nat-pair { display: grid; gap: 3px; }
+.ov-nat-line { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; align-items: center; gap: var(--d2); }
+.ov-nat-w { font-size: var(--t-micro); color: var(--text-3); }
+.ov-nat-line.is-nat .ov-bar-f { background: var(--rule-firm); }
+.ov-nat-n { font-size: var(--t-micro); color: var(--text-2); white-space: nowrap; }
+.ov-nat-d { font-size: var(--t-micro); color: var(--text-2); }
+
+/* --- intake. A column per day. At 60 days a no-wrap flex row leaves 3.8px per
+   column, so the columns hold a floor width and the series scrolls past it. */
+.ov-intake-lead {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  font-size: var(--t-small); color: var(--text-2); margin-bottom: var(--d4);
+}
+.ov-fig { font-family: var(--font-brand); font-size: 24px; font-weight: 300; color: var(--text); }
+.ov-arrow { color: var(--text-3); }
+.ov-intake-net {
+  font-size: var(--t-body); font-weight: 600; color: var(--text);
+  padding-left: var(--d2); margin-left: var(--d1); border-left: 1px solid var(--rule-firm);
+}
+.ov-chart-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
+.ov-cols-chart { display: flex; align-items: flex-end; gap: 3px; min-width: min-content; }
+/* 26px floor: "+12" in tabular figures at --t-small is ~21px, and a floor that
+   does not clear the widest label the series can produce lets the ellipsis eat
+   the value. The chart scrolls, so a wider floor costs scroll, not a number. */
+.ov-col { flex: 1 1 0; min-width: 26px; display: grid; gap: 3px; justify-items: center; }
+/* the count added that day is a value, so --t-small: --t-micro is the annotation
+   step (tokens.css) */
+.ov-col-n {
+  font-size: var(--t-small); color: var(--text-2); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.ov-col-track {
+  display: flex; align-items: flex-end; justify-content: center;
+  width: 100%; height: 58px; background: var(--bg-sunk);
+  border-bottom: 1px solid var(--rule-firm);
+}
+.ov-col-track i { display: block; width: 100%; background: var(--text-3); min-height: 1px; }
+/* The day of the month is a value, so --t-small. No thinning to every third
+   day: two tabular digits are ~14px inside the 26px column floor. */
+.ov-col-k {
+  font-size: var(--t-small); color: var(--text-3); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.ov-col.is-on .ov-col-track i { background: var(--text); }
+.ov-col.is-on .ov-col-n { color: var(--text); font-weight: 600; }
+
+/* --- staleness ------------------------------------------------------------ */
+.ov-mini {
+  /* hairlines on the children, not gap-over-a-rule-background: a partial
+     last row must be quiet surface, never a painted grey cell. */
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+  gap: 0; background: var(--surface); border: 1px solid var(--rule);
+  margin-bottom: var(--d4);
+}
+.ov-mini-i {
+  background: var(--surface); padding: var(--d2) var(--d3);
+  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+}
+.ov-mini-v {
+  font-family: var(--font-brand); font-size: 19px; font-weight: 300;
+  line-height: 1.15; color: var(--text);
+}
+.ov-mini-u { font-size: var(--t-small); font-family: var(--font-data); color: var(--text-3); }
+.ov-hist { display: grid; gap: 5px; }
+.ov-hist-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 38px; align-items: center; gap: var(--d2); }
+.ov-hist-k { font-size: var(--t-micro); color: var(--text-2); }
+.ov-hist-n { font-size: var(--t-small); color: var(--text); text-align: right; }
+/* the year boundary is a rule as well as a step on the scale */
+.ov-hist-row.is-past-year { border-top: 1px solid var(--rule-firm); padding-top: 5px; }
+.ov-hist-row.is-past-year + .ov-hist-row.is-past-year { border-top: 0; padding-top: 0; }
+.ov-hist-mark { font-size: var(--t-micro); color: var(--text-3); margin-top: 3px; }
+
+/* --- rules. Bounded: the three panels on this row share a bottom edge, so an
+   unbounded list hands the two beside it hundreds of pixels of blank paper. */
+.ov-rules {
+  display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+  max-height: 480px; overflow-y: auto; overscroll-behavior-y: contain;
+}
+.ov-rule { background: var(--surface); padding: var(--d2) var(--d3); display: grid; gap: 2px; }
+.ov-rule-top { display: flex; align-items: center; justify-content: space-between; gap: var(--d2); }
+.ov-rule-id { font-size: var(--t-micro); font-weight: 600; color: var(--text); }
+.ov-rule-st { font-size: var(--t-small); color: var(--text-2); line-height: 1.4; }
+.ov-rule-m { font-size: var(--t-micro); color: var(--text-3); }
+/* "holds" and "no verdict" are quiet pills. A breach is not drawn here at all:
+   it is a <SevChip> at sevBreach, on the one scale the whole product uses. */
+.ov-verdict {
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  font-size: var(--t-micro); padding: 2px var(--d2); border-radius: var(--radius-pill);
+}
+.ov-verdict.is-ok { color: var(--text-3); background: var(--surface-2); }
+.ov-verdict.is-none { color: var(--text-3); background: var(--surface-2); font-style: italic; }
+.ov-rule-foot {
+  font-size: var(--t-micro); color: var(--text-2); margin-top: var(--d3);
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+}
+.ov-rule-foot .num { color: var(--text); font-weight: 600; }
+.ov-link {
+  margin-left: auto; background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; color: var(--text); border-bottom: 1px solid var(--rule-firm);
+}
+.ov-link:hover { border-bottom-color: var(--text); }
+
+/* --- clinics: the sparkline, and the one row the agent read. The bars scroll
+   inside their own box because a 60-session series is 660px in a cell. */
+.ov-sess { display: inline-flex; align-items: flex-end; gap: 5px; max-width: 320px; }
+.ov-spark {
+  display: inline-flex; align-items: flex-end; gap: 2px; padding-bottom: 4px;
+  max-width: 220px; overflow-x: auto; overscroll-behavior-x: contain;
+}
+.ov-spark-c {
+  position: relative; display: flex; align-items: flex-end; flex: none;
+  width: 9px; height: 24px;
+  background: var(--bg-sunk); border-bottom: 1px solid var(--rule-firm);
+}
+/* a tick under one column and none under the others: a shape channel, so the
+   cited session does not depend on clay alone to be found */
+.ov-spark-c.is-cited::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -4px;
+  height: 2px; background: var(--accent);
+}
+.ov-spark-c i { display: block; width: 100%; background: var(--text-3); }
+/* THE accent. clay, once, for the session the capacity agent actually read. */
+.ov-spark-c.is-cited { border-bottom-color: var(--accent); }
+.ov-spark-c.is-cited i { background: var(--accent); }
+/* A value, so --t-small; nowrap so a two-date range cannot break across lines.
+   .ov-spark shrinks inside the 320px cell instead -- it already scrolls. */
+.ov-spark-k {
+  font-size: var(--t-small); color: var(--text-3); flex: none;
+  align-self: flex-end; white-space: nowrap;
+}
+.ov-cited-tag { color: var(--accent); font-weight: 600; }
+
+/* --- wards. Occupancy is graded against the 85% safe-operating line by
+   sevOccupancy, so the bar, its mark and the number's block are the contract's. */
+.ov-occ { display: grid; gap: 4px; min-width: 178px; }
+.ov-occ-n {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: var(--t-micro); color: var(--text);
+}
+.ov-occ-w { font-weight: 400; }
+/* TrolleyGAR as a bordered word, not a filled swatch: a green GAR swatch five
+   columns from an occupancy severity block is ONE hue under protanopia. The
+   status word carries the whole signal; --cat-* stays triage-only. */
+.ov-gar {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--t-micro); padding: 1px var(--d2);
+  border: 1px solid var(--rule-firm); border-radius: var(--radius);
+  color: var(--text-2);
+}
+.ov-gar i { display: none; }
+.ov-gar.is-A { color: var(--text); border-color: var(--text-3); }
+.ov-gar.is-R { color: var(--text); border-color: var(--text); font-weight: 600; }
+
+@media (max-width: 700px) {
+  .ov-nat-line { grid-template-columns: 56px minmax(0, 1fr); }
+  .ov-nat-n { grid-column: 2; text-align: right; }
+  .ov-panel-note { margin-left: 0; width: 100%; }
+}
+
+/* Intake is a narrow series; clinic capacity is a wide table. Pairing them at
+   1:2 lets both keep their natural width instead of one being starved. */
+.ov-pair { grid-template-columns: minmax(280px, 1fr) minmax(0, 2.2fr); }
+@media (max-width: 1180px) { .ov-pair { grid-template-columns: minmax(0, 1fr); } }

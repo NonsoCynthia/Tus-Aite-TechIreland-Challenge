@@ -1,0 +1,112 @@
+/* The severity scale. Values and rationale live in tokens.css; this file spends
+   them. The escalation is FILL AREA first: a hairline, a tint, then two solid
+   blocks whose text flips to paper. */
+
+.sev {
+  /* Load-bearing: .sev-sr is absolutely positioned, and with no positioned
+     ancestor its containing block is the VIEWPORT -- 189px of real horizontal
+     scroll inside a scrolled table. width:1px/overflow:hidden clips its TEXT,
+     never its POSITION. */
+  position: relative;
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 1px var(--d2); border-radius: var(--radius);
+  border: 1px solid transparent; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sev-1 { color: var(--sev-1-fg); background: var(--sev-1-bg); border-color: var(--sev-1-edge); }
+.sev-2 { color: var(--sev-2-fg); background: var(--sev-2-bg); border-color: var(--sev-2-edge); }
+.sev-3 { color: var(--sev-3-fg); background: var(--sev-3-bg); border-color: var(--sev-3-edge); }
+.sev-4 { color: var(--sev-4-fg); background: var(--sev-4-bg); border-color: var(--sev-4-edge); }
+
+/* Steps 3 and 4 share geometry and only 1.46:1 of lightness. Hue is reserved
+   for triage, so AREA is what separates them. */
+.sev-3, .sev-4 { font-weight: 600; }
+.sev-4 { padding: 2px var(--d3); }
+
+/* AREA, AND OUTWARD. An inset ring drawn in --sev-4-fg eats area rather than
+   adding it, and step 4 then reads lighter than step 3 (BUILD_LEDGER.md). An
+   outline takes part in no layout, so it survives the three surfaces that
+   override .sev's padding (.lst-table .sub .sev, .rule-chip > .sev, .pt-sub
+   .sev), which a padding-based escalation would not. If a chip is ever made
+   focusable, give the focus ring an outline-offset -- both want `outline`. */
+.sev-fill.sev-4 { outline: 2px solid var(--sev-4-bg); outline-offset: 0; }
+
+/* `quiet` withholds the fill at the top two steps, for a surface that already
+   has something louder to say. It escalates on ink instead. */
+.sev-quiet.sev-3 { color: var(--sev-2-fg); background: var(--sev-2-bg); border-color: var(--sev-3-bg); }
+.sev-quiet.sev-4 { color: var(--sev-4-bg); background: var(--sev-2-bg); border-color: var(--sev-4-bg); }
+
+/* The step word, for assistive technology only. Absolutely positioned with no
+   offsets, so it keeps its static position and takes none of .sev's gap. It DOES
+   push a scrollbar unless .sev is a containing block -- see the note there. */
+.sev-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+/* --- the bar ------------------------------------------------------------- */
+.sevbar {
+  position: relative; display: block; width: 100%; min-width: 40px;
+  background: var(--bg-sunk); border: 1px solid var(--rule);
+  overflow: hidden;
+}
+/* The bar's own ramp, NOT the chip's: the chip's steps 1 and 2 are a hairline
+   and a tint because they sit BEHIND text, and borrowing them ran the escalation
+   backwards. Against the track (--bg-sunk) this rises strictly: 1.55 / 2.68 /
+   5.41 / 8.01 / 10.23. On a dark ground steps 1 and 2 collapse into one, because
+   --sev-2-edge resolves there to exactly --clay; SevBar is light-only today. */
+.sevbar-f { position: absolute; inset: 0 auto 0 0; background: var(--rule-firm); }
+.sevbar[data-sev="1"] .sevbar-f { background: var(--sev-2-edge); }
+.sevbar[data-sev="2"] .sevbar-f { background: var(--clay); }
+.sevbar[data-sev="3"] .sevbar-f { background: var(--sev-3-bg); }
+.sevbar[data-sev="4"] .sevbar-f { background: var(--sev-4-bg); }
+/* THE THRESHOLD LINE takes the FOREGROUND OF WHATEVER IT SITS ON: one colour
+   over every step fades as the bar fills and vanishes on exactly the cases PAST
+   the line it marks. Steps 3 and 4 own a foreground token that inverts with the
+   ground, so one set of rules is right on both (BUILD_LEDGER.md).
+   WHICH GROUND, not which step: SevBar states the side in `data-on` and this
+   file reads it -- do not infer it from the step, which agrees only by
+   construction at three of the four call sites. */
+.sevbar-m {
+  position: absolute; top: -1px; bottom: -1px; width: 1px;
+  background: var(--text);
+}
+/* `left: 100%` puts the element at x in [W, W+1] of a box that clips at W, so a
+   line at the very end of the track is not faint -- it is ABSENT. That is every
+   referral still inside its target, where `of` is exactly 1.0. */
+.sevbar-m[data-on="fill"], .sevbar-m[data-at="end"] { transform: translateX(-1px); }
+.sevbar[data-sev="2"] .sevbar-m[data-on="fill"] { background: var(--paper); }
+.sevbar[data-sev="3"] .sevbar-m[data-on="fill"] { background: var(--sev-3-fg); }
+.sevbar[data-sev="4"] .sevbar-m[data-on="fill"] { background: var(--sev-4-fg); }
+
+/* --- the legend. A strip, not a panel: no ground and no border of its own, so
+   the swatches sit on the same surface as the marks they explain and no bordered
+   box competes with the table for the first look. Steps 1 and 2 are
+   near-invisible as fills by design -- the mark there is its edge and its word,
+   so the legend prints the word inside the swatch. Ratios: BUILD_LEDGER.md. */
+.sevleg {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--d1) var(--d3);
+}
+/* .lab's typography at --text-2, not --text-3, so the strip clears AA at 11px on
+   the sunk ground too (4.30 -> 5.99). */
+.sevleg .sevleg-t { color: var(--text-2); flex: none; }
+.sevleg-steps {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--d1) var(--d2);
+}
+.sevleg-steps li { display: inline-flex; }
+/* ONE flex item: the strip wraps, and a label that wraps away from the chip it
+   names becomes a label for the ladder before it. */
+.sevleg-g { display: inline-flex; align-items: baseline; gap: var(--d2); }
+/* --t-small, not --t-micro: these are words in their own case, and the strip
+   must be legible without pulling rank on the table. */
+.sevleg .sev { font-size: var(--t-small); }
+/* The caller owns an Aside's TYPOGRAPHY: aside.css sets none, by contract. The
+   12px and the 1.5 are also what .aside-t's target-size arithmetic is computed
+   against -- read aside.css before changing either. */
+.sevleg-n {
+  flex: 1 0 100%; margin: 0; max-width: 92ch;
+  font-size: var(--t-small); line-height: 1.5; color: var(--text-2);
+}

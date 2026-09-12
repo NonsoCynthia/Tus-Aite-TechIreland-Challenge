@@ -1,0 +1,156 @@
+/* The run overlay. Dark, because there is no clinical number on it to misread:
+   the data surfaces stay light. */
+
+.runlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: var(--bg); color: var(--text);
+  display: flex; flex-direction: column;
+  animation: runlay-in var(--t-base) var(--ease);
+}
+@keyframes runlay-in { from { opacity: 0 } to { opacity: 1 } }
+
+/* The border stays full-bleed; the CONTENTS share the body's measure, so the
+   heading starts where the readouts and lanes it introduces do. */
+.runlay-head {
+  border-bottom: 1px solid var(--rule);
+  padding: var(--d6) var(--d7) var(--d4);
+}
+.runlay-head-in {
+  display: flex; align-items: flex-start; gap: var(--d4);
+  max-width: 1100px; margin: 0 auto; width: 100%;
+}
+.runlay-t h1 { font-size: var(--t-hero); margin-top: var(--d1); }
+.runlay-x {
+  margin-left: auto; background: none; border: 1px solid var(--rule);
+  border-radius: var(--radius); color: var(--text-2);
+  width: 34px; height: 34px; display: grid; place-items: center; cursor: pointer;
+}
+.runlay-x:hover:not(:disabled) { color: var(--text); border-color: var(--rule-firm); }
+.runlay-x:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.runlay-body {
+  flex: 1 1 auto; overflow-y: auto;
+  padding: var(--d6) var(--d7) var(--d8);
+  display: grid; gap: var(--d6); align-content: start;
+  max-width: 1100px; width: 100%; margin: 0 auto;
+}
+
+/* --- before / after. Two columns of the same width, so neither state is the
+   bigger claim, with the hairline BETWEEN them rather than around each. */
+.run-ba {
+  display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--surface); border: 1px solid var(--rule);
+}
+.run-ba-c { padding: var(--d4) var(--d5); }
+.run-ba-c + .run-ba-c { border-left: 1px solid var(--rule); }
+.run-ba-l { list-style: none; margin: var(--d3) 0 0; padding: 0; display: grid; gap: var(--d3); }
+.run-ba-l li {
+  position: relative; padding-left: var(--d4);
+  font-size: var(--t-small); line-height: 1.6; color: var(--text-2);
+}
+/* the mark's own bar, at rest: a 8px rule rather than a bullet glyph */
+.run-ba-l li::before {
+  content: ''; position: absolute; left: 0; top: 9px;
+  width: var(--d2); height: 1px; background: var(--rule-firm);
+}
+.run-ba-l b { color: var(--text); font-weight: 600; }
+/* a severity chip inside a sentence keeps the line's rhythm */
+.run-ba-l .sev { margin: 0 1px; }
+
+
+
+/* --- readouts: what is about to happen, as instrument values -------------- */
+.run-plan {
+  /* hairlines on the children: a fluid track count leaves a partial last
+     row, and gap-over-a-rule-background paints those empty cells solid grey. */
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 0; background: var(--surface); border: 1px solid var(--rule);
+}
+.readout { background: var(--surface); padding: var(--d3) var(--d4);  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);}
+.readout-v {
+  font-size: 21px; line-height: 1.15; margin-top: var(--d1); color: var(--text);
+}
+.readout.is-big .readout-v { font-size: 30px; }
+.readout-u { font-size: var(--t-micro); color: var(--text-3); margin-top: 2px; }
+
+/* --- lanes: one per agent, each with its own committed count -------------- */
+.lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--d2); }
+.lane {
+  position: relative; overflow: hidden;
+  display: grid; grid-template-columns: 190px 1fr auto;
+  align-items: center; gap: var(--d4);
+  padding: var(--d4); border: 1px solid var(--rule); background: var(--surface);
+  transition: border-color var(--t-base) var(--ease), opacity var(--t-base) var(--ease);
+}
+.lane.is-todo { opacity: 0.42; }
+.lane.is-live { border-color: var(--accent); }
+/* the fill is the agent's own committed count, so a lane cannot look busy
+   unless rows really landed */
+.lane-bar { position: absolute; inset: 0; pointer-events: none; }
+.lane-bar i {
+  display: block; height: 100%; width: 0;
+  background: var(--surface-2); border-right: 1px solid var(--rule-firm);
+}
+.lane > *:not(.lane-bar) { position: relative; }
+.lane-id { display: grid; gap: 2px; }
+.lane-n { font-family: var(--font-brand); font-size: var(--t-section); }
+.lane-m { font-size: var(--t-micro); color: var(--text-3); }
+.lane-reads { display: grid; gap: 2px; min-width: 0; }
+.lane-r { font-size: var(--t-body); color: var(--text); }
+.lane-c { font-size: var(--t-micro); color: var(--text-3); }
+.lane-count { text-align: right; white-space: nowrap; }
+.lane-count strong { font-size: 20px; }
+.lane-of { font-size: var(--t-micro); color: var(--text-3); }
+.lane-idle { font-size: var(--t-micro); color: var(--text-3); letter-spacing: 0.06em; }
+
+/* --- the total: rows committed to agent.agent_scores, polled from the endpoint
+   the coordinator reads. No interpolation -- it steps when data arrives. */
+.run-total { display: grid; gap: var(--d2); }
+.run-bar { height: 3px; background: var(--bg-sunk); overflow: hidden; }
+.run-bar i { display: block; height: 100%; background: var(--accent); }
+.run-total-t { display: flex; align-items: baseline; gap: var(--d2); font-size: var(--t-small); }
+.run-n { font-size: 20px; color: var(--text); }
+.run-of { color: var(--text-3); }
+.run-id { margin-left: auto; font-size: var(--t-micro); color: var(--text-3); }
+
+/* --- completion ---------------------------------------------------------- */
+.run-done { display: grid; gap: var(--d4); }
+.run-done-nums {
+  /* hairlines on the children: a fluid track count leaves a partial last
+     row, and gap-over-a-rule-background paints those empty cells solid grey. */
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0; background: var(--surface); border: 1px solid var(--rule);
+}
+.run-done-p { font-size: var(--t-small); color: var(--text-2); line-height: 1.6; margin: 0; }
+.run-go { display: flex; gap: var(--d3); }
+.run-go .cta { background: var(--accent); border-color: var(--accent); color: var(--ink-deep); }
+.run-go .cta.is-ghost {
+  background: none; color: var(--text); border-color: var(--rule-firm);
+}
+
+.run-start {
+  justify-self: start;
+  display: inline-flex; align-items: center; gap: var(--d3);
+  padding: 0 var(--d5); min-height: 44px;
+  background: var(--accent); color: var(--ink-deep);
+  border: 0; border-radius: var(--radius);
+  font: inherit; font-size: var(--t-data); font-weight: 550; cursor: pointer;
+}
+.run-start:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.run-locked {
+  padding: var(--d4); border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent); background: var(--surface);
+}
+.run-locked p { margin: var(--d2) 0 0; color: var(--text-2); max-width: 76ch; }
+
+@media (max-width: 860px) {
+  .run-ba { grid-template-columns: 1fr; }
+  .run-ba-c + .run-ba-c { border-left: 0; border-top: 1px solid var(--rule); }
+  .lane { grid-template-columns: 1fr; gap: var(--d2); }
+  .lane-count { text-align: left; }
+  .runlay-body, .runlay-head { padding-left: var(--d4); padding-right: var(--d4); }
+}
+
+/* Do not centre .runlay-body: centring content taller than a scroll container
+   clips its top beyond reach. The before/after panel fills the space instead. */

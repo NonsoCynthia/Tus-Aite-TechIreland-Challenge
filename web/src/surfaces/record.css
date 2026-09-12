@@ -1,0 +1,158 @@
+/* The decision record. A reviewer's surface: dense, tabular, every rule keeping
+   its ID so it can be found in core.ref_rules.
+   A rule verdict is not a triage category, so the verdict pills sit in the ink
+   register and --cat-* stays for band chips and tab swatches. The word travels
+   in every chip ("holds", "breached", "N past target"). */
+
+.rec .lede { margin-bottom: var(--d5); }
+.rec-sec { margin-top: var(--d7); }
+
+.rec-meta {
+  /* hairlines on the children, not gap-over-a-rule-background: a partial
+     last row must be quiet surface, never a painted grey cell. */
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0; background: var(--surface); border: 1px solid var(--rule);
+}
+.field { background: var(--surface); padding: var(--d3) var(--d4); min-width: 0;  border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);}
+.field-v {
+  font-size: var(--t-data); margin-top: 3px; color: var(--text);
+  overflow-wrap: anywhere;
+}
+.field.is-big .field-v { font-size: 24px; line-height: 1.1; }
+.field-n { font-size: var(--t-micro); color: var(--text-3); margin-top: 2px; }
+
+.sec-h {
+  font-size: var(--t-section); display: flex; flex-wrap: wrap;
+  align-items: baseline; gap: var(--d3); margin-bottom: var(--d3);
+}
+.sec-note { font-family: var(--font-data); font-size: var(--t-small); color: var(--text-3); font-weight: 400; }
+
+/* --- rule board ---------------------------------------------------------- */
+.rules { width: 100%; border-collapse: collapse; background: var(--surface); }
+.rules th {
+  text-align: left; font-size: var(--t-micro); letter-spacing: var(--track-lab);
+  text-transform: uppercase; color: var(--text-3); font-weight: 600;
+  padding: var(--d2) var(--d3); border-bottom: 1px solid var(--rule-firm);
+  background: var(--bg-sunk); white-space: nowrap;
+}
+.rules td {
+  padding: var(--d3); border-bottom: 1px solid var(--rule);
+  font-size: var(--t-small); vertical-align: top;
+}
+.rules tr:last-child td { border-bottom: 0; }
+.rules .c-n { text-align: right; white-space: nowrap; }
+.rules th.c-n { text-align: right; }
+.c-rid { color: var(--text); font-weight: 550; white-space: nowrap; }
+.c-st { color: var(--text-2); }
+.rules tr.is-breached .c-rid { color: var(--text); font-weight: 700; }
+
+/* Three verdicts, three glyphs, three registers. "holds" and "not tested" are
+   quiet because neither is an alarm; a breach is a <SevChip>, so its fill comes
+   from the severity scale and never from here. */
+.verdict {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  font-size: var(--t-micro); padding: 3px var(--d2);
+  border-radius: var(--radius-pill);
+}
+/* colour is never the only channel: the word travels with it, always */
+.verdict.is-ok  { color: var(--text-3); background: var(--surface-2); }
+/* an untested rule is an ABSENCE of a verdict, not a pass. It is drawn quieter
+   than "holds", never as a check. */
+.verdict.is-none {
+  color: var(--text-3); background: transparent;
+  box-shadow: inset 0 0 0 1px var(--rule); font-style: italic;
+}
+.verdict svg { flex: 0 0 auto; }
+
+/* the breach verdict renders through <SevChip>, which brings its own fill from
+   the severity tokens. This only lends it the pill's geometry. */
+.c-v .sev {
+  align-items: center; gap: 5px;
+  padding: 3px var(--d2); border-radius: var(--radius-pill);
+  font-size: var(--t-micro);
+}
+.c-v .sev svg { flex: 0 0 auto; }
+
+/* --- the reconciliation ledger ------------------------------------------
+   Each bucket separately labelled, never summed into one figure. */
+.ledger { border: 1px solid var(--rule); background: var(--surface); }
+.ledger-row {
+  display: grid; grid-template-columns: 84px 200px 1fr;
+  align-items: baseline; gap: var(--d3);
+  padding: var(--d3) var(--d4); border-bottom: 1px solid var(--rule);
+}
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-n { font-size: 22px; text-align: right; }
+.ledger-k { font-size: var(--t-body); font-weight: 550; }
+.ledger-w { font-size: var(--t-small); color: var(--text-2); line-height: 1.5; }
+.ledger-w em { color: var(--text-3); font-style: italic; }
+.ledger-sum {
+  margin-top: var(--d2); padding: var(--d2) var(--d4);
+  font-size: var(--t-small); color: var(--text-2);
+  background: var(--bg-sunk); border: 1px solid var(--rule);
+}
+/* The gap is an integrity failure, so the edge is the top of the severity
+   scale. The edge is only the supporting cue: the SevChip carrying the count is
+   the fill area, and fill is what carries across a room. */
+.ledger-sum.is-off { border-left: 3px solid var(--sev-4-bg); color: var(--text); }
+.ledger-sum strong { color: var(--text); }
+.ledger-sum .sev { margin-left: var(--d1); }
+
+.warn-chip {
+  display: inline-block; margin-left: var(--d2); padding: 2px var(--d2);
+  font-size: var(--t-micro); color: var(--text);
+  background: var(--bg-sunk); border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--rule-firm);
+}
+/* --- the override log. Bounded so the header has a scroll container to stick
+   to: `position: sticky` on a th is inert without one, and .scroll-x sets
+   overflow on both axes but no height. */
+.ovr-vp {
+  max-height: min(calc(100vh - 320px), 640px); overflow: auto;
+  border: 1px solid var(--rule); background: var(--surface);
+}
+/* sticky needs SEPARATE borders: a collapsed border belongs to the table, not
+   the cell, so it scrolls out from under a stuck header. An inset shadow draws
+   the rule instead, as the ranked list's header already does. */
+.rules.ovr-log { border-collapse: separate; border-spacing: 0; }
+.ovr-vp .ovr-log th {
+  position: sticky; top: 0; z-index: 2;
+  border-bottom: 0; box-shadow: inset 0 -1px 0 var(--rule-firm);
+}
+.ovr-log td { white-space: nowrap; }
+/* the Reason is the one column that must wrap, and the one that sets row
+   height. Capped so a long reason cannot make a 200px row. */
+.ovr-log td:nth-child(5) {
+  white-space: normal; min-width: 260px; max-width: 420px;
+}
+
+.ovr-foot {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--d3);
+  margin-top: var(--d2); font-size: var(--t-small); color: var(--text-3);
+}
+.ovr-more {
+  font: inherit; font-size: var(--t-small); cursor: pointer;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--rule-firm); border-radius: var(--radius);
+  padding: 5px var(--d3);
+}
+.ovr-more:hover { background: var(--bg-sunk); }
+
+.p-note {
+  font-size: var(--t-small); color: var(--text-2);
+  line-height: 1.55; margin: var(--d3) 0 0;
+}
+
+@media (max-width: 760px) {
+  .ledger-row { grid-template-columns: 64px 1fr; }
+  .ledger-w { grid-column: 1 / -1; }
+}
+
+/* the buckets overlap; saying so IS the panel */
+.ledger-overlap {
+  margin-top: var(--d2); padding-top: var(--d2);
+  border-top: 1px solid var(--rule);
+  font-size: var(--t-small); line-height: 1.55; color: var(--text-2);
+  max-width: 92ch;
+}
+.ledger-overlap .num { color: var(--text); }

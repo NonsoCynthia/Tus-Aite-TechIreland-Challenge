@@ -1,0 +1,626 @@
+/* Component styles. Every colour comes from tokens.css; none is a literal. */
+
+/* --- the shell: rail plus content, side by side, filling the viewport. The rail
+   is the fixed column; the content area takes whatever is left. */
+.app {
+  /* The shell is the scrollport: html/body are pinned to the viewport, so this
+     scrolls and the scrollable extent is exactly the content. */
+  height: 100%; overflow-y: auto;
+  display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr);
+}
+.main { display: flex; flex-direction: column; min-width: 0; }
+.content { flex: 1 1 auto; min-width: 0; }
+
+.boot {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--d4);
+  background: var(--bg); color: var(--text-2); font-size: var(--t-small);
+}
+/* the same arithmetic as the rail: cap height is 266/676 of the rendered height
+   and the kit's floor is 13px, so 40px puts the cap at 15.7px. */
+.boot-brand { display: grid; justify-items: center; gap: var(--d2); }
+.boot-mark { display: block; height: 40px; width: auto; }
+/* For a hospital that holds no waiting list nothing is loading and nothing will
+   arrive, so the boot screen needs a way out of it. */
+.boot-pick { display: flex; align-items: center; gap: var(--d3); margin-top: var(--d4); }
+.boot-pick select {
+  background: var(--surface); color: var(--text); border: 1px solid var(--rule-firm);
+  border-radius: var(--radius); padding: var(--d2) var(--d3); font: inherit;
+}
+
+.boot-descriptor {
+  font-family: var(--font-brand); font-size: var(--t-micro); font-weight: 300;
+  letter-spacing: 0.1em; color: var(--text-2);
+}
+
+/* --- rail ---------------------------------------------------------------- */
+.rail {
+  background: var(--bg); color: var(--text);
+  border-right: 1px solid var(--rule);
+  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh;
+}
+.rail-brand {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--d1);
+  padding: var(--d5) var(--d5) var(--d4);
+  background: none; border: 0; cursor: pointer; text-align: left; width: 100%;
+}
+.rail-brand picture { display: block; line-height: 0; }
+.rail-brand img { display: block; height: 40px; width: auto; }
+.rail-descriptor {
+  font-family: var(--font-brand); font-size: var(--t-micro); font-weight: 300;
+  letter-spacing: 0.1em; color: var(--text-2);
+  padding-top: var(--d1); border-top: 1px solid var(--rule); width: 100%;
+}
+
+.rail-nav { flex: 1 1 auto; padding: var(--d3) var(--d3) 0; overflow-y: auto; }
+.rail-group + .rail-group { margin-top: var(--d5); }
+.rail-lab { padding: 0 var(--d3) var(--d2); color: var(--text-3); }
+.rail-item {
+  display: flex; align-items: center; gap: var(--d3); width: 100%;
+  padding: var(--d2) var(--d3); border: 0; border-radius: var(--radius);
+  background: none; color: var(--text-2); font: inherit; font-size: var(--t-body);
+  cursor: pointer; text-align: left;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.rail-item:hover { background: var(--surface); color: var(--text); }
+/* taupe, not clay: on dark the kit's accent is taupe, and clay is spent once
+   per composition on the content side */
+.rail-item.is-on {
+  background: var(--surface); color: var(--text);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.rail-item svg { flex: 0 0 auto; opacity: 0.9; }
+
+.rail-foot { padding: var(--d4) var(--d5) var(--d5); display: grid; gap: var(--d3); }
+.sysstat { display: flex; flex-wrap: wrap; gap: var(--d3); }
+.sysstat-i {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--t-micro); color: var(--text-3);
+}
+.sysstat-i i {
+  width: 5px; height: 5px; border-radius: 50%;
+  /* off the reserved triage hues: a service being down is not a clinical
+     category, and the word beside it carries the state anyway */
+  background: var(--clay); display: inline-block;
+}
+.sysstat-i.is-up i { background: var(--text-3); }
+.sysstat-i b { font-weight: 600; color: var(--text-2); }
+.sysstat-i:not(.is-up) b { color: var(--text); }
+.sysstat-i.is-up { color: var(--text-2); }
+
+/* lucide writes width/height as PRESENTATION attributes, so a CSS rule wins and
+   --icon stays the single source. Stroke is a ROLE: 1.75 chrome, 2.25 signal. */
+.ico   { width: var(--icon);    height: var(--icon);    flex: none; }
+.ico-s { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
+
+/* --- top bar ------------------------------------------------------------- */
+.topbar {
+  display: flex; align-items: center; gap: var(--d4); flex-wrap: nowrap;
+  min-height: var(--topbar-h); padding: var(--d2) var(--d6);
+  border-bottom: 1px solid var(--rule); background: var(--surface);
+  position: sticky; top: 0; z-index: 20;
+}
+.scope { display: flex; align-items: center; gap: var(--d2); min-width: 0; flex-wrap: nowrap; }
+
+/* The days in the selector are DISCOVERED by probing and cached per hospital
+   for the life of the process (orchestrator/app/main.py:120-165), so a batch
+   loaded while the service is up is invisible until this clears that cache. */
+.probe {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  padding: 0 var(--d3); min-height: 34px;
+  background: var(--bg); border: 1px solid var(--rule-firm);
+  border-radius: var(--radius); color: var(--text-2);
+  font: inherit; font-size: var(--t-small); cursor: pointer;
+}
+.probe:hover:not(:disabled) { color: var(--text); border-color: var(--text-3); }
+.probe:disabled { opacity: 0.55; cursor: progress; }
+.probe-said { font-size: var(--t-small); color: var(--text-2); max-width: 52ch; }
+.picker-wrap {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  padding: 0 var(--d3); min-height: 34px;
+  background: var(--bg); border: 1px solid var(--rule-firm);
+  border-radius: var(--radius); color: var(--text-3);
+}
+.picker-wrap:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+.picker {
+  font: inherit; font-size: var(--t-small); color: var(--text);
+  background: none; border: 0; padding: 6px 0; max-width: 30ch;
+  text-overflow: ellipsis;
+}
+/* Everything in the bar stays on ONE row or the bar grows from 56px to 101px.
+   The pickers are the elastic part, so they give up width rather than the
+   actions dropping to a second row. */
+@media (max-width: 1600px) {
+  .picker { max-width: 22ch; }
+}
+@media (max-width: 1400px) {
+  .picker { max-width: 16ch; }
+}
+.picker:focus { outline: none; }
+
+.topbar-right {
+  margin-left: auto; display: flex; align-items: center; gap: var(--d3);
+  flex: 0 0 auto;   /* the actions never shrink; the pickers give way first */
+}
+
+/* the only durable display of alpha: agent.decision_rankings stores none of
+   alpha, scarcity, priority or band, so it exists nowhere else after this run */
+.runpill {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  padding: 5px var(--d3); border: 1px solid var(--rule);
+  border-radius: var(--radius-pill); background: var(--bg-sunk);
+  font-size: var(--t-micro); color: var(--text-2); white-space: nowrap;
+}
+.runpill-id { color: var(--text); letter-spacing: 0.02em; }
+.runpill-a strong { color: var(--text); }
+.runpill-sep { width: 1px; height: 11px; background: var(--rule-firm); }
+
+.cta {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  padding: 0 var(--d4); min-height: 34px;
+  background: var(--ink); color: var(--paper);
+  border: 1px solid var(--ink); border-radius: var(--radius);
+  font: inherit; font-size: var(--t-small); font-weight: 550; cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
+}
+.cta:hover:not(:disabled) { background: var(--ink-deep); }
+.cta:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --- what the chrome could not say inline. Both statements here are facts and
+   NEITHER IS AN ERROR, so neither takes .err's severity edge: no reserved hue,
+   no severity step. In the flow rather than sticky, because no second offset can
+   be trusted under a sticky bar whose height is a min-height. */
+.notes { display: grid; }
+.notes-i {
+  display: flex; align-items: flex-start; gap: var(--d3);
+  margin: 0; padding: var(--d3) var(--d6);
+  background: var(--bg-sunk); border-bottom: 1px solid var(--rule);
+  font-size: var(--t-small); line-height: 1.55; color: var(--text-2);
+}
+.notes-i svg { color: var(--text-3); flex: none; margin-top: 2px; }
+.notes-i b { color: var(--text); font-weight: 600; }
+.notes-i .num { color: var(--text); }
+/* the same affordance as .cta-why: a word, underlined, no box */
+.notes-act {
+  margin-left: var(--d2); padding: 0; background: none; border: 0;
+  font: inherit; font-size: var(--t-small); color: var(--text); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.notes-act:disabled { color: var(--text-3); cursor: progress; text-decoration: none; }
+
+/* --- layout. .pad fills its column; a reading measure is applied to PROSE only,
+   via .measure, so a paragraph stays readable without the grid collapsing. */
+.pad { padding: var(--d6) var(--d6) var(--d8); width: 100%; }
+.measure { max-width: 68ch; }
+.muted { color: var(--text-2); }
+.num { font-variant-numeric: tabular-nums; }
+/* An error means a number on screen cannot be trusted, which is SEV_INTEGRITY
+   (lib/severity.ts:84) and the top of the severity scale -- never a triage hue. */
+.err {
+  padding: var(--d3) var(--d4);
+  border: 1px solid var(--sev-4-edge); border-left: 3px solid var(--sev-4-bg);
+  background: var(--surface); color: var(--text);
+}
+
+/* --- lede ---------------------------------------------------------------- */
+.lede { margin-bottom: var(--d5); }
+.lede .lede-p { max-width: 68ch; }
+.lede h1 { margin-bottom: 8px; }
+.lede-p { margin: 0; font-size: var(--t-body); line-height: 1.6; color: var(--text-2); }
+.lede-p strong { color: var(--text); font-size: var(--t-data); }
+
+.big { font-family: var(--font-brand); font-size: 26px; font-weight: 300; }
+
+/* The five triage swatches. Reserved hues, each also carrying its name on screen.
+   TRAP: these class names are BUILT BY CONCATENATION -- List.tsx's TAB_TOKEN and
+   Patient.tsx's chipClass produce `cat-semiurgent` and `cat-uncategorised`, which
+   no static search will find. Do not delete any of them on a grep's evidence. */
+.cat-urgent        { background: var(--cat-urgent); }
+.cat-semiurgent    { background: var(--cat-semi); }
+.cat-routine       { background: var(--cat-routine); }
+.cat-uncategorised { background: var(--cat-uncat); }
+
+/* --spine-w / --spine-bar drive .j-steps, .j-line and .j-mark below; the list
+   draws its own overflow through .spn (surfaces/list.css). */
+
+/* --- the mark drawing itself, once, on the landing ----------------------- */
+@keyframes markStem { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes markBar  { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* --- section headings ----------------------------------------------------- */
+.sec-h {
+  font-family: var(--font-brand); font-size: var(--t-section); font-weight: 500;
+  margin: 0 0 12px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+.sec-note {
+  font-family: var(--font-data); font-size: var(--t-small);
+  font-weight: 400; color: var(--text-2);
+}
+
+/* TrolleyGAR's Green/Amber/Red lives in surfaces/overview.css (.ov-gar), where
+   the instrument that owns those hues renders. Staleness is drawn on the reading
+   itself (.pt-stale, components/Vitals). */
+
+/* --- surface nav ---------------------------------------------------------- */
+.surfaces { display: flex; gap: 2px; margin-left: 8px; }
+.surf.is-on { color: var(--text); border-bottom-color: var(--clay); }
+
+/* --- category tabs -------------------------------------------------------- */
+.tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--rule-firm);
+  margin-bottom: 14px; flex-wrap: wrap;
+  position: sticky; top: 0; z-index: 5;
+  /* glass: depth through blur, never light through glow. Chrome only --
+     never behind a number, where contrast would depend on what scrolls past. */
+  background: color-mix(in srgb, var(--paper) 78%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+.tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: inherit; font-size: var(--t-body); color: var(--text-2);
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: 10px 16px; cursor: pointer; margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); }
+.tab[data-state="active"] { color: var(--text); border-bottom-color: var(--text); }
+.tab[data-state="active"] .tab-n { color: var(--text-2); }
+.cat-outside { background: var(--cat-outside); }
+.panel-note {
+  font-size: var(--t-small); color: var(--text-2);
+  margin: 0 0 12px; max-width: 78ch; line-height: 1.5;
+}
+.panel-note strong { color: var(--text); }
+
+/* --- the rows. The ranked table is .lst-table / .lst-row (surfaces/list.css);
+   what is left here are the CELL classes that table still spends. */
+.th-sub { display: block; font-weight: 400; letter-spacing: 0; color: var(--text-3); }
+.pw { font-size: var(--t-body); }
+.sub { font-size: var(--t-micro); color: var(--text-2); margin-top: 1px; }
+.wait-n, .n2 { font-size: var(--t-data); font-weight: 600; }
+.n2 .of { font-weight: 400; color: var(--text-2); font-size: var(--t-micro); }
+
+/* --- pagination ----------------------------------------------------------- */
+.pager {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; padding: 14px 2px 0;
+}
+.pager-of { font-size: var(--t-small); color: var(--text-2); }
+.pg {
+  font: inherit; font-size: var(--t-small); color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--rule-firm);
+  padding: 5px 11px; min-height: 30px; cursor: pointer;
+}
+.pg:hover:not(:disabled) { color: var(--text); border-color: var(--text-3); }
+.pg:disabled { opacity: 0.4; cursor: default; }
+.pg-n { min-width: 30px; padding: 5px 8px; }
+.pg-n.is-on {
+  color: var(--paper); background: var(--ink); border-color: var(--ink);
+}
+
+/* --- the journey: a dated list, then an axis to scale --------------------- */
+.journey { margin: 12px 0 30px; }
+.j-cols {
+  display: grid; grid-template-columns: 268px 1fr; gap: 28px;
+  border: 1px solid var(--rule); background: var(--surface); padding: 18px 20px;
+}
+@media (max-width: 880px) { .j-cols { grid-template-columns: 1fr; } }
+.j-h {
+  font-family: var(--font-brand); font-size: var(--t-micro); letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-2); margin-bottom: 12px;
+}
+.j-h .num { color: var(--text); font-weight: 500; text-transform: none; letter-spacing: 0; }
+
+/* intake: the mark's stem, with one bar per step */
+.j-steps { list-style: none; margin: 0; padding: 0 0 0 15px; border-left: var(--spine-w) solid var(--rule-firm); }
+.j-steps li { position: relative; padding: 0 0 11px 0; display: grid; gap: 1px; }
+.j-steps li::before {
+  content: ''; position: absolute; left: -15px; top: 7px;
+  width: 11px; height: var(--spine-bar); background: var(--text-3);
+}
+.j-steps li.is-clinical::before { background: var(--clay); width: 15px; }
+/* The three that carry a VALUE read at --t-small; the LABELS beside them stay
+   at --t-micro, so the value is the larger of the pair (tokens.css). */
+.j-d { font-size: var(--t-small); color: var(--text-2); }
+.j-t { font-size: var(--t-small); color: var(--text); line-height: 1.3; }
+.j-x { font-size: var(--t-small); color: var(--text-3); }
+.j-steps li.is-clinical .j-t { color: var(--clay); font-weight: 600; }
+
+/* the wait: the LENGTH is the argument, so it is drawn to scale */
+.j-axis { position: relative; height: 74px; }
+.j-line { position: absolute; left: 0; right: 0; top: 12px; height: var(--spine-w); background: var(--rule-firm); }
+/* GRADIENT 1 OF 2, and it stays: two HARD stops interpolate nothing, so this is
+   a hatch, not a blend, and claims no light source or elevation. It is also
+   load-bearing -- this band is the stretch of the wait with NOTHING recorded
+   (Journey.tsx:96), and deleting it takes the EXTENT of the silence off the
+   axis, leaving the legend to say how long and nothing to say where. */
+.j-silence {
+  position: absolute; left: 0; right: 0; top: 4px; height: 21px;
+  background: repeating-linear-gradient(-45deg, transparent 0 5px, var(--bg-sunk) 5px 10px);
+  border-left: 2px solid var(--clay);
+}
+.j-mark { position: absolute; top: 0; display: flex; flex-direction: column; align-items: center; width: 128px; text-align: center; transform: translateX(-50%); }
+.j-mark i { display: block; width: var(--spine-w); height: 26px; background: var(--text); }
+.j-mark.is-now i { background: var(--ink); }
+.j-mark.is-target i { background: var(--text-3); }
+/* a target only days into a years-long wait would hang off the left edge */
+.j-mark.is-early { align-items: flex-start; text-align: left; transform: none; }
+.j-mt { font-size: var(--t-micro); color: var(--text); margin-top: 6px; line-height: 1.25; }
+.j-md { font-size: var(--t-small); color: var(--text-2); }
+
+/* --- patient ------------------------------------------------------------- */
+.back {
+  font: inherit; font-size: var(--t-small); color: var(--text-2);
+  background: none; border: 0; padding: 0 0 14px; cursor: pointer;
+}
+.back:hover { color: var(--text); }
+.chip {
+  display: inline-block; padding: 3px 9px; font-size: var(--t-micro);
+  color: var(--paper); letter-spacing: 0.02em;
+}
+.p-sec { margin-bottom: 28px; }
+.p-note { font-size: var(--t-small); color: var(--text-2); max-width: 76ch; line-height: 1.55; margin: 10px 0 0; }
+.p-note strong { color: var(--text); }
+/* TRAP: app.css loads before surfaces/run.css, so anything declared here that
+   run.css does not restate still applies inside the run overlay. The overlay
+   owns its own lane and button styles; do not put them back here. */
+
+/* --- provenance graph: the one dark surface inside a light screen --------- */
+.prov { border: 1px solid var(--rule-firm); background: var(--ink-deep); }
+.prov-canvas { position: relative; width: 100%; }
+.prov-note {
+  font-size: var(--t-small); color: var(--taupe); margin: 0;
+  padding: var(--d3) var(--d4); border-top: 1px solid var(--rule);
+  max-width: none; line-height: 1.5;
+}
+.prov-note strong { color: var(--paper); }
+.prov-load {
+  display: flex; align-items: center; justify-content: center; height: 100%;
+  color: var(--taupe); font-size: var(--t-small); opacity: 0.7;
+}
+
+/* --- the one modal -------------------------------------------------------- */
+.ovr {
+  width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 64px);
+  border: 1px solid var(--rule-firm); background: var(--surface);
+  color: var(--text); padding: 24px 26px; font: inherit;
+}
+.ovr::backdrop {
+  background: color-mix(in srgb, var(--ink-deep) 55%, transparent);
+  backdrop-filter: blur(3px);
+}
+.ovr-h { font-family: var(--font-brand); font-size: 20px; font-weight: 500; margin: 0 0 4px; }
+.ovr-sub { font-size: var(--t-small); color: var(--text-2); margin: 0 0 18px; }
+.ovr-f { display: grid; gap: 5px; margin-bottom: 16px; }
+.ovr-l { font-size: var(--t-small); color: var(--text-2); }
+.ovr-opt { color: var(--text-3); }
+.ovr-in {
+  font: inherit; font-size: var(--t-body); color: var(--text);
+  background: var(--bg); border: 1px solid var(--rule-firm); padding: 9px 11px; width: 100%;
+}
+.ovr-ta { resize: vertical; min-height: 54px; }
+.ovr-hint { font-size: var(--t-micro); color: var(--text-3); line-height: 1.4; }
+/* The one place an interruption is justified, so the one panel that takes a
+   FILL rather than an edge -- on the severity scale, never a triage hue. */
+.ovr-warn {
+  border: 1px solid var(--sev-2-edge); border-left: 3px solid var(--sev-3-bg);
+  background: var(--sev-2-bg); color: var(--text);
+  padding: 13px 15px; margin: 0 0 16px; font-size: var(--t-small); line-height: 1.55;
+}
+.ovr-warn p { margin: 6px 0 10px; color: var(--sev-2-fg); }
+.ovr-attest { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
+.ovr-attest input { margin-top: 2px; }
+.ovr-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.ovr-go { min-height: 40px; padding: 0 var(--d5); font-size: var(--t-body); }
+.ovr-err { margin-top: 12px; }
+/* A recorded override is a confirmation, not a severity and not a CPC band, so
+   it stays in the ink register: "this happened", with no clinical grade. */
+.flash {
+  border-left: 3px solid var(--text); background: var(--surface-2);
+  padding: 11px 16px; margin-bottom: 18px; font-size: var(--t-body);
+}
+
+/* --- landing: the empty waiting room ------------------------------------- */
+.landing { position: relative; min-height: calc(100vh - 0px); overflow: hidden; background: var(--paper); }
+.landing-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: 62% 50%;
+}
+/* GRADIENT 2 OF 2, and the only soft blend in the product. Without it
+   .landing-sub and .landing-thesis fail WCAG AA at every width, and the flat
+   color-mix alternative needs 0.52-0.58 alpha across the WHOLE frame, obscuring
+   MORE of the photograph. It is not what the kit bans: not a surface, no
+   elevation claim, all four stops ONE token at four alphas (BUILD_LEDGER.md).
+   Do not add a third gradient on the strength of this one. */
+.landing-scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(100deg,
+    color-mix(in srgb, var(--paper) 97%, transparent) 0%,
+    color-mix(in srgb, var(--paper) 90%, transparent) 34%,
+    color-mix(in srgb, var(--paper) 15%, transparent) 62%,
+    transparent 100%);
+}
+.landing-in {
+  position: relative; max-width: 1248px; margin: 0 auto;
+  padding: clamp(48px, 11vh, 130px) 24px 64px; max-width: 1248px;
+}
+.landing-mark { margin-bottom: 26px; }
+.landing-word {
+  font-family: var(--font-brand); font-weight: 200; font-size: clamp(46px, 7.4vw, 92px);
+  letter-spacing: var(--track-wide); line-height: 1; margin: 0; color: var(--ink);
+}
+.landing-sub {
+  font-family: var(--font-brand); font-size: 13px; font-weight: 300;
+  letter-spacing: 0.1em; color: var(--text-2); margin: 12px 0 46px;
+}
+.landing-lead {
+  font-size: clamp(19px, 2.3vw, 27px); line-height: 1.45; max-width: 21ch;
+  margin: 0 0 22px; color: var(--text);
+}
+.landing-lead strong { font-family: var(--font-brand); font-weight: 400; }
+.landing-thesis {
+  font-size: var(--t-body); line-height: 1.62; max-width: 46ch;
+  color: var(--text-2); margin: 0 0 34px;
+}
+.landing-go {
+  font-family: var(--font-brand); font-size: 15px; color: var(--paper);
+  background: var(--ink); border: 1px solid var(--ink); padding: 13px 26px; cursor: pointer;
+}
+.landing-go:disabled { opacity: 0.45; cursor: default; }
+@media (max-width: 720px) {
+  .landing-scrim { background: color-mix(in srgb, var(--paper) 94%, transparent); }
+  .landing-lead { max-width: none; }
+}
+/* --- why this position: arithmetic, not assertion ------------------------ */
+.why-tier {
+  border-left: 3px solid var(--rule-firm); background: var(--surface-2);
+  padding: 11px 15px; font-size: var(--t-body); line-height: 1.55; margin-bottom: 14px;
+  max-width: 78ch;
+}
+.why-sum { display: grid; gap: 7px; max-width: 620px; margin-bottom: 12px; }
+.why-row { display: grid; grid-template-columns: 118px 1fr 190px; align-items: center; gap: 12px; }
+.why-k { font-size: var(--t-small); color: var(--text-2); }
+.why-b { height: 9px; background: var(--bg-sunk); display: block; }
+.why-b i { display: block; height: 100%; background: var(--text-3); }
+.why-b i.is-wait { background: var(--clay); }
+.why-v { font-size: var(--t-small); text-align: right; color: var(--text-2); }
+.why-row.is-total .why-k, .why-row.is-total .why-v { color: var(--text); font-weight: 600; }
+.why-row.is-total { border-top: 1px solid var(--rule); padding-top: 7px; }
+.why-neighbours { margin-top: 16px; border: 1px solid var(--rule); }
+.nb {
+  display: grid; grid-template-columns: 78px 46px 1fr 68px 106px 128px;
+  gap: 10px; align-items: baseline; padding: 9px 14px; font-size: var(--t-small);
+  border-top: 1px solid var(--rule); background: var(--surface);
+}
+.nb:first-child { border-top: 0; }
+.nb.is-self { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--clay); }
+.nb-l { color: var(--text-3); font-size: var(--t-micro); }
+.nb-p { font-family: var(--font-brand); font-size: 15px; }
+.nb-t { color: var(--text-2); font-size: var(--t-micro); }
+.nb-s { color: var(--text-2); text-align: right; }
+
+/* --- boot, before the days are discovered -------------------------------- */
+.boot {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 18px;
+  color: var(--text-2); font-size: var(--t-small); background: var(--bg);
+}
+/* .run-locked lives with the overlay that draws it, surfaces/run.css. */
+
+/* --- nothing computed yet: say so where the ranking would be ------------- */
+.notyet {
+  border: 1px solid var(--rule); border-left: 3px solid var(--rule-firm);
+  background: var(--surface-2); padding: 15px 18px; max-width: 78ch;
+}
+.notyet strong { font-size: var(--t-body); }
+.notyet p { margin: 7px 0 0; font-size: var(--t-small); color: var(--text-2); line-height: 1.6; }
+
+/* --- pairwise comparison: the question the project exists to answer ------- */
+.nb { grid-template-columns: 78px 46px 1fr 68px 106px 128px 54px; }
+.nb-cmp {
+  font: inherit; font-size: var(--t-micro); color: var(--text-2);
+  background: none; border: 1px solid var(--rule-firm); padding: 3px 8px; cursor: pointer;
+}
+.nb-cmp:hover { color: var(--text); border-color: var(--text-3); }
+.cmp { margin-top: 16px; border: 1px solid var(--rule-firm); background: var(--surface); }
+.cmp-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 13px 18px; border-bottom: 1px solid var(--rule);
+}
+.cmp-head h3 { font-family: var(--font-brand); font-size: 15px; font-weight: 500; margin: 0; }
+.cmp-cols, .cmp-step {
+  display: grid; grid-template-columns: 1fr 170px 170px; gap: 14px;
+  padding: 9px 18px; align-items: baseline;
+}
+.cmp-cols { border-bottom: 1px solid var(--rule); }
+.cmp-who { font-size: var(--t-micro); color: var(--text-2); }
+.cmp-step { border-bottom: 1px solid var(--rule); }
+.cmp-rule { font-size: var(--t-small); display: flex; align-items: center; gap: 9px; }
+.cmp-v { font-size: var(--t-small); color: var(--text-2); }
+/* the step that actually separated them carries the one clay mark here */
+.cmp-step.is-decider { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--clay); }
+.cmp-step.is-decider .cmp-rule, .cmp-step.is-decider .cmp-v { color: var(--text); font-weight: 600; }
+.cmp-tag {
+  font-size: var(--t-micro); font-weight: 400; color: var(--clay);
+  border: 1px solid var(--clay); padding: 1px 6px; letter-spacing: 0.03em;
+}
+.cmp-note { grid-column: 1 / -1; font-size: var(--t-micro); color: var(--text-3); margin-top: 3px; }
+.cmp-terms { padding: 14px 18px; }
+.cmp-terms-h {
+  font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-2); font-family: var(--font-brand); margin-bottom: 9px;
+}
+.cmp-trow {
+  display: grid; grid-template-columns: 1fr 170px 170px 130px; gap: 14px;
+  padding: 5px 0; font-size: var(--t-small);
+}
+.cmp-tk { color: var(--text-2); }
+.cmp-tv { color: var(--text); }
+.cmp-td { color: var(--text-3); text-align: right; }
+.cmp-verdict {
+  margin: 12px 0 0; font-size: var(--t-body); line-height: 1.6; max-width: 76ch;
+  border-left: 3px solid var(--clay); padding-left: 14px;
+}
+
+/* The hospital selector belongs on this screen: both figures above it are
+   counted from whichever hospital is chosen. */
+.landing-pick { display: flex; align-items: flex-end; gap: var(--d3); flex-wrap: wrap; }
+.landing-sel { display: grid; gap: 5px; }
+.landing-sel select {
+  font: inherit; font-size: var(--t-small); color: var(--text);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: 1px solid var(--rule-firm);
+  border-radius: var(--radius); padding: 0 var(--d3); min-height: 42px; max-width: 34ch;
+}
+
+/* A lost WebGL context leaves a black rectangle otherwise, which mid-demo reads
+   as a broken product rather than a dropped graphics context. */
+.prov-lost {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  gap: var(--d3); background: color-mix(in srgb, var(--ink-deep) 90%, transparent);
+  color: var(--taupe); font-size: var(--t-small);
+}
+.prov-lost button {
+  margin-left: var(--d2); background: var(--taupe); color: var(--ink-deep);
+  border: 0; border-radius: var(--radius); padding: 6px var(--d3);
+  font: inherit; font-size: var(--t-small); cursor: pointer;
+}
+
+/* --- narrow screens: the rehearsal machine is 1280x800. The rail collapses to
+   icons rather than letting the ranked table scroll -- 172px, the biggest single
+   reclaim, and the icons plus the active marker still say where you are. */
+@media (max-width: 1439px) {
+  .app { grid-template-columns: 64px minmax(0, 1fr); }
+  .rail-item span:not(.lab) { display: none; }
+  .rail-item { justify-content: center; padding: var(--d2); }
+  .rail-lab, .sysstat-i { display: none; }
+  .rail-brand { padding: var(--d4) var(--d2); align-items: center; }
+  /* The <picture> has already swapped to the VECTOR mark here: 52x70 at 24px is
+     17.8px wide in a 48px box. The lockup at 18px was 68px and overhung it. */
+  .rail-brand img { height: 24px; }
+  /* The kit: "in any clinical setting the words decision support travel with
+     the mark", so they wrap under it rather than going with the nav labels. */
+  .rail-descriptor {
+    text-align: center; letter-spacing: 0.02em; line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  .rail-nav { padding: var(--d3) var(--d2) 0; }
+  .pad { padding: var(--d4) var(--d4) var(--d7); }
+}
+
+/* A day that can be read but not scored: evidence is date-blind, so ranking an
+   older day would cite readings taken after it. Visible, not in a tooltip. */
+.cta-locked {
+  display: inline-flex; align-items: center; gap: var(--d2);
+  padding: var(--d1) var(--d3); min-height: 34px;
+  border: 1px dashed var(--rule-firm); border-radius: var(--radius);
+  font-size: var(--t-small); color: var(--text-2);
+}
+.cta-locked b { color: var(--text); font-weight: 600; }
+.cta-locked svg { color: var(--text-3); flex: none; }
+.cta-why {
+  background: none; border: 0; padding: 0 0 0 var(--d1); font: inherit;
+  font-size: var(--t-small); color: var(--text); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}

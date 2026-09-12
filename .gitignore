@@ -5,6 +5,11 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+# Any venv, however it is named. `.venv/` and `**/.venv/` did NOT match
+# `.venv-orch/`, so a 1,513-file, 52MB virtualenv was tracked from the
+# commit that added the orchestrator until it was found before the first push.
+.venv*/
+**/.venv*/
 kg/.env
 kg/out/
 kg/mappings/*.ini
@@ -16,3 +21,13 @@ htmlcov/
 **/.venv/
 **/.pytest_cache/
 **/.coverage
+
+# Frontend build artefacts. web/ is a Vite app; none of this belongs in git.
+node_modules/
+**/node_modules/
+web/dist/
+**/dist/
+.playwright-mcp/
+# tsc --build writes this on every compile, so a tracked copy shows up as a
+# modification in every status and every diff for a file nobody reads.
+*.tsbuildinfo

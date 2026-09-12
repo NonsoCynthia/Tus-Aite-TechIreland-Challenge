@@ -108,6 +108,41 @@ services:
       oxigraph:
         condition: service_started
 
+  orchestrator:
+    # Context is the repo root -- the image composes coordinator/,
+    # capacity-agent/ and urgency-agent/ in-process, and the coordinator
+    # imports retrieval.app.schemas.
+    build:
+      context: .
+      dockerfile: orchestrator/Dockerfile
+    container_name: triage_orchestrator
+    environment:
+      # Every coordinator helper takes base_url as a keyword; only _load_config()
+      # hardcodes localhost and main() is its sole caller, so this works unchanged.
+      RETRIEVAL_BASE_URL: http://retrieval:8000
+      RETRIEVAL_BEARER_TOKENS: ${RETRIEVAL_BEARER_TOKENS}
+      # Read-only, and only for what retrieval has no endpoint for: the
+      # reference layer (core.ref_*) and reading an override back. Every write
+      # still goes through retrieval.
+      RETRIEVAL_DB_URL: ${RETRIEVAL_DB_URL}
+      # The run graph holds 11,839 triples per decision that nothing has ever
+      # queried. retrieval's own read path collapses repeated predicates, so the
+      # cohort graph is read straight from here.
+      OXIGRAPH_QUERY_URL: http://oxigraph:7878/query
+      # A decision lives in orchestrator memory. Without this a container
+      # restart empties the ranked list until someone re-runs -- and takes the
+      # only record of the actual alpha with it, since it is not in Postgres.
+      DECISION_SNAPSHOT: /snapshots/decisions.json
+    volumes:
+      - orchestrator_snapshots:/snapshots
+    ports:
+      - "${UI_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      oxigraph:
+        condition: service_started
+
   rationale:
     build:
       context: .
@@ -152,3 +187,4 @@ volumes:
   db_data:
   pgadmin_data:
   oxigraph_data:
+  orchestrator_snapshots:
