@@ -44,3 +44,23 @@ Four ADRs were added building it, two of them open and neither this track's to c
 
 ADR-005 (score the most recent observation) and ADR-006 (normalise through escalation breakpoints,
 not linearly) are accepted; ADR-006 is pending a distribution check against real data.
+
+**2026-09-12:** the rationale layer (merged separately, `rationale/`) gained an `llm` render
+engine (`rationale/llm_render.py`, ADR-010) — OpenAI Agents SDK, evidence-faithfulness enforced
+in code via a citation-IRI guardrail, additive alongside the existing deterministic default. On
+top of that, `orchestrator-agent/` adds a genuine tool-calling agent that runs the fixed
+urgency → capacity → coordinator → rationale sequence end to end and narrates the result
+(ADR-011) — its tools only trigger the existing packages' own `make *-run` targets or read what
+they already wrote, never computing a score or inventing a citation itself. Both verified against
+real OpenAI calls, not just mocked.
+
+`orchestrator-agent/` then gained a second mode (ADR-012): a clinician can ask it a question
+directly ("why is this referral ranked here", "has it been scored yet") via five new read-only
+tools, with conversation history carried across follow-ups. Both modes are now bounded by a
+code-enforced scope guardrail (ADR-013, OpenAI Agents SDK `InputGuardrail`) — a request outside
+"run the pipeline" or "answer a question about data already in the system" is rejected before
+either mode's tools are reachable at all, verified against real OpenAI calls including a
+prompt-injection attempt. ADR-014 closed a related gap: "why"/"explain" questions now must
+route through `generate_rationale` (citation-guardrailed, ADR-010) rather than being answered
+freehand from `get_decision`/`get_evidence`'s raw, unverified JSON — `generate_rationale` also
+gained a `pathway_number` parameter so it can target one specific referral, verified live.

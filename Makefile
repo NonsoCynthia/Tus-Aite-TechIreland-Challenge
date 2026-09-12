@@ -26,6 +26,8 @@ RATIONALE_ENGINE ?= deterministic
         urgency-run capacity-run coordinator-run rationale-build rationale-run \
         rationale-api-up rationale-api-down rationale-test rationale-lint \
         rationale-typecheck rationale-check demo-run \
+        orchestrator-run orchestrator-ask orchestrator-chat \
+        orchestrator-test orchestrator-lint orchestrator-typecheck orchestrator-check \
         dataset-test test reset psql logs volumes
 
 ## --- Bring the stack up ---
@@ -165,6 +167,58 @@ demo-run: urgency-run capacity-run coordinator-run
 		PATHWAY=$(if $(PATHWAY),$(PATHWAY),$(DEMO_PATHWAY)) \
 		RATIONALE_STYLE=$(RATIONALE_STYLE) \
 		RATIONALE_ENGINE=$(RATIONALE_ENGINE)
+
+## --- Orchestrator agent (tool-calling: urgency -> capacity -> coordinator ->
+## rationale, orchestrator-agent/README.md) ---
+##
+## Runs on the HOST, not in a container: its tools shell out to the
+## *-run targets above, which themselves manage Docker -- containerising the
+## agent too would need Docker-in-Docker for no real benefit. Requires
+## `python3.12`, `make`, and OPENAI_API_KEY set (root .env).
+
+orchestrator-run:
+	cd orchestrator-agent && \
+	  ( [ -d .venv ] || python3.12 -m venv .venv ) && \
+	  .venv/bin/pip install -q -r requirements.txt && \
+	  .venv/bin/python -m orchestrator_agent run \
+	    --hospital $(HOSPITAL) --as-of-date $(AS_OF) --run-id $(RUN_ID)
+
+## Q&A mode: `make orchestrator-ask QUESTION="why is PW-1 ranked here?"`
+orchestrator-ask:
+	cd orchestrator-agent && \
+	  ( [ -d .venv ] || python3.12 -m venv .venv ) && \
+	  .venv/bin/pip install -q -r requirements.txt && \
+	  .venv/bin/python -m orchestrator_agent ask "$(QUESTION)"
+
+## Interactive Q&A session -- run this one directly, not through a pipe.
+orchestrator-chat:
+	cd orchestrator-agent && \
+	  ( [ -d .venv ] || python3.12 -m venv .venv ) && \
+	  .venv/bin/pip install -q -r requirements.txt && \
+	  .venv/bin/python -m orchestrator_agent chat
+
+orchestrator-test:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r orchestrator-agent/requirements-dev.txt && PYTHONPATH=orchestrator-agent:rationale python -m pytest orchestrator-agent/tests/ -q"
+
+orchestrator-lint:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r orchestrator-agent/requirements-dev.txt && python -m ruff check --config orchestrator-agent/ruff.toml orchestrator-agent/"
+
+orchestrator-typecheck:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r orchestrator-agent/requirements-dev.txt && python -m mypy --config-file orchestrator-agent/mypy.ini orchestrator-agent"
+
+orchestrator-check: orchestrator-test orchestrator-lint orchestrator-typecheck
 
 ## --- Everything ---
 
