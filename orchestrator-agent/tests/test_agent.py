@@ -61,3 +61,13 @@ def test_build_agent_wires_the_scope_guardrail() -> None:
 
     guardrail_names = {g.get_name() for g in agent.input_guardrails}
     assert "triage-scope-guardrail" in guardrail_names
+
+
+def test_instructions_require_generate_rationale_for_why_questions() -> None:
+    # ADR-014: "why"/"explain" questions must route through the
+    # citation-guardrailed generate_rationale, never a freehand answer
+    # composed from get_decision/get_evidence's raw output. Whitespace is
+    # normalised since the instructions are hand-wrapped prose.
+    normalised = " ".join(INSTRUCTIONS.split())
+    assert "MUST be answered by calling generate_rationale" in normalised
+    assert "never by composing the explanation yourself" in normalised

@@ -60,4 +60,7 @@ tools, with conversation history carried across follow-ups. Both modes are now b
 code-enforced scope guardrail (ADR-013, OpenAI Agents SDK `InputGuardrail`) — a request outside
 "run the pipeline" or "answer a question about data already in the system" is rejected before
 either mode's tools are reachable at all, verified against real OpenAI calls including a
-prompt-injection attempt.
+prompt-injection attempt. ADR-014 closed a related gap: "why"/"explain" questions now must
+route through `generate_rationale` (citation-guardrailed, ADR-010) rather than being answered
+freehand from `get_decision`/`get_evidence`'s raw, unverified JSON — `generate_rationale` also
+gained a `pathway_number` parameter so it can target one specific referral, verified live.

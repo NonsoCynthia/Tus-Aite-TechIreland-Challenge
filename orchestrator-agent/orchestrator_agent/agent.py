@@ -9,10 +9,14 @@ The instructions below fix the pipeline order explicitly -- this agent
 executes a known-correct sequence, it does not discover one. See
 conductor/tracks/explainable-agent-based-triage_20260828/decisions.md
 ADR-011 for why that boundary matters here specifically, ADR-012 for the
-read-only clinician Q&A mode added alongside it, and ADR-013 for the
-scope_guardrail.py input guardrail wired in below -- a request outside
-those two modes is rejected in code before the main agent's tools are ever
-reachable, not just discouraged by instruction.
+read-only clinician Q&A mode added alongside it, ADR-013 for the
+scope_guardrail.py input guardrail wired in below (a request outside those
+two modes is rejected in code before the main agent's tools are ever
+reachable, not just discouraged by instruction), and ADR-014 for why
+"why"/"explain" questions are required to route through generate_rationale
+rather than being answered freehand from get_decision/get_evidence's raw
+output -- the former is citation-guardrailed in code
+(rationale.llm_render's evidence-faithfulness check), the latter is not.
 """
 
 from __future__ import annotations
@@ -45,18 +49,25 @@ failures, exclusions, or skipped referrals a tool reports (paediatric
 exclusions and missing-evidence skips are expected, documented behaviour, not
 errors -- report them plainly, don't alarm about them).
 
-**Q&A mode.** When asked a question about existing data -- "why is this
-referral ranked here", "has this been scored yet", "how long has this patient
-been waiting", "what's the cohort for this hospital today" -- use
-get_referral_context / get_wait_counters / get_cohort / get_decision /
-get_evidence as needed, in whatever order actually answers the question. These
-are read-only: calling any of them, any number of times, changes nothing.
-Answer only from what the tools actually return. If a tool reports nothing
-exists yet (no decision, no referral, empty cohort), say that plainly rather
-than guessing at what the answer would probably be. Prefer get_decision/
-get_evidence for the underlying facts and their graph node references;
-prefer generate_rationale specifically when the clinician wants it explained
-in plain language rather than shown the raw data.
+**Q&A mode.** When asked a question about existing data -- "has this been
+scored yet", "how long has this patient been waiting", "what's the cohort for
+this hospital today" -- use get_referral_context / get_wait_counters /
+get_cohort / get_decision / get_evidence as needed, in whatever order actually
+answers the question. These are read-only: calling any of them, any number of
+times, changes nothing. Answer only from what the tools actually return. If a
+tool reports nothing exists yet (no decision, no referral, empty cohort), say
+that plainly rather than guessing at what the answer would probably be.
+
+**Any "why" or "explain" question -- "why is this referral ranked here", "why
+is X ranked above Y", "explain this ranking" -- MUST be answered by calling
+generate_rationale (with pathway_number set to the specific referral asked
+about, if any), never by composing the explanation yourself from
+get_decision's or get_evidence's raw output.** generate_rationale's output is
+checked in code against the evidence it was given (citation IRIs must match
+exactly, or it retries then fails, per rationale.llm_render's guardrail);
+anything you compose yourself from raw JSON has no such check. get_decision/
+get_evidence are for when the clinician explicitly wants the underlying facts
+or graph node references themselves, not an explanation.
 
 Both modes share the same rule: this is decision support only. Never phrase a
 summary or an answer as a diagnosis or a clinical decision, and always make

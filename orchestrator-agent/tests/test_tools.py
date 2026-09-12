@@ -266,6 +266,80 @@ class TestGenerateRationale:
         assert "text for PW-2" in result
         assert "PW-3" not in result
 
+    def test_pathway_number_explains_only_that_one_placement(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        packs = [
+            EvidencePack(
+                decision="decision/9001/2026-08-30",
+                placement=f"placement/9001/2026-08-30/PW-{i}",
+                position=i,
+                referral=f"referral/9001/PW-{i}",
+                pathway_number=f"PW-{i}",
+                evidence=(
+                    EvidenceItem(
+                        role="urgency", iri=f"score/run-1/9001/PW-{i}/urgency", type="Score"
+                    ),
+                ),
+            )
+            for i in range(1, 4)
+        ]
+        monkeypatch.setattr(tools, "load_rationale_settings", _rationale_settings)
+        monkeypatch.setattr(tools, "RetrievalClient", _FakeRetrievalClient(decision={}))
+        monkeypatch.setattr(tools, "packs_from_decision_response", lambda decision: packs)
+
+        rendered_for: list[str] = []
+
+        def fake_render(pack: EvidencePack, *, style: str, settings: object) -> Rationale:
+            rendered_for.append(pack.pathway_number)
+            return Rationale(
+                pathway_number=pack.pathway_number,
+                text=f"text for {pack.pathway_number}",
+                citation_iris=(),
+            )
+
+        monkeypatch.setattr(tools, "render_rationale_llm", fake_render)
+
+        # limit=5 (default) would normally explain all three -- pathway_number
+        # must narrow to exactly one regardless.
+        result = tools.generate_rationale("9001", "2026-08-30", pathway_number="PW-2")
+
+        assert rendered_for == ["PW-2"]
+        assert result == "text for PW-2"
+
+    def test_pathway_number_not_in_the_decision_reports_that_plainly(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        packs = [
+            EvidencePack(
+                decision="decision/9001/2026-08-30",
+                placement="placement/9001/2026-08-30/PW-1",
+                position=1,
+                referral="referral/9001/PW-1",
+                pathway_number="PW-1",
+                evidence=(
+                    EvidenceItem(role="urgency", iri="score/run-1/9001/PW-1/urgency", type="Score"),
+                ),
+            )
+        ]
+        monkeypatch.setattr(tools, "load_rationale_settings", _rationale_settings)
+        monkeypatch.setattr(tools, "RetrievalClient", _FakeRetrievalClient(decision={}))
+        monkeypatch.setattr(tools, "packs_from_decision_response", lambda decision: packs)
+        called = False
+
+        def fake_render(pack: EvidencePack, *, style: str, settings: object) -> Rationale:
+            nonlocal called
+            called = True
+            return Rationale(pathway_number=pack.pathway_number, text="x", citation_iris=())
+
+        monkeypatch.setattr(tools, "render_rationale_llm", fake_render)
+
+        result = tools.generate_rationale("9001", "2026-08-30", pathway_number="PW-999")
+
+        assert "PW-999" in result
+        assert "not in the Decision" in result
+        assert called is False
+
 
 def _orchestrator_settings() -> OrchestratorSettings:
     return OrchestratorSettings(

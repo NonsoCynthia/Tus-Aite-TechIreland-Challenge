@@ -691,3 +691,48 @@ call (the scope check) before the main agent even starts, adding latency and cos
 every request, including well-formed in-scope ones. Accepted because the alternative —
 trusting the main agent's own instructions to self-police — is exactly the failure mode
 this ADR exists to close.
+
+---
+
+### ADR-014: "Why"/"explain" questions must route through generate_rationale, never be composed freehand
+
+**Date:** 2026-09-12
+**Status:** accepted
+
+**Context:** Raised directly by review of ADR-012's own design: Q&A mode's
+`get_decision`/`get_evidence` return raw, unverified JSON, and the agent could either
+call `generate_rationale` (which routes through `rationale.llm_render`'s
+citation-IRI guardrail — the model's output is checked against the evidence it was
+given, retried once on a mismatch, and raised on a second failure) or compose the
+"why is this referral ranked here" answer itself from that raw JSON, in the same
+response. The second path has no equivalent check — only the general instruction
+"never state a fact a tool did not return," which is a preference the model can
+misjudge, not a check that catches it when it does. This is the same class of gap
+ADR-013 closed for out-of-scope requests, applied here to in-scope ones that happen
+to need an explanation rather than a raw lookup.
+
+**Decision:** `agent.py`'s instructions now state explicitly, in capitals, that any
+"why"/"explain" question **must** be answered by calling `generate_rationale`, never
+composed from `get_decision`/`get_evidence`'s raw output — and both of those tools'
+own docstrings (which the model also reads, via `function_tool`'s
+`use_docstring_info`) repeat the same rule, so the constraint is stated twice, not
+once. `generate_rationale` gained a `pathway_number` parameter so it can now explain
+one specific referral, not just the top-`limit` of a hospital-day's whole ranking —
+without it, "why is PW-9001-000007 ranked here" had no way to route through this tool
+precisely, since the tool only knew how to explain the top of the list.
+
+**Verified against a real OpenAI call:** asked "why is PW-9001-000007 ranked here"
+with `get_decision` and `generate_rationale` both instrumented to record which was
+called. `get_decision` was never invoked; `generate_rationale` was called exactly
+once, with `pathway_number="PW-9001-000007"` — confirming the model both picked the
+guardrailed tool and correctly narrowed it to the one referral asked about, not the
+top-5 default.
+
+**Trade-off accepted:** this closes the gap for "why"/"explain" phrasing specifically,
+which still depends on the model recognising a question as that kind of question —
+the tool-call boundary this ADR adds (generate_rationale's citation-IRI guardrail) is
+a hard check once that tool is actually called, but *whether* it gets called for a
+given phrasing is still instruction-level, the same limitation ADR-013 accepted for
+scope classification. A stronger version would guardrail the main agent's own output
+directly (e.g. an output guardrail checking any explanatory answer for stated facts
+not traceable to a tool call), not attempted here.

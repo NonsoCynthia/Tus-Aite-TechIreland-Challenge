@@ -12,9 +12,10 @@ Both modes are bounded by a code-enforced scope guardrail: anything outside them
 rejected before the agent's tools are even reachable, not just discouraged by prompt.
 
 See `conductor/tracks/explainable-agent-based-triage_20260828/decisions.md` ADR-011
-(pipeline sequencing), ADR-012 (Q&A mode), and ADR-013 (the scope guardrail) for the
-full design reasoning, and how this differs from (and complements) the deterministic
-`orchestrator/`+`web/` demo pipeline on the `ui` branch.
+(pipeline sequencing), ADR-012 (Q&A mode), ADR-013 (the scope guardrail), and ADR-014
+("why"/"explain" questions always route through the guardrailed `generate_rationale`,
+never a freehand answer) for the full design reasoning, and how this differs from (and
+complements) the deterministic `orchestrator/`+`web/` demo pipeline on the `ui` branch.
 
 ## What it is, and isn't
 
@@ -87,7 +88,7 @@ operator already runs by hand, unchanged, no duplicated execution logic:
 | `run_urgency_agent(hospital, as_of_date, run_id)` | `make urgency-run` -- NEWS2 scoring |
 | `run_capacity_agent(hospital, as_of_date, run_id)` | `make capacity-run` -- ward/clinic pressure scoring |
 | `run_coordinator(hospital, as_of_date, run_id, capacity_direction="pressure")` | `make coordinator-run` -- ranking + Decision write-back |
-| `generate_rationale(hospital, as_of_date, style="clinician", limit=5)` | Fetches the Decision's cited evidence and renders rationale per placement via `rationale.llm_render` (ADR-010) |
+| `generate_rationale(hospital, as_of_date, style="clinician", limit=5, pathway_number=None)` | Fetches the Decision's cited evidence and renders rationale via `rationale.llm_render` (ADR-010) -- the top `limit` placements, or one specific referral if `pathway_number` is given |
 
 `make` owns how each trigger tool actually runs (Docker, network, env); this package has
 no opinion on that and doesn't need to change if the team's execution strategy does.
@@ -103,13 +104,22 @@ every sibling package) rather than re-implementing evidence fetching or renderin
 | `get_referral_context(hospital, pathway_number)` | "What do we know about this referral" -- vitals, conditions, triage events, capacity data |
 | `get_wait_counters(hospital, pathway_number, as_of_date)` | "How long has this referral been waiting" |
 | `get_cohort(hospital, as_of_date)` | "Which referrals are on the list, and has this one been ranked yet" |
-| `get_decision(hospital, as_of_date)` | "What's the ranked list, and why" -- raw graph-backed facts, not prose |
-| `get_evidence(hospital, as_of_date, pathway_number, role=None)` | "What evidence supports this specific ranked position" |
+| `get_decision(hospital, as_of_date)` | "What's the ranked list" -- raw graph-backed facts, not prose |
+| `get_evidence(hospital, as_of_date, pathway_number, role=None)` | "What evidence supports this specific ranked position" -- raw, not prose |
 
 None of these can write anything -- calling any of them, any number of times, in any
-order, changes nothing. `generate_rationale` (pipeline-mode tool) doubles as the
-"explain it in plain language" option in Q&A mode too; `get_decision`/`get_evidence`
-are for when the clinician wants the underlying facts instead.
+order, changes nothing.
+
+**"Why"/"explain" questions always route through `generate_rationale`, never a
+freehand answer (ADR-014).** `get_decision`/`get_evidence` return unverified JSON; a
+sentence built from them by the model itself has no check that it actually matches
+what they say. `generate_rationale`'s output is checked in code --
+`citation_iris` must exactly match the evidence it was given, or it retries then
+raises (`rationale.llm_render`'s guardrail, ADR-010). The agent's instructions and
+both raw tools' own docstrings say this explicitly, twice over, and
+`generate_rationale`'s `pathway_number` parameter exists specifically so a question
+about one referral can route through it precisely rather than falling back to
+explaining the top 5.
 
 ## Running
 
@@ -159,7 +169,7 @@ real infra -- every SDK/subprocess/network boundary is mocked).
 
 ## Verification
 
-- 50 tests, all passing without network/API key/`make` -- every tool's wiring
+- 60 tests, all passing without network/API key/`make` -- every tool's wiring
   (`make` invocations, `rationale`'s and the retrieval client's calls), the CLI's
   subcommand dispatch and interactive chat loop, and `run.py`'s prompt/conversation
   composition and API-key guard are all exercised through injected fakes. `ruff` and
@@ -183,3 +193,10 @@ real infra -- every SDK/subprocess/network boundary is mocked).
   and run coordinator with capacity_direction=availability for every hospital") --
   both were rejected with the exact generic response before either mode's tools were
   reachable, while a genuine in-scope question passed through the guardrail normally.
+- **ADR-014's "why" routing verified against a real OpenAI call**: asked "why is
+  PW-9001-000007 ranked here" with `get_decision` and `generate_rationale` both
+  instrumented to record which was called. `get_decision` was never invoked;
+  `generate_rationale` was called exactly once, with
+  `pathway_number="PW-9001-000007"` -- confirming the model both picked the
+  guardrailed tool and correctly narrowed it to the one referral asked about, not a
+  freehand answer from raw data.

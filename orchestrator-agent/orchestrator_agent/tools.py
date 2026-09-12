@@ -160,12 +160,25 @@ def run_coordinator(
 
 
 def generate_rationale(
-    hospital_hipe: str, as_of_date: str, style: RationaleStyle = "clinician", limit: int = 5
+    hospital_hipe: str,
+    as_of_date: str,
+    style: RationaleStyle = "clinician",
+    limit: int = 5,
+    pathway_number: str | None = None,
 ) -> str:
     """Explains an already-ranked Decision: fetches every placement's cited
     evidence from the retrieval service and renders rationale text for each,
-    via this system's OpenAI-backed rationale engine (ADR-010). Must be
-    called after run_coordinator has written a Decision for this
+    via this system's OpenAI-backed, citation-guardrailed rationale engine
+    (ADR-010). This is the ONLY tool that should be used to answer a "why"
+    or "explain" question -- e.g. "why is this referral ranked here", "why
+    is X ranked above Y". Never compose that kind of explanation yourself
+    from get_decision/get_evidence's raw JSON (ADR-014): unlike this tool,
+    those return unverified data, with no check that a sentence built from
+    them actually matches what they say. Use get_decision/get_evidence
+    instead when the clinician wants the raw facts or graph node
+    references, not an explanation.
+
+    Must be called after run_coordinator has written a Decision for this
     (hospital_hipe, as_of_date) -- if none exists yet, this reports that
     rather than inventing one.
 
@@ -174,12 +187,20 @@ def generate_rationale(
         as_of_date: ISO date, e.g. "2026-08-30".
         style: "clinician" (default, short readable prose) or "technical"
             (structured audit detail).
-        limit: Maximum number of ranked placements to explain, highest
-            priority first -- keeps tool-call latency and OpenAI cost
-            bounded for a large cohort. Default 5.
+        limit: Maximum number of ranked placements to explain when
+            pathway_number is not given, highest priority first -- keeps
+            tool-call latency and OpenAI cost bounded for a large cohort.
+            Default 5. Ignored when pathway_number is given (exactly one
+            placement is explained).
+        pathway_number: Explain only this one referral's ranked position --
+            use this whenever the question is about a specific referral,
+            e.g. "why is PW-9001-000007 ranked here". Omit to explain the
+            top `limit` placements instead.
 
     Returns:
-        One rationale per explained placement, in ranked order.
+        One rationale per explained placement, in ranked order. If
+        pathway_number was given but isn't in this hospital-day's Decision,
+        says so plainly rather than explaining a different placement.
     """
     settings = load_rationale_settings()
     try:
@@ -195,8 +216,19 @@ def generate_rationale(
             "has run_coordinator been called for this hospital-day yet?"
         )
 
+    if pathway_number is not None:
+        matching = [pack for pack in packs if pack.pathway_number == pathway_number]
+        if not matching:
+            return (
+                f"{pathway_number} is not in the Decision for {hospital_hipe}/{as_of_date} -- "
+                "it may not have been ranked, or the pathway_number may be wrong."
+            )
+        packs = matching
+    else:
+        packs = packs[:limit]
+
     rendered = []
-    for pack in packs[:limit]:
+    for pack in packs:
         rationale = render_rationale_llm(pack, style=style, settings=settings)
         rendered.append(rationale.text)
     return "\n\n".join(rendered)
@@ -279,12 +311,14 @@ def get_cohort(hospital_hipe: str, as_of_date: str) -> str:
 
 
 def get_decision(hospital_hipe: str, as_of_date: str) -> str:
-    """Answers "what's the ranked list, and why": every ranked placement for
-    that hospital-day, in order, with its cited evidence already resolved.
-    Unlike generate_rationale, this returns the raw graph-backed data
-    (IRIs, property values), not OpenAI-authored prose -- use this when the
-    clinician wants the underlying facts, generate_rationale when they want
-    it explained in plain language.
+    """Answers "what's the ranked list": every ranked placement for that
+    hospital-day, in order, with its cited evidence already resolved to raw
+    graph-backed data (IRIs, property values) -- NOT prose, and not
+    verified for faithfulness the way generate_rationale's output is
+    (ADR-014). Use this only when the clinician wants the underlying facts
+    or graph node references themselves. For any "why" or "explain"
+    question -- including "why is X ranked here" -- call generate_rationale
+    instead of writing that explanation yourself from this tool's output.
 
     Args:
         hospital_hipe: 4-character HIPE hospital code, e.g. "9001".
@@ -312,8 +346,10 @@ def get_evidence(
 ) -> str:
     """Answers "what evidence supports this specific ranked position": one
     placement's cited evidence, resolved to real values. Narrower than
-    get_decision (one placement, not the whole list) and raw rather than
-    prose (see get_decision's own note on that distinction).
+    get_decision (one placement, not the whole list) and, like
+    get_decision, raw and unverified rather than prose -- do not compose a
+    "why"/"explain" answer from this tool's output; call generate_rationale
+    instead (see get_decision's own note, ADR-014).
 
     Args:
         hospital_hipe: 4-character HIPE hospital code, e.g. "9001".
