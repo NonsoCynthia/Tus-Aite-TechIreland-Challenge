@@ -121,6 +121,8 @@ services:
       # hardcodes localhost and main() is its sole caller, so this works unchanged.
       RETRIEVAL_BASE_URL: http://retrieval:8000
       RETRIEVAL_BEARER_TOKENS: ${RETRIEVAL_BEARER_TOKENS}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
       # Read-only, and only for what retrieval has no endpoint for: the
       # reference layer (core.ref_*) and reading an override back. Every write
       # still goes through retrieval.

@@ -1,8 +1,10 @@
 # Clinician interface
 
 The screens a clinician reads: the hospital overview, the ranked list, one patient's evidence, a run in
-progress, the decision record and the cohort graph. React 19 and TypeScript, built by Vite, served as static
-files by the orchestrator in [`../orchestrator/`](../orchestrator/).
+progress, the decision record, the cohort graph, and a read-only AI assistant panel for questions about the
+current hospital-day or selected referral. The assistant is available from the landing page and across the
+entered decision-support interface. React 19 and TypeScript, built by Vite, served as static files by the
+orchestrator in [`../orchestrator/`](../orchestrator/).
 
 **Nothing clinical is worked out here.** Every figure on screen arrives over `/api/*`: the ordering from
 [`../coordinator/`](../coordinator/README.md), the scores from [`../urgency-agent/`](../urgency-agent/README.md)
@@ -38,6 +40,7 @@ docker compose up -d --build orchestrator
 
 # 3. Open http://localhost:8080. The port comes from UI_PORT, which is not in
 #    .env or .env.example, so 8080 applies unless you set it yourself.
+#    The AI assistant also needs OPENAI_API_KEY in the root .env.
 
 # 4. Optional: live reload, with the container above still up.
 cd web && npm install && npm run dev     # serves :5173
@@ -75,7 +78,7 @@ src/
   surfaces/      one screen per file. Six of the seven have their own stylesheet;
                  Landing has none, its rules sit in app.css
   components/    severity marks, disclosures, vitals, agent inputs, journey, compare,
-                 override, provenance, the mark
+                 override, provenance, the mark, assistant panel
   lib/           api calls, types, target days, the NEWS2 tables, the severity scale
 ```
 
@@ -188,9 +191,34 @@ The legend above the table paints its steps from the same code the marks use, so
 | `/api/scores/{run_id}/{hospital}` | each agent's score with the evidence it cited |
 | `POST /api/overrides` | records what a clinician did |
 | `POST /api/hospital-days/{hospital}/refresh` | looks again for days that hold a list |
+| `POST /api/chat` | sends a clinician's read-only question to the server-side OpenAI assistant |
 
 Unmarked rows are GET. Defined in `orchestrator/app/main.py`, typed in `src/lib/api.ts`. An unknown GET path
 returns the page rather than a 404, so a 200 does not prove an endpoint exists.
+
+## AI assistant
+
+`AssistantPanel.tsx` adds a bottom-right Tus prompt that says "I am Tus, here to answer your questions."
+It is rendered as an app-level overlay rather than inside one screen, so it remains visible on the landing page,
+overview, ranked list, patient evidence view, knowledge graph, and decision record.
+It sends the current hospital, date and selected pathway to `POST /api/chat`, so the model has UI context but the browser never sees
+`OPENAI_API_KEY` or `RETRIEVAL_BEARER_TOKENS`.
+
+The assistant is intentionally read-only in the UI. The orchestrator calls `orchestrator-agent`'s
+Q&A-only agent, whose available tools can read retrieval/cohort/evidence data and generate rationale, but
+cannot trigger urgency, capacity or coordinator runs. Running the agents remains the job of the existing
+`Run the agents` control.
+
+Common UI questions do not need the evidence-heavy retrieval Decision endpoint. Before the model sees a
+question, `orchestrator/app/main.py` adds compact current facts from the same state the UI displays: hospital
+name, waiting-list count, ranked count, first ranked referral, and the selected referral's rank when there is
+one. This keeps questions such as "Who is ranked first?" and "How many referrals are on the list?" fast, while
+the evidence and rationale tools remain available for "why" questions. Specific-referral rationale uses the
+single-placement evidence endpoint, and falls back to deterministic prose if the LLM wording layer fails its
+citation check.
+
+The server also appends the decision-support caveat when the model omits it, so every chat response keeps the
+clinical boundary visible.
 
 ## Numbers that are typed in rather than fetched
 
