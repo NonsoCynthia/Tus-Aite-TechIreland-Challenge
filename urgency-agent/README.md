@@ -182,6 +182,13 @@ To score a hospital-day's whole cohort:
 python -m urgency_agent --hospital 9004 --as-of-date 2026-08-30 --run-id run-0001
 ```
 
+From the repo root, collaborators can run the same job through the root `Makefile` without setting up
+a local Python environment:
+
+```bash
+make urgency-run HOSPITAL=9001 AS_OF=2026-08-30 RUN_ID=run-0001
+```
+
 Exit code is 0 when nothing was skipped and no graph projection failed. **Paediatric refusals do not
 affect the exit code** -- a run that refuses every 0601 referral and scores the rest has done exactly
 its job.

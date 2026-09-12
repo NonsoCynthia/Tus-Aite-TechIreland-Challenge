@@ -84,6 +84,16 @@ one referral's vitals, then `POST /scores`. A coordinator calls `GET /hospitals/
 its cohort (which now includes that new referral), then `GET /runs/{run_id}/hospitals/.../scores` to
 gather every score already written for it, then `POST /decisions` once it's ranked them.
 
+## Rationale Layer Change
+
+For the rationale layer, the cohort endpoint now includes `referral_state_valid_from`. The coordinator
+uses that value when it cites `referral_state` evidence, because the KG `ReferralState` IRI is keyed by
+`valid_from`, not by `referral_date`.
+
+This keeps decision citations dereferenceable through `GET /evidence/...`: a rationale can resolve the
+cited `ReferralState`, `Rule`, `BedStatus`, `ClinicSession`, and `Score` nodes instead of showing an
+empty unresolved evidence item.
+
 Every read endpoint's evidence is **resolved inline** (FR8, Phase 6) -- each citation comes back as
 `{"role": ..., "iri": ..., "type": ..., "properties": {...}}`, the node's actual data (e.g. a
 `ClinicSession`'s `slotsAvailable`), not just an identifier the caller would have to dereference

@@ -17,10 +17,10 @@ from datetime import date
 
 import psycopg
 import pytest
-from fastapi.testclient import TestClient
-
 from app.config import settings
 from app.main import app
+from fastapi.testclient import TestClient
+
 from tests.adapters import to_score_in
 from tests.fixtures import make_score
 
@@ -91,6 +91,7 @@ class TestCohort:
             "pathway_number",
             "specialty_hipe",
             "referral_date",
+            "referral_state_valid_from",
             "adjusted_wait_days",
             "cpc",
             "currently_suspended",
