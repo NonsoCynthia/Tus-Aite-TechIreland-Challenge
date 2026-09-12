@@ -1,0 +1,32 @@
+# Builds and publishes the clinician UI (web/) as a static site.
+#
+# This gets the page LOADING on Netlify -- it does not make it WORK. Every
+# screen fetches data over /api/*, and that traffic needs a backend attached:
+# retrieval-service has no CORS support, and the bearer token that
+# authenticates to it must never reach the browser (web/README.md), so
+# something server-side has to sit between this site and retrieval and hold
+# that secret. Locally, and in the only deployment this repo documents, that
+# something is the `orchestrator` container (docker-compose.yml) -- one
+# process that builds this same bundle AND proxies /api/* on one origin.
+#
+# Netlify has no equivalent wired up here. Until either (a) `orchestrator`
+# itself is deployed somewhere reachable and this site is pointed at it via a
+# redirect, or (b) a Netlify Function is written to hold the bearer token and
+# proxy /api/* to a publicly-reachable retrieval-service, every API call from
+# this Netlify deploy will fail and the screens will show no data.
+#
+# web/vite.config.ts's own dev-server proxy (`/api` -> 127.0.0.1:8080) is the
+# same problem in miniature: it stands in for `orchestrator` locally, and
+# nothing here stands in for it on Netlify yet.
+
+[build]
+  base = "web"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # reagraph's camera-controls dependency declares node >=22 in its own
+  # engines field; the build still runs on Node 20 with only a warning, but
+  # pinned here rather than left to whatever Netlify's own default happens
+  # to be. Verified clean (no engine warning) on this exact version.
+  NODE_VERSION = "22"
