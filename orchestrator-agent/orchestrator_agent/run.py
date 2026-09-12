@@ -117,6 +117,31 @@ def _default_ask_runner(
     return str(result.final_output), result.to_input_list()
 
 
+def _default_read_only_ask_runner(
+    *, history: ConversationHistory | None, question: str, model: str, api_key: str
+) -> tuple[str, ConversationHistory]:
+    """The real OpenAI Agents SDK run for the browser UI's read-only chat.
+
+    This intentionally builds the Q&A-only agent, whose tool list excludes the
+    pipeline trigger tools.
+    """
+    from agents import InputGuardrailTripwireTriggered, Runner, set_default_openai_key
+
+    from .agent import build_qa_agent
+    from .scope_guardrail import GENERIC_OUT_OF_SCOPE_RESPONSE
+
+    set_default_openai_key(api_key)
+    agent = build_qa_agent(model=model)
+    conversation_input: str | ConversationHistory = (
+        question if history is None else [*history, {"role": "user", "content": question}]
+    )
+    try:
+        result = Runner.run_sync(agent, conversation_input)
+    except InputGuardrailTripwireTriggered:
+        return GENERIC_OUT_OF_SCOPE_RESPONSE, history or []
+    return str(result.final_output), result.to_input_list()
+
+
 def ask_question(
     question: str,
     *,
@@ -146,6 +171,25 @@ def ask_question(
     """
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not set -- required to run the orchestrator agent")
+
+    return runner(
+        history=history,
+        question=question,
+        model=settings.openai_model,
+        api_key=settings.openai_api_key,
+    )
+
+
+def ask_question_read_only(
+    question: str,
+    *,
+    settings: Settings,
+    history: ConversationHistory | None = None,
+    runner: AskRunner = _default_read_only_ask_runner,
+) -> tuple[str, ConversationHistory]:
+    """Ask a UI chat question with only read/rationale tools available."""
+    if not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set -- required to run the UI assistant")
 
     return runner(
         history=history,

@@ -79,10 +79,44 @@ never guess at a workaround or invent a result a tool did not actually
 return.
 """.strip()
 
-_TOOLS: list[Tool] = [
+QA_INSTRUCTIONS = """
+You are the read-only AI assistant inside the clinician UI for a hospital
+referral prioritisation system.
+
+Answer questions about existing triage data only: the current waiting list,
+referral context, wait counters, rankings, evidence, and rationale. Use the
+available tools when facts are needed. Never guess, never diagnose, and never
+state a score, rank, wait time, or citation that a tool did not return.
+
+The browser may include "Current facts from orchestrator state" in the user
+message. Treat those facts as authoritative UI context: if they fully answer a
+question about waiting-list size, ranked count, the first/top referral, a
+selected referral's rank, or whether a decision exists, answer from those
+facts and do not call a slower tool. If those facts are absent or incomplete,
+questions about the size or membership of a waiting list MUST call get_cohort,
+and questions about ranked order, a referral's rank, or whether a decision
+exists MUST call get_decision.
+
+Any "why" or "explain" question MUST be answered by calling
+generate_rationale, with pathway_number set when the user is asking about one
+referral.
+
+This browser chat is read-only. If the user asks you to run the pipeline,
+score referrals, rank referrals, reorder a list, write an override, or change
+a decision, explain that those actions must be done through the existing UI
+controls. Do not imply that you have changed anything.
+
+Always make clear this is decision support only and clinician sign-off is
+required.
+""".strip()
+
+_PIPELINE_TOOLS: list[Tool] = [
     function_tool(tools.run_urgency_agent),
     function_tool(tools.run_capacity_agent),
     function_tool(tools.run_coordinator),
+]
+
+_QA_TOOLS: list[Tool] = [
     function_tool(tools.generate_rationale),
     function_tool(tools.get_referral_context),
     function_tool(tools.get_wait_counters),
@@ -91,6 +125,8 @@ _TOOLS: list[Tool] = [
     function_tool(tools.get_evidence),
 ]
 
+_TOOLS: list[Tool] = [*_PIPELINE_TOOLS, *_QA_TOOLS]
+
 
 def build_agent(*, model: str) -> Agent:
     return Agent(
@@ -98,5 +134,15 @@ def build_agent(*, model: str) -> Agent:
         instructions=INSTRUCTIONS,
         model=model,
         tools=_TOOLS,
+        input_guardrails=[scope_input_guardrail],
+    )
+
+
+def build_qa_agent(*, model: str) -> Agent:
+    return Agent(
+        name="triage-ui-assistant",
+        instructions=QA_INSTRUCTIONS,
+        model=model,
+        tools=_QA_TOOLS,
         input_guardrails=[scope_input_guardrail],
     )

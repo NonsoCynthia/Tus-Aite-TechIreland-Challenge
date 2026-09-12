@@ -16,6 +16,7 @@ from orchestrator_agent.retrieval_client import RetrievalClientError
 from orchestrator_agent.tools import ToolExecutionError
 from rationale.client import RetrievalServiceError
 from rationale.config import Settings as RationaleSettings
+from rationale.llm_render import RationaleGuardrailError
 from rationale.models import EvidenceItem, EvidencePack, Rationale
 
 
@@ -179,9 +180,16 @@ def _rationale_settings() -> RationaleSettings:
 
 
 class _FakeRetrievalClient:
-    def __init__(self, decision: dict | None = None, error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        decision: dict | None = None,
+        evidence: dict | None = None,
+        error: Exception | None = None,
+    ) -> None:
         self._decision = decision
+        self._evidence = evidence
         self._error = error
+        self.calls: list[tuple[str, ...]] = []
 
     def __call__(self, base_url: str, bearer_token: str) -> _FakeRetrievalClient:
         return self
@@ -193,10 +201,25 @@ class _FakeRetrievalClient:
         return None
 
     def get_decision(self, hospital_hipe: str, as_of_date: str) -> dict:
+        self.calls.append(("decision", hospital_hipe, as_of_date))
         if self._error is not None:
             raise self._error
         assert self._decision is not None
         return self._decision
+
+    def get_placement_evidence(
+        self,
+        hospital_hipe: str,
+        as_of_date: str,
+        pathway_number: str,
+        *,
+        role: str | None = None,
+    ) -> dict:
+        self.calls.append(("evidence", hospital_hipe, as_of_date, pathway_number, role or ""))
+        if self._error is not None:
+            raise self._error
+        assert self._evidence is not None
+        return self._evidence
 
 
 class TestGenerateRationale:
@@ -266,27 +289,18 @@ class TestGenerateRationale:
         assert "text for PW-2" in result
         assert "PW-3" not in result
 
-    def test_pathway_number_explains_only_that_one_placement(
+    def test_pathway_number_uses_single_placement_evidence_endpoint(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        packs = [
-            EvidencePack(
-                decision="decision/9001/2026-08-30",
-                placement=f"placement/9001/2026-08-30/PW-{i}",
-                position=i,
-                referral=f"referral/9001/PW-{i}",
-                pathway_number=f"PW-{i}",
-                evidence=(
-                    EvidenceItem(
-                        role="urgency", iri=f"score/run-1/9001/PW-{i}/urgency", type="Score"
-                    ),
-                ),
-            )
-            for i in range(1, 4)
-        ]
+        evidence_response = {
+            "placement": "placement/9001/2026-08-30/PW-2",
+            "evidence": [
+                {"role": "urgency", "iri": "score/run-1/9001/PW-2/urgency", "type": "Score"}
+            ],
+        }
         monkeypatch.setattr(tools, "load_rationale_settings", _rationale_settings)
-        monkeypatch.setattr(tools, "RetrievalClient", _FakeRetrievalClient(decision={}))
-        monkeypatch.setattr(tools, "packs_from_decision_response", lambda decision: packs)
+        fake = _FakeRetrievalClient(evidence=evidence_response)
+        monkeypatch.setattr(tools, "RetrievalClient", fake)
 
         rendered_for: list[str] = []
 
@@ -300,31 +314,19 @@ class TestGenerateRationale:
 
         monkeypatch.setattr(tools, "render_rationale_llm", fake_render)
 
-        # limit=5 (default) would normally explain all three -- pathway_number
-        # must narrow to exactly one regardless.
         result = tools.generate_rationale("9001", "2026-08-30", pathway_number="PW-2")
 
+        assert fake.calls == [("evidence", "9001", "2026-08-30", "PW-2", "")]
         assert rendered_for == ["PW-2"]
         assert result == "text for PW-2"
 
-    def test_pathway_number_not_in_the_decision_reports_that_plainly(
+    def test_pathway_number_evidence_failure_reports_that_plainly(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        packs = [
-            EvidencePack(
-                decision="decision/9001/2026-08-30",
-                placement="placement/9001/2026-08-30/PW-1",
-                position=1,
-                referral="referral/9001/PW-1",
-                pathway_number="PW-1",
-                evidence=(
-                    EvidenceItem(role="urgency", iri="score/run-1/9001/PW-1/urgency", type="Score"),
-                ),
-            )
-        ]
         monkeypatch.setattr(tools, "load_rationale_settings", _rationale_settings)
-        monkeypatch.setattr(tools, "RetrievalClient", _FakeRetrievalClient(decision={}))
-        monkeypatch.setattr(tools, "packs_from_decision_response", lambda decision: packs)
+        monkeypatch.setattr(
+            tools, "RetrievalClient", _FakeRetrievalClient(error=RetrievalServiceError("404"))
+        )
         called = False
 
         def fake_render(pack: EvidencePack, *, style: str, settings: object) -> Rationale:
@@ -337,8 +339,37 @@ class TestGenerateRationale:
         result = tools.generate_rationale("9001", "2026-08-30", pathway_number="PW-999")
 
         assert "PW-999" in result
-        assert "not in the Decision" in result
+        assert "could not fetch the evidence" in result
         assert called is False
+
+    def test_guardrail_failure_falls_back_to_deterministic_rationale(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        evidence_response = {
+            "placement": "placement/9001/2026-08-30/PW-2",
+            "evidence": [
+                {
+                    "role": "urgency",
+                    "iri": "score/run-1/9001/PW-2/urgency",
+                    "type": "Score",
+                    "properties": {"scoreValue": "0.5"},
+                }
+            ],
+        }
+        monkeypatch.setattr(tools, "load_rationale_settings", _rationale_settings)
+        monkeypatch.setattr(
+            tools, "RetrievalClient", _FakeRetrievalClient(evidence=evidence_response)
+        )
+
+        def fake_llm_render(pack: EvidencePack, *, style: str, settings: object) -> Rationale:
+            raise RationaleGuardrailError("missing citation")
+
+        monkeypatch.setattr(tools, "render_rationale_llm", fake_llm_render)
+
+        result = tools.generate_rationale("9001", "2026-08-30", pathway_number="PW-2")
+
+        assert "Referral PW-2 is shown for clinician review" in result
+        assert "urgency score is 0.500" in result
 
 
 def _orchestrator_settings() -> OrchestratorSettings:
