@@ -11,6 +11,8 @@ from dataclasses import dataclass
 import pytest
 
 from orchestrator_agent import tools
+from orchestrator_agent.config import Settings as OrchestratorSettings
+from orchestrator_agent.retrieval_client import RetrievalClientError
 from orchestrator_agent.tools import ToolExecutionError
 from rationale.client import RetrievalServiceError
 from rationale.config import Settings as RationaleSettings
@@ -263,3 +265,136 @@ class TestGenerateRationale:
         assert "text for PW-1" in result
         assert "text for PW-2" in result
         assert "PW-3" not in result
+
+
+def _orchestrator_settings() -> OrchestratorSettings:
+    return OrchestratorSettings(
+        openai_api_key="sk-test",
+        openai_model="gpt-4.1-mini",
+        retrieval_base_url="http://retrieval.test",
+        bearer_token="tok",
+    )
+
+
+class _FakeQAClient:
+    def __init__(self, response: dict | None = None, error: Exception | None = None) -> None:
+        self._response = response
+        self._error = error
+        self.calls: list[tuple] = []
+
+    def __call__(self, base_url: str, bearer_token: str) -> _FakeQAClient:
+        return self
+
+    def __enter__(self) -> _FakeQAClient:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def _respond(self, *args: object) -> dict:
+        self.calls.append(args)
+        if self._error is not None:
+            raise self._error
+        assert self._response is not None
+        return self._response
+
+    def get_referral_context(self, hospital_hipe: str, pathway_number: str) -> dict:
+        return self._respond("context", hospital_hipe, pathway_number)
+
+    def get_wait_counters(self, hospital_hipe: str, pathway_number: str, as_of_date: str) -> dict:
+        return self._respond("wait_counters", hospital_hipe, pathway_number, as_of_date)
+
+    def get_cohort(self, hospital_hipe: str, as_of_date: str) -> dict:
+        return self._respond("cohort", hospital_hipe, as_of_date)
+
+    def get_decision(self, hospital_hipe: str, as_of_date: str) -> dict:
+        return self._respond("decision", hospital_hipe, as_of_date)
+
+    def get_evidence(
+        self, hospital_hipe: str, as_of_date: str, pathway_number: str, *, role: str | None = None
+    ) -> dict:
+        return self._respond("evidence", hospital_hipe, as_of_date, pathway_number, role)
+
+
+class TestReadOnlyTools:
+    def test_get_referral_context_returns_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
+        fake = _FakeQAClient(response={"referral": {"pathway_number": "PW-1"}})
+        monkeypatch.setattr(tools, "QARetrievalClient", fake)
+
+        result = tools.get_referral_context("9001", "PW-1")
+
+        assert "PW-1" in result
+        assert fake.calls == [("context", "9001", "PW-1")]
+
+    def test_get_referral_context_reports_a_clear_message_on_failure(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
+        monkeypatch.setattr(
+            tools, "QARetrievalClient", _FakeQAClient(error=RetrievalClientError("404"))
+        )
+
+        result = tools.get_referral_context("9001", "PW-nope")
+
+        assert "could not fetch context" in result
+
+    def test_get_wait_counters_passes_as_of_date(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
+        fake = _FakeQAClient(response={"adjusted_wait_days": 12})
+        monkeypatch.setattr(tools, "QARetrievalClient", fake)
+
+        result = tools.get_wait_counters("9001", "PW-1", "2026-08-30")
+
+        assert "12" in result
+        assert fake.calls == [("wait_counters", "9001", "PW-1", "2026-08-30")]
+
+    def test_get_cohort_returns_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
+        fake = _FakeQAClient(response={"referrals": []})
+        monkeypatch.setattr(tools, "QARetrievalClient", fake)
+
+        result = tools.get_cohort("9001", "2026-08-30")
+
+        assert "referrals" in result
+        assert fake.calls == [("cohort", "9001", "2026-08-30")]
+
+    def test_get_decision_reports_a_clear_message_when_none_exists_yet(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
+        monkeypatch.setattr(
+            tools, "QARetrievalClient", _FakeQAClient(error=RetrievalClientError("404 not found"))
+        )
+
+        result = tools.get_decision("9001", "2026-08-30")
+
+        assert "no decision found" in result
+        assert "run_coordinator" in result
+
+    def test_get_decision_returns_json_on_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
+        fake = _FakeQAClient(response={"decision": "decision/9001/2026-08-30"})
+        monkeypatch.setattr(tools, "QARetrievalClient", fake)
+
+        result = tools.get_decision("9001", "2026-08-30")
+
+        assert "decision/9001/2026-08-30" in result
+
+    def test_get_evidence_passes_role_through(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
+        fake = _FakeQAClient(response={"evidence": []})
+        monkeypatch.setattr(tools, "QARetrievalClient", fake)
+
+        tools.get_evidence("9001", "2026-08-30", "PW-1", role="urgency")
+
+        assert fake.calls == [("evidence", "9001", "2026-08-30", "PW-1", "urgency")]
+
+    def test_get_evidence_omits_role_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
+        fake = _FakeQAClient(response={"evidence": []})
+        monkeypatch.setattr(tools, "QARetrievalClient", fake)
+
+        tools.get_evidence("9001", "2026-08-30", "PW-1")
+
+        assert fake.calls == [("evidence", "9001", "2026-08-30", "PW-1", None)]

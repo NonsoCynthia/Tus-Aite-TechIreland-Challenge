@@ -19,18 +19,28 @@ the LLM decides *when* to call these, never *what they compute*.
   every sibling package) and calls its already-guardrailed
   `render_rationale_llm` (ADR-010) per placement -- never re-implements
   evidence fetching or rendering.
+- get_referral_context / get_wait_counters / get_cohort / get_decision /
+  get_evidence: read-only GETs against retrieval-service_20260904 (ADR-012),
+  backing the clinician Q&A mode. These can never write anything -- the
+  clinician asking a question can prompt the model into calling any number
+  of them, in any order, without touching the determinism boundary the
+  trigger tools hold.
 """
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
 from typing import Literal
 
-from .config import repo_root
+from .config import load_settings, repo_root
+from .retrieval_client import RetrievalClient as QARetrievalClient
+from .retrieval_client import RetrievalClientError
 
 RationaleStyle = Literal["clinician", "technical"]
+CitationRole = Literal["urgency", "capacity", "timeframe", "multi_list"]
 
 # `rationale` is a top-level package (rationale/__init__.py) -- the repo
 # root must be on sys.path for `import rationale.client` etc. to resolve,
@@ -190,3 +200,136 @@ def generate_rationale(
         rationale = render_rationale_llm(pack, style=style, settings=settings)
         rendered.append(rationale.text)
     return "\n\n".join(rendered)
+
+
+def _qa_client() -> QARetrievalClient:
+    settings = load_settings()
+    return QARetrievalClient(settings.retrieval_base_url, settings.bearer_token)
+
+
+def _format_json(data: object) -> str:
+    return json.dumps(data, indent=2, default=str)[:_MAX_OUTPUT_CHARS]
+
+
+def get_referral_context(hospital_hipe: str, pathway_number: str) -> str:
+    """Answers "what do we know about this referral": its own record
+    (specialty, dates, triage status), every observation (vitals),
+    condition, and triage event, plus capacity data for its specialty
+    (wards, latest bed status, recent clinic sessions).
+
+    Args:
+        hospital_hipe: 4-character HIPE hospital code, e.g. "9001".
+        pathway_number: The referral's pathway number, e.g. "PW-9001-000007".
+
+    Returns:
+        The raw context as JSON, or a plain-language error if the referral
+        doesn't exist.
+    """
+    try:
+        with _qa_client() as client:
+            data = client.get_referral_context(hospital_hipe, pathway_number)
+    except RetrievalClientError as exc:
+        return f"could not fetch context for {hospital_hipe}/{pathway_number}: {exc}"
+    return _format_json(data)
+
+
+def get_wait_counters(hospital_hipe: str, pathway_number: str, as_of_date: str) -> str:
+    """Answers "how long has this referral been waiting": days since
+    referral, days since received, days awaiting triage, and the
+    suspension-adjusted wait -- the same four counters every agent and the
+    rule checker use, from one shared source (kg/queries/wait_counters.rq).
+
+    Args:
+        hospital_hipe: 4-character HIPE hospital code, e.g. "9001".
+        pathway_number: The referral's pathway number, e.g. "PW-9001-000007".
+        as_of_date: ISO date to compute the counters as of, e.g. "2026-08-30".
+
+    Returns:
+        The four counters as JSON, or a plain-language error if there's no
+        data for that referral/date in the graph.
+    """
+    try:
+        with _qa_client() as client:
+            data = client.get_wait_counters(hospital_hipe, pathway_number, as_of_date)
+    except RetrievalClientError as exc:
+        return f"could not fetch wait counters for {hospital_hipe}/{pathway_number}: {exc}"
+    return _format_json(data)
+
+
+def get_cohort(hospital_hipe: str, as_of_date: str) -> str:
+    """Answers "which referrals are on the waiting list, and has this one
+    been ranked yet": every referral still on the list for that
+    hospital-day, oldest first, with CPC, wait counters, and whether its
+    CRT has been breached.
+
+    Args:
+        hospital_hipe: 4-character HIPE hospital code, e.g. "9001".
+        as_of_date: ISO date, e.g. "2026-08-30".
+
+    Returns:
+        The cohort as JSON. An empty `referrals` list means nothing is on
+        the list that day, not an error.
+    """
+    try:
+        with _qa_client() as client:
+            data = client.get_cohort(hospital_hipe, as_of_date)
+    except RetrievalClientError as exc:
+        return f"could not fetch the cohort for {hospital_hipe}/{as_of_date}: {exc}"
+    return _format_json(data)
+
+
+def get_decision(hospital_hipe: str, as_of_date: str) -> str:
+    """Answers "what's the ranked list, and why": every ranked placement for
+    that hospital-day, in order, with its cited evidence already resolved.
+    Unlike generate_rationale, this returns the raw graph-backed data
+    (IRIs, property values), not OpenAI-authored prose -- use this when the
+    clinician wants the underlying facts, generate_rationale when they want
+    it explained in plain language.
+
+    Args:
+        hospital_hipe: 4-character HIPE hospital code, e.g. "9001".
+        as_of_date: ISO date, e.g. "2026-08-30".
+
+    Returns:
+        The decision as JSON, or a plain-language message if nothing has
+        been ranked for that hospital-day yet.
+    """
+    try:
+        with _qa_client() as client:
+            data = client.get_decision(hospital_hipe, as_of_date)
+    except RetrievalClientError as exc:
+        if "404" in str(exc):
+            return (
+                f"no decision found for {hospital_hipe}/{as_of_date} -- "
+                "has run_coordinator been called for this hospital-day yet?"
+            )
+        return f"could not fetch the decision for {hospital_hipe}/{as_of_date}: {exc}"
+    return _format_json(data)
+
+
+def get_evidence(
+    hospital_hipe: str, as_of_date: str, pathway_number: str, role: CitationRole | None = None
+) -> str:
+    """Answers "what evidence supports this specific ranked position": one
+    placement's cited evidence, resolved to real values. Narrower than
+    get_decision (one placement, not the whole list) and raw rather than
+    prose (see get_decision's own note on that distinction).
+
+    Args:
+        hospital_hipe: 4-character HIPE hospital code, e.g. "9001".
+        as_of_date: ISO date, e.g. "2026-08-30".
+        pathway_number: The ranked referral's pathway number.
+        role: Narrow to one citation role (urgency/capacity/timeframe/
+            multi_list), or omit for all four.
+
+    Returns:
+        The resolved evidence as JSON.
+    """
+    try:
+        with _qa_client() as client:
+            data = client.get_evidence(hospital_hipe, as_of_date, pathway_number, role=role)
+    except RetrievalClientError as exc:
+        return (
+            f"could not fetch evidence for {hospital_hipe}/{as_of_date}/{pathway_number}: {exc}"
+        )
+    return _format_json(data)

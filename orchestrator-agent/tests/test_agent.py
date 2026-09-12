@@ -20,7 +20,20 @@ def test_instructions_state_the_default_capacity_direction() -> None:
     assert "pressure" in INSTRUCTIONS
 
 
-def test_build_agent_exposes_exactly_the_four_pipeline_tools() -> None:
+def test_instructions_describe_both_pipeline_and_qa_modes() -> None:
+    assert "Pipeline mode" in INSTRUCTIONS
+    assert "Q&A mode" in INSTRUCTIONS
+    for read_tool in (
+        "get_referral_context",
+        "get_wait_counters",
+        "get_cohort",
+        "get_decision",
+        "get_evidence",
+    ):
+        assert read_tool in INSTRUCTIONS
+
+
+def test_build_agent_exposes_exactly_the_pipeline_and_read_tools() -> None:
     agent = build_agent(model="gpt-4.1-mini")
 
     tool_names = {tool.name for tool in agent.tools}
@@ -29,6 +42,11 @@ def test_build_agent_exposes_exactly_the_four_pipeline_tools() -> None:
         "run_capacity_agent",
         "run_coordinator",
         "generate_rationale",
+        "get_referral_context",
+        "get_wait_counters",
+        "get_cohort",
+        "get_decision",
+        "get_evidence",
     }
 
 
@@ -36,3 +54,10 @@ def test_build_agent_uses_the_configured_model() -> None:
     agent = build_agent(model="gpt-4.1")
 
     assert agent.model == "gpt-4.1"
+
+
+def test_build_agent_wires_the_scope_guardrail() -> None:
+    agent = build_agent(model="gpt-4.1-mini")
+
+    guardrail_names = {g.get_name() for g in agent.input_guardrails}
+    assert "triage-scope-guardrail" in guardrail_names

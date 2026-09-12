@@ -53,3 +53,11 @@ urgency → capacity → coordinator → rationale sequence end to end and narra
 (ADR-011) — its tools only trigger the existing packages' own `make *-run` targets or read what
 they already wrote, never computing a score or inventing a citation itself. Both verified against
 real OpenAI calls, not just mocked.
+
+`orchestrator-agent/` then gained a second mode (ADR-012): a clinician can ask it a question
+directly ("why is this referral ranked here", "has it been scored yet") via five new read-only
+tools, with conversation history carried across follow-ups. Both modes are now bounded by a
+code-enforced scope guardrail (ADR-013, OpenAI Agents SDK `InputGuardrail`) — a request outside
+"run the pipeline" or "answer a question about data already in the system" is rejected before
+either mode's tools are reachable at all, verified against real OpenAI calls including a
+prompt-injection attempt.

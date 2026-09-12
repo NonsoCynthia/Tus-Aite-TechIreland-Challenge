@@ -26,8 +26,8 @@ RATIONALE_ENGINE ?= deterministic
         urgency-run capacity-run coordinator-run rationale-build rationale-run \
         rationale-api-up rationale-api-down rationale-test rationale-lint \
         rationale-typecheck rationale-check demo-run \
-        orchestrator-run orchestrator-test orchestrator-lint orchestrator-typecheck \
-        orchestrator-check \
+        orchestrator-run orchestrator-ask orchestrator-chat \
+        orchestrator-test orchestrator-lint orchestrator-typecheck orchestrator-check \
         dataset-test test reset psql logs volumes
 
 ## --- Bring the stack up ---
@@ -180,8 +180,22 @@ orchestrator-run:
 	cd orchestrator-agent && \
 	  ( [ -d .venv ] || python3.12 -m venv .venv ) && \
 	  .venv/bin/pip install -q -r requirements.txt && \
-	  .venv/bin/python -m orchestrator_agent \
+	  .venv/bin/python -m orchestrator_agent run \
 	    --hospital $(HOSPITAL) --as-of-date $(AS_OF) --run-id $(RUN_ID)
+
+## Q&A mode: `make orchestrator-ask QUESTION="why is PW-1 ranked here?"`
+orchestrator-ask:
+	cd orchestrator-agent && \
+	  ( [ -d .venv ] || python3.12 -m venv .venv ) && \
+	  .venv/bin/pip install -q -r requirements.txt && \
+	  .venv/bin/python -m orchestrator_agent ask "$(QUESTION)"
+
+## Interactive Q&A session -- run this one directly, not through a pipe.
+orchestrator-chat:
+	cd orchestrator-agent && \
+	  ( [ -d .venv ] || python3.12 -m venv .venv ) && \
+	  .venv/bin/pip install -q -r requirements.txt && \
+	  .venv/bin/python -m orchestrator_agent chat
 
 orchestrator-test:
 	docker run --rm \
