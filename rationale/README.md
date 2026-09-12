@@ -19,12 +19,47 @@ The `rationale/` package now contains:
 | `models.py` | Defines `EvidenceItem`, `EvidencePack`, and `Rationale`. |
 | `evidence_pack.py` | Converts retrieval decision/evidence responses into evidence packs. |
 | `render.py` | Deterministically renders technical audit text or clinician prose from cited evidence. |
+| `llm_render.py` | Renders the same evidence pack via the OpenAI Agents SDK -- an alternative engine, not a replacement. See "LLM Rendering Engine" below. |
 | `cli.py` / `__main__.py` | Runs rationale generation from the command line. |
-| `tests/` | Unit tests for packing, rendering, config, client, CLI behavior, and API behavior. |
+| `tests/` | Unit tests for packing, rendering, config, client, CLI behavior, LLM-engine guardrails, and API behavior. |
 
-The current version is deliberately deterministic. An LLM can be added later as a
-wording layer, but only after this evidence pack exists; the model should receive
-the evidence bundle and rewrite it, not decide which evidence matters.
+The default engine is deterministic template rendering. An `llm` engine (below) is
+also available: it receives this same evidence bundle and rewrites it as prose --
+it does not decide which evidence matters, matching this package's original design
+intent.
+
+## LLM Rendering Engine
+
+`--engine llm` / `?engine=llm` calls the OpenAI Agents SDK instead of the template
+renderer, using the exact same `EvidencePack` as input. See ADR-010
+(`conductor/tracks/explainable-agent-based-triage_20260828/decisions.md`) for why
+OpenAI rather than the `claude-opus-5` tech-stack.md originally named, and for the
+evidence-faithfulness guardrail this engine enforces in code.
+
+Requires `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`, default `gpt-4.1-mini`)
+in the root `.env` -- **never commit a real value**. The deterministic engine
+(the default) needs neither.
+
+```bash
+python -m rationale --hospital 9004 --as-of 2026-08-30 --pathway PW-9004-000123 \
+  --style clinician --engine llm
+```
+
+```bash
+curl "http://localhost:8010/rationale/9004/2026-08-30/PW-9004-000123?style=clinician&engine=llm"
+```
+
+**Evidence-faithfulness is enforced in code, not trusted from the prompt alone.**
+The model must return `citation_iris` covering exactly the evidence pack's own
+IRIs -- the same contract the deterministic renderer already guarantees by
+construction. A mismatch retries once, then raises `RationaleGuardrailError`
+(mapped to HTTP `503` by the API) rather than silently returning ungrounded text.
+A caller wanting a rationale regardless should catch that and fall back to
+`render.render_rationale`.
+
+The `agents` package import is lazy (inside `llm_render._default_agent_runner`),
+so the deterministic engine, and every test except `tests/test_llm_render.py`'s
+own mocked-transport tests, never require `openai-agents` to be installed.
 
 ## Current Implementation State
 
@@ -43,9 +78,13 @@ Implemented:
   `ReferralState` citations.
 - Unit tests for client behavior, evidence packing, rendering, CLI behavior, and the API wrapper.
 
+- An `llm` render engine (OpenAI Agents SDK) as an alternative to the deterministic
+  renderer, selectable via `--engine llm` / `?engine=llm`, with a code-enforced
+  evidence-faithfulness guardrail. See "LLM Rendering Engine" above and ADR-010.
+
 Not implemented yet:
 
-- LLM rewriting or prompt-cached wording.
+- Prompt-cached wording, or a Message Batches-style bulk path, for the `llm` engine.
 - A clinician web UI.
 - User-facing authentication/authorization on the rationale API. The API is currently intended for
   local/internal Compose use and calls retrieval with the shared retrieval bearer token.
@@ -174,6 +213,17 @@ make rationale-run \
   AS_OF=2026-08-30 \
   PATHWAY=PW-9001-000007 \
   RATIONALE_STYLE=technical
+```
+
+Use the `llm` engine (requires `OPENAI_API_KEY` in the root `.env`):
+
+```bash
+make rationale-run \
+  HOSPITAL=9001 \
+  AS_OF=2026-08-30 \
+  PATHWAY=PW-9001-000007 \
+  RATIONALE_STYLE=clinician \
+  RATIONALE_ENGINE=llm
 ```
 
 Run the full local scoring/ranking/rationale sequence:

@@ -9,6 +9,7 @@ from dataclasses import asdict
 from .client import RetrievalClient
 from .config import load_settings
 from .evidence_pack import packs_from_decision_response
+from .llm_render import render_many_llm
 from .models import EvidencePack
 from .render import render_many
 
@@ -39,6 +40,16 @@ def build_parser() -> argparse.ArgumentParser:
         default="technical",
         help="Rationale wording style. Defaults to technical.",
     )
+    parser.add_argument(
+        "--engine",
+        choices=["deterministic", "llm"],
+        default="deterministic",
+        help=(
+            "deterministic (default): template rendering, no external calls. "
+            "llm: OpenAI Agents SDK rewrites the same evidence pack as prose "
+            "(requires OPENAI_API_KEY)."
+        ),
+    )
     return parser
 
 
@@ -60,7 +71,10 @@ def main(argv: list[str] | None = None) -> int:
         else:
             decision = client.get_decision(args.hospital, args.as_of)
             packs = packs_from_decision_response(decision)
-    rationales = render_many(packs, style=args.style)
+    if args.engine == "llm":
+        rationales = render_many_llm(packs, style=args.style, settings=settings)
+    else:
+        rationales = render_many(packs, style=args.style)
 
     if args.format == "json":
         print(json.dumps([asdict(rationale) for rationale in rationales], indent=2))

@@ -145,6 +145,14 @@ natural-language explainability the challenge is about. An LLM that produced the
 
 ### LLM Configuration
 
+**As originally planned** (this section, unchanged below) — **as actually shipped**,
+`rationale/llm_render.py`'s `llm` engine uses OpenAI (`gpt-4.1-mini` default, via the
+OpenAI Agents SDK) instead, a deliberate team decision recorded in ADR-010
+(`conductor/tracks/explainable-agent-based-triage_20260828/decisions.md`). The
+deterministic engine described in "Agent Reasoning Model" above remains the
+default; the model/provider choice below applied only once an LLM engine was
+actually built.
+
 - Model: **`claude-opus-5`** (Anthropic Python SDK, `anthropic`)
 - `thinking: {"type": "adaptive"}` — do **not** pass `budget_tokens`; it is rejected on Opus 5
 - Prompt carries only the cited evidence for that ranked position; the model is instructed it may not

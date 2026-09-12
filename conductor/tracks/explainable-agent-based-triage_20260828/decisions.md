@@ -465,3 +465,67 @@ number) rather than `"score": "0.662"` for real capacity-agent output already wr
 (`test_coordinator_input.py::test_score_is_returned_as_a_json_number_not_a_string`) rather than
 coercing with `float(...)` first, which is what let this ship unnoticed in the existing test suite —
 417 tests pass against live Postgres/Oxigraph, ruff/mypy clean.
+
+---
+
+### ADR-010: The rationale layer's `llm` engine uses OpenAI, not `claude-opus-5`
+
+**Date:** 2026-09-12
+**Status:** accepted — team decision, deliberately deviating from tech-stack.md
+
+**Context:** tech-stack.md's Agent Reasoning Model section names `claude-opus-5`
+(Anthropic Python SDK) as the model for FR4's rationale layer. `rationale/` (merged
+2026-09-12, PR #11) shipped first as a fully deterministic template renderer
+(`render.py`) with no LLM at all, by design — its own README states the model
+"should receive the evidence bundle and rewrite it, not decide which evidence
+matters," left for later work. Separately, `orchestrator/`/`web/` (branch `ui`,
+not yet merged) already run the urgency → capacity → coordinator pipeline
+deterministically and well — composed from each package's public functions, not
+an agentic loop — so there was no unmet need for an LLM to orchestrate that part.
+The team decided an LLM was still missing anywhere in the system, and asked for it
+to use OpenAI specifically (an available API key), not Anthropic.
+
+**Decision:** `rationale/llm_render.py` adds an `llm` engine, selectable via
+`--engine llm` / `?engine=llm`, alongside the existing `deterministic` engine
+(still the default — nothing about the existing contract changed). It uses the
+OpenAI Agents SDK (`openai-agents`, import name `agents`) rather than a bare
+chat-completions call, and rather than Anthropic's SDK as tech-stack.md named.
+
+**Where it sits, and where it deliberately does not:** the `llm` engine receives
+the exact same `EvidencePack` the deterministic renderer does — built once,
+upstream, by `evidence_pack.py` from retrieval-service's already-resolved graph
+evidence. It does not call the retrieval service itself, does not choose which
+evidence to fetch, and does not run before that evidence pack exists. This holds
+to `rationale/README.md`'s original boundary exactly; the OpenAI Agents SDK's own
+tool-calling capability is not exercised here. A broader tool-calling orchestrator
+(triggering `urgency_agent`/`capacity_agent`/coordinator as tools, per this
+track's own brainstorm) remains a distinct, not-yet-built idea — this ADR covers
+only the rationale-generation seam that already existed and was already scoped
+for an LLM.
+
+**Evidence-faithfulness (NFR4) is enforced in code, not trusted from the prompt.**
+The model returns structured output (`LLMRationaleOutput`: `text` +
+`citation_iris`, via the SDK's `output_type`), and `citation_iris` is checked
+programmatically against the evidence pack's own IRI set — an exact match
+required, mirroring the deterministic renderer's own contract (it always cites
+every evidence item). A mismatch retries once, then raises
+`RationaleGuardrailError` rather than being silently accepted. This is a stronger
+guarantee than "the prompt says not to hallucinate" and is unit-tested against a
+fake, injectable `AgentRunner` — `tests/test_llm_render.py` never needs the real
+SDK, a network call, or an API key to verify the guardrail/retry logic; only
+`_default_agent_runner` (the real SDK call) is excluded from that coverage.
+
+**Verified against a real OpenAI call, not just mocked:** ran
+`render_rationale_llm` against a live key with a synthetic two-item evidence pack
+(a `Score` and a `BedStatus`). The model's structured output passed the guardrail
+on the first attempt and the returned prose referenced only the supplied
+`scoreValue`, `occupancyPct`, and `surgeCapacityInUse` values — nothing invented.
+
+**Trade-off accepted:** this is a second LLM provider in a codebase whose own
+tech-stack.md names one (Anthropic). No code currently depends on Anthropic's SDK,
+so there is no conflict today, but a future contributor reading tech-stack.md
+alone would not learn this — this ADR, and `rationale/README.md`'s "LLM Rendering
+Engine" section, are the record of the deviation and why. The deterministic engine
+remains the default specifically so the `llm` engine can be treated as additive
+and optional, not a hard dependency for anyone running the demo without an OpenAI
+key.
