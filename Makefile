@@ -20,12 +20,20 @@ DEMO_PATHWAY ?= PW-$(HOSPITAL)-000007
 CAPACITY_DIRECTION ?= pressure
 RATIONALE_STYLE ?= technical
 RATIONALE_ENGINE ?= deterministic
+TOP_K ?= 10
+BENCHMARK_FORMAT ?= text
+EVALUATION_FORMAT ?= text
+RATIONALE_JUDGE_ENGINE ?= heuristic
+RATIONALE_JUDGE_INPUT ?= evaluation/fixtures/rationale_judge_sample.json
+RATIONALE_BENCHMARK_ENGINE ?= heuristic
 
 .PHONY: up down build migrate seed fetch load generate calibrate verify \
         kg-views retrieval-build retrieval-test retrieval-lint retrieval-typecheck \
         urgency-run capacity-run coordinator-run rationale-build rationale-run \
         rationale-api-up rationale-api-down rationale-test rationale-lint \
         rationale-typecheck rationale-check demo-run \
+        agent-benchmark scenario-benchmark kg-audit rationale-judge rationale-benchmark \
+        trace-audit evaluation-suite evaluation-run evaluation-test \
         orchestrator-run orchestrator-ask orchestrator-chat \
         orchestrator-test orchestrator-lint orchestrator-typecheck orchestrator-check \
         dataset-test test reset psql logs volumes
@@ -167,6 +175,76 @@ demo-run: urgency-run capacity-run coordinator-run
 		PATHWAY=$(if $(PATHWAY),$(PATHWAY),$(DEMO_PATHWAY)) \
 		RATIONALE_STYLE=$(RATIONALE_STYLE) \
 		RATIONALE_ENGINE=$(RATIONALE_ENGINE)
+
+## --- Agent benchmark + outcome evaluation ---
+
+agent-benchmark:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r evaluation/requirements.txt && PYTHONPATH=urgency-agent:capacity-agent:coordinator:. python -m evaluation.agent_benchmark --format $(BENCHMARK_FORMAT)"
+
+scenario-benchmark:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r evaluation/requirements.txt && PYTHONPATH=urgency-agent:capacity-agent:coordinator:. python -m evaluation.scenario_benchmark --format $(BENCHMARK_FORMAT)"
+
+kg-audit:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r evaluation/requirements.txt && PYTHONPATH=urgency-agent:capacity-agent:coordinator:. python -m evaluation.kg_audit --format $(EVALUATION_FORMAT)"
+
+rationale-judge:
+	docker run --rm \
+		--env OPENAI_API_KEY \
+		--env OPENAI_MODEL \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r evaluation/requirements.txt && PYTHONPATH=urgency-agent:capacity-agent:coordinator:rationale:. python -m evaluation.rationale_judge --input $(RATIONALE_JUDGE_INPUT) --engine $(RATIONALE_JUDGE_ENGINE) --format $(EVALUATION_FORMAT)"
+
+rationale-benchmark:
+	docker run --rm \
+		--env OPENAI_API_KEY \
+		--env OPENAI_MODEL \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r evaluation/requirements.txt && PYTHONPATH=urgency-agent:capacity-agent:coordinator:rationale:. python -m evaluation.rationale_benchmark --engine $(RATIONALE_BENCHMARK_ENGINE) --format $(EVALUATION_FORMAT)"
+
+trace-audit:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r evaluation/requirements.txt && PYTHONPATH=urgency-agent:capacity-agent:coordinator:rationale:. python -m evaluation.trace_audit --format $(EVALUATION_FORMAT)"
+
+evaluation-suite:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r evaluation/requirements.txt && PYTHONPATH=urgency-agent:capacity-agent:coordinator:rationale:. python -m evaluation.suite --format $(EVALUATION_FORMAT)"
+
+evaluation-run:
+	docker run --rm \
+		--env-file .env \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r evaluation/requirements.txt && EVALUATOR_DB_URL=postgresql://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@host.docker.internal:$${POSTGRES_PORT}/$${POSTGRES_DB} python -m evaluation.cli --decision-id $(DECISION_ID) --top-k $(TOP_K)"
+
+evaluation-test:
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-w /app \
+		python:3.12-slim \
+		sh -lc "pip install -q -r evaluation/requirements-dev.txt && PYTHONPATH=urgency-agent:capacity-agent:coordinator:rationale:. python -m pytest evaluation/tests/ -q"
 
 ## --- Orchestrator agent (tool-calling: urgency -> capacity -> coordinator ->
 ## rationale, orchestrator-agent/README.md) ---

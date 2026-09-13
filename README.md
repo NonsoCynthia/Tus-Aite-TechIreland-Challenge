@@ -236,6 +236,14 @@ Docker invocations.
 | `make rationale-api-up` | Start the rationale HTTP API for frontend/backend integration. |
 | `make rationale-api-down` | Stop and remove the rationale HTTP API container. |
 | `make demo-run` | Run urgency, capacity, coordinator, then rationale in sequence. |
+| `make agent-benchmark` | Check urgency, capacity, and coordinator agents against controlled benchmark cases. |
+| `make scenario-benchmark` | Run seeded scenario/regression checks over broader synthetic agent cases. |
+| `make kg-audit` | Check KG/RDF/SHACL assets and citation role contracts for auditability. |
+| `make rationale-judge` | Judge a rationale against its cited evidence, locally by default or with an LLM. |
+| `make rationale-benchmark` | Judge benchmark-aware rationale explanations for key agent scenarios. |
+| `make trace-audit` | Audit agent trace provenance, citations, rules, exclusions, and rationale summaries. |
+| `make evaluation-suite` | Run the controlled benchmark, scenario benchmark, KG audit, rationale benchmark, and trace audit together. |
+| `make evaluation-run DECISION_ID=...` | Evaluate one written decision against CPC/CRT checks and the held-out answer key. |
 
 Common variables:
 
