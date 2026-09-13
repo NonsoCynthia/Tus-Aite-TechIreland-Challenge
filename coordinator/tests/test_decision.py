@@ -256,9 +256,10 @@ def test_dry_run_assembly_over_real_cohort_produces_populated_rule_checks() -> N
             }
 
     # Sanity: the real fixture actually exercises the urgent/semi-urgent
-    # bands this test asserts on (131/133 referrals respectively).
-    assert urgent_count == 131
-    assert semi_urgent_count == 133
+    # bands this test asserts on after the paediatric NEWS2 guardrail removes
+    # 2 urgent and 2 semi-urgent referrals from the adult-ranked list.
+    assert urgent_count == 129
+    assert semi_urgent_count == 131
 
 
 def test_legacy_citations_fallback_uses_urgency_agent_citations_and_omits_timeframe() -> None:

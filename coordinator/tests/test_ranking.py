@@ -293,6 +293,41 @@ def test_referral_with_no_urgency_score_key_missing_entirely_is_excluded() -> No
     assert result.excluded[0]["pathway_number"] == "P-NULL-URGENCY"
 
 
+def test_paediatric_referral_is_excluded_even_if_stale_urgency_score_exists() -> None:
+    """ADR-007 is a ranking guardrail too: an old or accidental NEWS2 score
+    must not place a paediatric referral in the adult-ranked list."""
+    adult = _referral("P-ADULT", specialty_hipe="0600", urgency_score=0.1, capacity_score=0.1)
+    paediatric = _referral(
+        "P-PAED",
+        specialty_hipe="0601",
+        urgency_score=1.0,
+        capacity_score=1.0,
+    )
+
+    result = rank_cohort([paediatric, adult], capacity_direction="pressure")
+
+    assert [r["pathway_number"] for r in result.rankings] == ["P-ADULT"]
+    excluded = {r["pathway_number"]: r for r in result.excluded}
+    assert excluded["P-PAED"]["exclusion_reason"] == "paediatric_news2_not_applicable"
+
+
+def test_paediatric_flag_is_excluded_even_without_specialty_code() -> None:
+    """If retrieval provides the reference-layer flag, coordinator honors it
+    directly instead of relying only on the specialty code literal."""
+    paediatric = _referral(
+        "P-PAED-FLAG",
+        specialty_hipe="9999",
+        is_paediatric=True,
+        urgency_score=1.0,
+    )
+
+    result = rank_cohort([paediatric], capacity_direction="pressure")
+
+    assert result.rankings == []
+    assert result.excluded[0]["pathway_number"] == "P-PAED-FLAG"
+    assert result.excluded[0]["exclusion_reason"] == "paediatric_news2_not_applicable"
+
+
 def test_uncategorised_and_excluded_tails_still_separated_after_full_sort() -> None:
     """The full sort key must not accidentally merge the two tail groups
     (ADR-006): both have `severity_rank=None`, so `sort_key` must still

@@ -54,6 +54,44 @@ cd web && npm install && npm run dev     # serves :5173
 that come from a different address, and the access token must never reach the browser, so the browser has to see
 the API on the same address as the page. In the container that is literally true: one process serves both.
 
+## Run the AI assistant
+
+The AI assistant is the bottom-right Tus prompt in the interface: "I am Tus, here to answer your questions."
+It is part of the orchestrator-backed UI, so there is no separate frontend service to start.
+
+Set these in the repo-root `.env` before starting the orchestrator:
+
+```env
+OPENAI_API_KEY=your_openai_key
+OPENAI_MODEL=gpt-4.1-mini
+RETRIEVAL_BEARER_TOKENS=your_existing_retrieval_token
+```
+
+Then run from the repo root:
+
+```bash
+make up
+docker compose up -d --build orchestrator
+```
+
+Open:
+
+```text
+http://localhost:8080
+```
+
+To check the chat API directly:
+
+```bash
+curl -X POST http://localhost:8080/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Who is ranked first on the list?","hospital_hipe":"9001","as_of_date":"2026-08-30"}'
+```
+
+The assistant is read-only. It can answer questions about the current waiting list, rankings, selected
+referral, evidence, and rationale, but it cannot run agents, reorder referrals, write overrides, or change
+decisions from chat.
+
 ## How it is checked
 
 There are no unit tests, no linter and no formatter in this folder. Standing in for them is
