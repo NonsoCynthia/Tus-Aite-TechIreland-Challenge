@@ -15,4 +15,7 @@ def test_evaluation_suite_combines_agent_and_kg_checks() -> None:
 
     assert report.passed
     assert report.agent_benchmark.passed_count == 14
+    assert report.scenario_benchmark.passed_count == 21
     assert report.kg_audit.passed_count == 5
+    assert report.rationale_benchmark.passed_count == 6
+    assert report.trace_audit.passed_count == 8

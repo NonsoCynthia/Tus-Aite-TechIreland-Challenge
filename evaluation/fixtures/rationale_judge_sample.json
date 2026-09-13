@@ -1,0 +1,57 @@
+{
+  "evidence_pack": {
+    "decision": "decision/9001/2026-08-30",
+    "placement": "placement/9001/2026-08-30/PW-9001-000007",
+    "position": 3,
+    "referral": "referral/9001/PW-9001-000007",
+    "pathway_number": "PW-9001-000007",
+    "evidence": [
+      {
+        "role": "urgency",
+        "iri": "score/run-1/9001/PW-9001-000007/urgency",
+        "type": "Score",
+        "properties": {
+          "scoreValue": "0.750",
+          "method": "urgency-news2-v1"
+        }
+      },
+      {
+        "role": "capacity",
+        "iri": "bed-status/9001/W-9001-04/2026-08-30%2020%3A00%3A00",
+        "type": "BedStatus",
+        "properties": {
+          "occupancyPct": "83.52",
+          "freeBeds": "15"
+        }
+      },
+      {
+        "role": "timeframe",
+        "iri": "referral-state/9001/PW-9001-000007/2026-08-25",
+        "type": "ReferralState",
+        "properties": {
+          "triageStatus": "triaged",
+          "validFrom": "2026-08-25"
+        }
+      },
+      {
+        "role": "timeframe",
+        "iri": "rule/RULE-CRT-SEMI",
+        "type": "Rule",
+        "properties": {
+          "statement": "A semi-urgent referral should be seen within 13 weeks",
+          "thresholdDays": "91"
+        }
+      }
+    ]
+  },
+  "rationale": {
+    "pathway_number": "PW-9001-000007",
+    "text": "Referral PW-9001-000007 is ranked #3 for clinician review. This is decision support; clinician sign-off is required. The recorded urgency score is 0.750 on a 0 to 1 scale. Capacity evidence reports the relevant ward was 83.52 percent occupied, with 15 beds free. CPC/CRT evidence records the referral state was triaged from 2026-08-25; the applicable timeframe rule states: A semi-urgent referral should be seen within 13 weeks.",
+    "citation_iris": [
+      "score/run-1/9001/PW-9001-000007/urgency",
+      "bed-status/9001/W-9001-04/2026-08-30%2020%3A00%3A00",
+      "referral-state/9001/PW-9001-000007/2026-08-25",
+      "rule/RULE-CRT-SEMI"
+    ]
+  }
+}

@@ -20,6 +20,7 @@ The `rationale/` package now contains:
 | `evidence_pack.py` | Converts retrieval decision/evidence responses into evidence packs. |
 | `render.py` | Deterministically renders technical audit text or clinician prose from cited evidence. |
 | `llm_render.py` | Renders the same evidence pack via the OpenAI Agents SDK -- an alternative engine, not a replacement. See "LLM Rendering Engine" below. |
+| `../evaluation/rationale_judge.py` | Optional explanation judge for checking rationale faithfulness, safety language and readability against the cited evidence pack. |
 | `cli.py` / `__main__.py` | Runs rationale generation from the command line. |
 | `tests/` | Unit tests for packing, rendering, config, client, CLI behavior, LLM-engine guardrails, and API behavior. |
 
@@ -56,6 +57,23 @@ construction. A mismatch retries once, then raises `RationaleGuardrailError`
 (mapped to HTTP `503` by the API) rather than silently returning ungrounded text.
 A caller wanting a rationale regardless should catch that and fall back to
 `render.render_rationale`.
+
+## Explanation Judging
+
+The evaluation package includes an optional rationale judge:
+
+```bash
+make rationale-judge
+make rationale-judge RATIONALE_JUDGE_ENGINE=llm
+```
+
+The local default is a deterministic heuristic over a sample evidence/rationale
+pair. `RATIONALE_JUDGE_ENGINE=llm` uses AI-as-judge with structured output and
+requires `OPENAI_API_KEY`. The judge is intentionally bounded: it reviews
+whether explanation text is faithful to cited evidence, avoids diagnostic or
+system-action language, mentions urgency/capacity/CPC-CRT evidence, and is
+readable. It does not judge whether the underlying agent scores or rankings are
+clinically correct.
 
 The `agents` package import is lazy (inside `llm_render._default_agent_runner`),
 so the deterministic engine, and every test except `tests/test_llm_render.py`'s
