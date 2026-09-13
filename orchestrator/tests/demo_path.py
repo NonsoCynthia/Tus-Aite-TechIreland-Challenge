@@ -225,7 +225,8 @@ check("both citation lists ride along on every row",
 # Everyone on the list is in exactly one of four states -- but the states
 # OVERLAP, so they reconcile on the union and never on the sum. The three
 # paediatric referrals are refused by the urgency agent AND then recorded by the
-# coordinator as missing_urgency_score, so adding the buckets gives 311 of 308.
+# coordinator as paediatric_news2_not_applicable, so adding the buckets gives
+# more rows than the cohort holds.
 placed_set = {r["pathway_number"] for r in rows}
 paed_set = set(d["refused_paediatric"])
 skip_set = set(d["skipped"])

@@ -866,7 +866,7 @@ function Reconciliation({ decision, total }: { decision: Decision; total: number
     },
     {
       k: 'Excluded by the coordinator', n: exc.size,
-      w: 'no urgency score reached the ranking, so no position could be computed',
+      w: 'no valid adult NEWS2 urgency score reached the ranking, so no position could be computed',
       note: overlap ? `${overlap} of these are the refusals above, seen a second time` : undefined,
     },
   ]

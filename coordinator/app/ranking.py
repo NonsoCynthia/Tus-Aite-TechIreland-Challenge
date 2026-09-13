@@ -37,6 +37,13 @@ up rather than comparing `crt_breached` directly.
 _UNCATEGORISED_BAND_ORDER = 1
 _EXCLUDED_BAND_ORDER = 2
 _EXCLUDED_CPC = 4
+_PAEDIATRIC_SPECIALTY = "0601"
+_PAEDIATRIC_EXCLUSION_REASON = "paediatric_news2_not_applicable"
+
+
+def _is_paediatric_referral(referral: dict[str, Any]) -> bool:
+    """True when a referral must stay outside the adult NEWS2 ranking."""
+    return bool(referral.get("is_paediatric")) or referral.get("specialty_hipe") == _PAEDIATRIC_SPECIALTY
 
 
 def _severity_rank_and_band_order(cpc: int | None) -> tuple[int, int]:
@@ -139,12 +146,22 @@ def rank_cohort(
     """
     banded = order_by_band(referrals)
 
-    with_urgency = [r for r in banded if r.get("urgency_score") is not None]
+    non_paediatric = [r for r in banded if not _is_paediatric_referral(r)]
+    paediatric = [
+        {**r, "exclusion_reason": _PAEDIATRIC_EXCLUSION_REASON}
+        for r in banded
+        if _is_paediatric_referral(r)
+    ]
+
+    with_urgency = [r for r in non_paediatric if r.get("urgency_score") is not None]
     excluded = [
         {**r, "exclusion_reason": "missing_urgency_score"}
-        for r in banded
+        for r in non_paediatric
         if r.get("urgency_score") is None
-    ]
+    ] + paediatric
+
+    if not with_urgency:
+        return RankedCohort(rankings=[], excluded=excluded)
 
     # Scarcity is a fact about specialties present in the cohort, not
     # about which referrals have an urgency score yet -- but a referral
@@ -152,7 +169,7 @@ def rank_cohort(
     # referral missing only capacity_score is still ranked normally).
     distinct_capacity_by_specialty: dict[str, float] = {
         r["specialty_hipe"]: r["capacity_score"]
-        for r in banded
+        for r in non_paediatric
         if r.get("capacity_score") is not None
     }
     scarcity = compute_scarcity(list(distinct_capacity_by_specialty.values()), capacity_direction)
