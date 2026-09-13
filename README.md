@@ -109,10 +109,14 @@ Batches API for bulk validation runs.
 - Shows CPC/CRT rule violations prominently.
 - Serves the JSON API and the built single-page UI from one origin, so the browser never makes a
   cross-origin call and the retrieval service's bearer token never reaches it.
+- Includes a read-only AI assistant panel that answers questions about the current list, selected referral,
+  ranking, and evidence through the server-side orchestrator-agent. It cannot run, score, rank, reorder, or
+  override referrals from chat.
 
 Implementation tools: React 19, TypeScript, Vite, TanStack Query, Reagraph (WebGL). The bundle is
 built at image build time and served as static files by the FastAPI/Uvicorn orchestrator; nothing
-in this interface is server-rendered. See `web/README.md`.
+in this interface is server-rendered. The chat backend uses OpenAI Agents SDK server-side. See
+`web/README.md` and `orchestrator-agent/README.md`.
 
 ### 9. Frontend Aesthetics and Interaction Design
 
@@ -172,6 +176,9 @@ retrieval/ FastAPI mediator over Postgres + Oxigraph
 rationale/ CLI + HTTP API for technical audit output or clinician prose
         |
         v
+orchestrator-agent/ OpenAI tool-calling agent for pipeline narration and read-only Q&A
+        |
+        v
 React + Vite clinician interface, built into the FastAPI orchestrator image
         |
         v
@@ -192,6 +199,7 @@ Clinician accept/reorder/override, logged back to graph
 | Simulation | SimPy |
 | Data/calibration | pandas, numpy, Pydantic v2 |
 | Rationale layer | FastAPI, httpx, deterministic renderer; LLM wording layer planned |
+| AI assistant | OpenAI Agents SDK, server-side tool calling through the orchestrator |
 | Dependency management | uv |
 | Local services | Docker Compose |
 | Testing | pytest, pytest-cov |

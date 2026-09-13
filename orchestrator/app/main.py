@@ -639,6 +639,17 @@ class RunIn(BaseModel):
     as_of_date: str
 
 
+class ChatIn(BaseModel):
+    question: str = Field(min_length=1, max_length=1200)
+    session_id: str | None = None
+    hospital_hipe: str | None = Field(default=None, min_length=4, max_length=4)
+    as_of_date: str | None = None
+    pathway_number: str | None = None
+
+
+_CHAT_CAVEAT = "This is decision support only; clinician sign-off is required."
+
+
 @app.post("/api/runs", status_code=202)
 def start_run(payload: RunIn) -> dict[str, Any]:
     """Plain def, not async: the agents use synchronous httpx and loop the cohort
@@ -660,6 +671,140 @@ def run_status(run_id: str) -> dict[str, Any]:
     if run is None:
         raise HTTPException(404, "unknown run_id")
     return run.as_dict()
+
+
+def _chat_question(payload: ChatIn) -> str:
+    context = [
+        "Browser UI Q&A mode.",
+        "This chat is read-only.",
+        "Use the current facts below when they answer the user's question.",
+        "These facts come from the same orchestrator state and retrieval reads that power the UI.",
+    ]
+    if payload.hospital_hipe:
+        context.append(f"Current hospital_hipe: {payload.hospital_hipe}")
+    if payload.as_of_date:
+        context.append(f"Current as_of_date: {payload.as_of_date}")
+    if payload.pathway_number:
+        context.append(f"Current selected pathway_number: {payload.pathway_number}")
+    context.extend(_chat_current_facts(payload))
+    context.append(f"User question: {payload.question.strip()}")
+    return "\n".join(context)
+
+
+def _chat_current_facts(payload: ChatIn) -> list[str]:
+    """Small, fast facts for common UI chat questions.
+
+    The retrieval Decision endpoint resolves evidence for every placement and
+    can take longer than a chat turn. The orchestrator already holds the exact
+    Decision the UI displays, so give the assistant the compact facts it needs
+    for basic list/rank questions and leave full evidence to rationale/evidence
+    tools.
+    """
+    if not payload.hospital_hipe or not payload.as_of_date:
+        return []
+
+    facts = ["Current facts from orchestrator state:"]
+    roster = _hosp_cache or hospitals()
+    hospital = next(
+        (
+            row for row in roster.get("hospitals", [])
+            if row.get("hospital_hipe") == payload.hospital_hipe
+        ),
+        None,
+    )
+    if hospital:
+        facts.append(f"- hospital_name: {hospital.get('hospital_name')}")
+
+    try:
+        cohort_response = _client.get(
+            f"/hospitals/{payload.hospital_hipe}/cohort/{payload.as_of_date}",
+            timeout=3.0,
+        )
+        if cohort_response.status_code >= 400:
+            raise HTTPException(
+                cohort_response.status_code,
+                f"retrieval GET /hospitals/{payload.hospital_hipe}/cohort/"
+                f"{payload.as_of_date} -> {cohort_response.status_code}",
+            )
+        cohort_rows = cohort_response.json().get("referrals", [])
+        facts.append(f"- waiting_list_referrals: {len(cohort_rows)}")
+    except (HTTPException, httpx.HTTPError) as exc:
+        facts.append(f"- waiting_list_referrals: unavailable ({exc})")
+
+    decision = store.get_decision(payload.hospital_hipe, payload.as_of_date)
+    if decision is None:
+        facts.append("- decision: none held by the orchestrator for this hospital-day")
+        return facts
+
+    rankings = decision.get("rankings") or []
+    facts.append(f"- decision_id: {decision.get('decision_id', '')}")
+    facts.append(f"- run_id: {decision.get('run_id', '')}")
+    facts.append(f"- ranked_referrals: {len(rankings)}")
+    if rankings:
+        facts.append(f"- first_ranked_referral: {_chat_ranking_summary(rankings[0], position=1)}")
+    if payload.pathway_number:
+        for index, row in enumerate(rankings, start=1):
+            if row.get("pathway_number") == payload.pathway_number:
+                facts.append(
+                    f"- selected_referral_rank: {_chat_ranking_summary(row, position=index)}"
+                )
+                break
+    return facts
+
+
+def _chat_ranking_summary(row: dict[str, Any], *, position: int) -> str:
+    parts = [
+        f"position={position}",
+        f"pathway_number={row.get('pathway_number')}",
+    ]
+    for key in (
+        "specialty_hipe",
+        "cpc",
+        "crt_breached",
+        "adjusted_wait_days",
+        "urgency_score",
+        "capacity_score",
+        "priority_score",
+    ):
+        if key in row:
+            parts.append(f"{key}={row.get(key)}")
+    return ", ".join(parts)
+
+
+def _chat_answer(answer: str) -> str:
+    lower = answer.lower()
+    if "decision support" in lower and ("sign-off" in lower or "sign off" in lower):
+        return answer
+    return f"{answer.rstrip()}\n\n{_CHAT_CAVEAT}"
+
+
+@app.post("/api/chat")
+def chat(payload: ChatIn) -> dict[str, Any]:
+    """Ask the read-only OpenAI agent from the browser UI.
+
+    The browser calls this same-origin route; API keys and retrieval tokens
+    remain server-side in the orchestrator container.
+    """
+    session_id = payload.session_id or f"chat-{uuid.uuid4().hex}"
+    history = store.get_chat_history(session_id)
+    try:
+        from orchestrator_agent.config import load_settings
+        from orchestrator_agent.run import ask_question_read_only
+
+        answer, updated_history = ask_question_read_only(
+            _chat_question(payload),
+            settings=load_settings(),
+            history=history,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("UI assistant failed")
+        raise HTTPException(status_code=502, detail=f"UI assistant failed: {exc}") from exc
+
+    answer = _chat_answer(answer)
+    store.put_chat_history(session_id, updated_history)
+    return {"session_id": session_id, "answer": answer}
 
 
 @app.post("/api/overrides")

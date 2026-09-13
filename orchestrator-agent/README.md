@@ -7,6 +7,8 @@ A genuine OpenAI Agents SDK tool-calling agent with two modes:
 - **Q&A mode** -- a clinician can ask it questions about existing data ("why is this
   referral ranked here?", "has it been scored yet?", "how long has it been waiting?"),
   read-only, in a conversation that carries context across follow-ups.
+- **UI assistant mode** -- the browser chat uses the same Q&A capability through
+  `POST /api/chat`, but with a narrower agent that exposes only read/rationale tools.
 
 Both modes are bounded by a code-enforced scope guardrail: anything outside them is
 rejected before the agent's tools are even reachable, not just discouraged by prompt.
@@ -36,6 +38,12 @@ infer it. What the agent actually contributes there:
 varies, so the model genuinely decides that, from a fixed set of read-only tools that
 can't change anything regardless of what it picks.
 
+**UI assistant mode is deliberately narrower than the CLI Q&A mode.** The clinician
+interface calls the orchestrator's `POST /api/chat` route, which uses `build_qa_agent()`.
+That agent can read cohort/referral/evidence data and call `generate_rationale`, but it
+does not have `run_urgency_agent`, `run_capacity_agent`, or `run_coordinator` in its tool
+list. Running the pipeline stays behind the existing UI run control, not the chat box.
+
 **The one hard boundary, in both modes:** every tool either *triggers* one of the
 existing deterministic packages exactly as its own CLI already runs it, or *reads* what
 a package already wrote. No tool lets the model compute a score, reorder a ranking, or
@@ -56,6 +64,7 @@ orchestrator_agent/
                         -- backs the Q&A mode's tools.
   agent.py              Wraps tools.py's functions with `function_tool`, builds the
                         Agent with both modes' instructions, wires the scope guardrail.
+                        Also builds the Q&A-only UI assistant agent.
                         The one place the `agents` SDK dependency is required at import
                         time.
   scope_guardrail.py     The code-enforced input guardrail (ADR-013) -- a second,
@@ -95,6 +104,12 @@ no opinion on that and doesn't need to change if the team's execution strategy d
 `generate_rationale` imports `rationale` directly (repo root added to `sys.path` at
 import time, the same `PYTHONPATH=<package>` convention the Makefile already uses for
 every sibling package) rather than re-implementing evidence fetching or rendering.
+When `pathway_number` is supplied, it uses retrieval's single-placement
+`/evidence/{hospital}/{date}/{pathway}` endpoint instead of the evidence-heavy full
+Decision endpoint, so UI "why this referral?" questions do not time out on a 305-row
+decision. If the OpenAI rationale writer fails its citation guardrail, the tool falls
+back to the deterministic rationale renderer, which still verbalises only cited graph
+evidence.
 
 **Q&A (read-only) tools** -- backed by `retrieval_client.py`, a GET-only client against
 `retrieval-service_20260904`:
@@ -162,6 +177,17 @@ Start an interactive Q&A session (ask follow-ups without repeating context; type
 ```bash
 python -m orchestrator_agent chat
 ```
+
+Use the assistant from the clinician UI:
+
+```bash
+cd ..
+docker compose up -d --build orchestrator
+# open http://localhost:8080 and use the Ask button in the top bar
+```
+
+The UI assistant needs `OPENAI_API_KEY` in the root `.env`. The key is read only by the
+orchestrator container; it is never sent to the browser.
 
 `make orchestrator-test` / `orchestrator-lint` / `orchestrator-typecheck` /
 `orchestrator-check` run the test suite in an isolated container (these never touch

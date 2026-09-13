@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from orchestrator_agent.config import Settings
-from orchestrator_agent.run import ask_question, run_pipeline
+from orchestrator_agent.run import ask_question, ask_question_read_only, run_pipeline
 
 
 def _settings(*, openai_api_key: str | None = "sk-test") -> Settings:
@@ -126,4 +126,26 @@ class TestAskQuestion:
 
         with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
             ask_question("why?", settings=_settings(openai_api_key=None), runner=runner)
+        assert runner.calls == []
+
+
+class TestAskQuestionReadOnly:
+    def test_uses_same_conversation_contract_as_qa_mode(self) -> None:
+        runner = _FakeAskRunner(answer="read-only answer")
+        prior_history = [{"role": "user", "content": "first question"}]
+
+        answer, history = ask_question_read_only(
+            "why?", settings=_settings(), history=prior_history, runner=runner
+        )
+
+        assert answer == "read-only answer"
+        assert runner.calls[0]["history"] == prior_history
+        assert runner.calls[0]["question"] == "why?"
+        assert {"role": "assistant", "content": "read-only answer"} in history
+
+    def test_raises_runtime_error_when_no_api_key_configured(self) -> None:
+        runner = _FakeAskRunner()
+
+        with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+            ask_question_read_only("why?", settings=_settings(openai_api_key=None), runner=runner)
         assert runner.calls == []

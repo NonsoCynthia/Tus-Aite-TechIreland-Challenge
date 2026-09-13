@@ -16,25 +16,31 @@ FROM python:3.12-slim
 WORKDIR /app
 
 COPY orchestrator/requirements.txt orchestrator/requirements.txt
+COPY orchestrator-agent/requirements.txt orchestrator-agent/requirements.txt
+COPY rationale/requirements.txt rationale/requirements.txt
 COPY capacity-agent/requirements.txt capacity-agent/requirements.txt
 COPY urgency-agent/requirements.txt urgency-agent/requirements.txt
 COPY retrieval/requirements.txt retrieval/requirements.txt
 RUN pip install --no-cache-dir \
       -r orchestrator/requirements.txt \
+      -r orchestrator-agent/requirements.txt \
+      -r rationale/requirements.txt \
       -r capacity-agent/requirements.txt \
       -r urgency-agent/requirements.txt \
       -r retrieval/requirements.txt
 
 COPY orchestrator/ orchestrator/
+COPY orchestrator-agent/ orchestrator-agent/
 COPY coordinator/ coordinator/
 COPY capacity-agent/ capacity-agent/
 COPY urgency-agent/ urgency-agent/
 COPY retrieval/ retrieval/
+COPY rationale/ rationale/
 COPY --from=ui /ui/dist web/dist
 
 # capacity_agent and urgency_agent are packages inside hyphenated directories,
 # so those directories go on the path, not just the root.
-ENV PYTHONPATH=/app:/app/capacity-agent:/app/urgency-agent \
+ENV PYTHONPATH=/app:/app/orchestrator-agent:/app/capacity-agent:/app/urgency-agent \
     PYTHONUNBUFFERED=1 \
     UI_DIST=/app/web/dist
 

@@ -12,6 +12,7 @@ import { Run } from './surfaces/Run'
 import { Landing } from './surfaces/Landing'
 import { CohortGraphSurface } from './surfaces/CohortGraph'
 import { DecisionRecord } from './surfaces/DecisionRecord'
+import { AssistantPanel } from './components/AssistantPanel'
 import type { Decision } from './lib/types'
 
 export type Surface = 'overview' | 'list' | 'graph' | 'record'
@@ -212,8 +213,11 @@ export function App() {
 
   if (!entered) {
     return (
-      <Landing hospital={hospital} date={date} name={name} hospitals={picks}
-               onHospital={setHospital} onEnter={() => setEntered(true)} />
+      <>
+        <Landing hospital={hospital} date={date} name={name} hospitals={picks}
+                 onHospital={setHospital} onEnter={() => setEntered(true)} />
+        <AssistantPanel hospital={hospital} date={date} pathway={patient} />
+      </>
     )
   }
 
@@ -383,6 +387,7 @@ export function App() {
              onSeeGraph={() => { setRunOpen(false); go('graph') }}
              onSeeList={() => { setRunOpen(false); go('list') }} />
       )}
+      <AssistantPanel hospital={hospital} date={date} pathway={patient} />
     </div>
   )
 }

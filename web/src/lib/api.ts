@@ -150,6 +150,22 @@ export const api = {
     if (!r.ok) throw new Error(`could not start a run: ${r.status}`)
     return r.json()
   },
+
+  chat: async (body: {
+    question: string
+    session_id?: string | null
+    hospital_hipe?: string | null
+    as_of_date?: string | null
+    pathway_number?: string | null
+  }): Promise<{ session_id: string; answer: string }> => {
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!r.ok) throw new Error(`/api/chat -> ${r.status} ${r.statusText}`)
+    return r.json()
+  },
 }
 
 /** SEVERITY_RANK, coordinator/app/bands.py. Note cpc 3 outranks cpc 2, so
