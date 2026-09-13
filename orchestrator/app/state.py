@@ -78,6 +78,7 @@ class Store:
         # never hospital alone, or the date filters nothing.
         self._decisions: dict[tuple[str, str], dict[str, Any]] = {}
         self._latest_run: dict[tuple[str, str], str] = {}
+        self._chat_history: dict[str, list[Any]] = {}
         self._restore()
 
     def create_run(self, run: Run) -> None:
@@ -155,6 +156,15 @@ class Store:
     def latest_run_id(self, hospital_hipe: str, as_of_date: str) -> str | None:
         with self._lock:
             return self._latest_run.get((hospital_hipe, as_of_date))
+
+    def get_chat_history(self, session_id: str) -> list[Any] | None:
+        with self._lock:
+            history = self._chat_history.get(session_id)
+            return list(history) if history is not None else None
+
+    def put_chat_history(self, session_id: str, history: list[Any]) -> None:
+        with self._lock:
+            self._chat_history[session_id] = list(history)
 
 
 store = Store()

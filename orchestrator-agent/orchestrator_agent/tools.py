@@ -55,9 +55,16 @@ if _REPO_ROOT_STR not in sys.path:
 # importing it here also lets tests monkeypatch these names directly on
 # `tools`, rather than needing to patch inside a function-local import.
 from rationale.client import RetrievalClient, RetrievalServiceError  # noqa: E402
+from rationale.config import Settings as RationaleSettings  # noqa: E402
 from rationale.config import load_settings as load_rationale_settings  # noqa: E402
 from rationale.evidence_pack import packs_from_decision_response  # noqa: E402
-from rationale.llm_render import render_rationale_llm  # noqa: E402
+from rationale.llm_render import (  # noqa: E402
+    AgentRunError,
+    RationaleGuardrailError,
+    render_rationale_llm,
+)
+from rationale.models import EvidencePack, Rationale  # noqa: E402
+from rationale.render import render_rationale  # noqa: E402
 
 # Output is a tool-call result the LLM reads directly -- keep it bounded so
 # one verbose CLI run can't blow out the model's context.
@@ -203,6 +210,33 @@ def generate_rationale(
         says so plainly rather than explaining a different placement.
     """
     settings = load_rationale_settings()
+    if pathway_number is not None:
+        try:
+            with RetrievalClient(settings.retrieval_base_url, settings.bearer_token) as client:
+                evidence_response = client.get_placement_evidence(
+                    hospital_hipe,
+                    as_of_date,
+                    pathway_number,
+                )
+        except RetrievalServiceError as exc:
+            return (
+                f"could not fetch the evidence for {hospital_hipe}/{as_of_date}/"
+                f"{pathway_number}: {exc}"
+            )
+
+        pack = EvidencePack.from_evidence_response(
+            decision=f"decision/{hospital_hipe}/{as_of_date}",
+            pathway_number=pathway_number,
+            response=evidence_response,
+        )
+        if not pack.evidence:
+            return (
+                f"{pathway_number} has no cited evidence in the Decision for "
+                f"{hospital_hipe}/{as_of_date}"
+            )
+        rationale = _render_rationale_for_tool(pack, style=style, settings=settings)
+        return rationale.text
+
     try:
         with RetrievalClient(settings.retrieval_base_url, settings.bearer_token) as client:
             decision = client.get_decision(hospital_hipe, as_of_date)
@@ -216,22 +250,22 @@ def generate_rationale(
             "has run_coordinator been called for this hospital-day yet?"
         )
 
-    if pathway_number is not None:
-        matching = [pack for pack in packs if pack.pathway_number == pathway_number]
-        if not matching:
-            return (
-                f"{pathway_number} is not in the Decision for {hospital_hipe}/{as_of_date} -- "
-                "it may not have been ranked, or the pathway_number may be wrong."
-            )
-        packs = matching
-    else:
-        packs = packs[:limit]
+    packs = packs[:limit]
 
     rendered = []
     for pack in packs:
-        rationale = render_rationale_llm(pack, style=style, settings=settings)
+        rationale = _render_rationale_for_tool(pack, style=style, settings=settings)
         rendered.append(rationale.text)
     return "\n\n".join(rendered)
+
+
+def _render_rationale_for_tool(
+    pack: EvidencePack, *, style: RationaleStyle, settings: RationaleSettings
+) -> Rationale:
+    try:
+        return render_rationale_llm(pack, style=style, settings=settings)
+    except (AgentRunError, RationaleGuardrailError):
+        return render_rationale(pack, style=style)
 
 
 def _qa_client() -> QARetrievalClient:
