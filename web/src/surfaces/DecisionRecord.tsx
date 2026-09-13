@@ -272,7 +272,7 @@ export function DecisionRecord({ hospital, date, reference }: {
               The buckets overlap and are never summed:{' '}
               <strong className="num">{bothPaedExc.length}</strong> referrals sit in two at once,
               refused by the urgency agent and therefore unplaceable, which the coordinator
-              records as <span className="num">missing_urgency_score</span>. Summed rather than
+              records as <span className="num">paediatric_news2_not_applicable</span>. Summed rather than
               unioned they read as <span className="num">{fmt(naiveSum)}</span> of{' '}
               <span className="num">{fmt(total)}</span>.
             </div>

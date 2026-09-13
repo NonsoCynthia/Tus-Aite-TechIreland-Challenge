@@ -116,6 +116,17 @@ referral was made; it may not be the date the current waiting-list state began. 
 `referral_state_valid_from` means rationale can dereference the exact state node cited by the ranked
 placement.
 
+## Paediatric NEWS2 Guardrail
+
+The coordinator now enforces the paediatric safety guardrail at ranking time as well as relying on
+the urgency agent's scoring refusal. Referrals marked `is_paediatric=true`, or carrying paediatric
+specialty `0601`, are excluded from the adult NEWS2-ranked list with
+`exclusion_reason=paediatric_news2_not_applicable`.
+
+This protects the ranked decision from stale or accidental urgency scores that may already exist for
+a paediatric referral. NEWS2 is validated for adults, so paediatric referrals are treated as outside
+the scope of this adult ranking model rather than as low-priority patients.
+
 ## Things this README needs you to know before you trust any output
 
 - **ADR-007 is resolved: `pressure`.** The capacity agent documents `capacity_score` as a
