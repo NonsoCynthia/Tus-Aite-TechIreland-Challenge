@@ -81,6 +81,13 @@
   background: var(--surface);
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
+/* A caption, not a second bubble: .assistant-msg p above gives every paragraph
+   a border, a fill and padding, all of which this has to undo. */
+.assistant-msg .assistant-src {
+  padding: 0; border: 0; background: none;
+  font-size: var(--t-micro); color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
 .assistant-msg.is-user { justify-self: end; }
 .assistant-msg.is-user p {
   background: var(--ink); border-color: var(--ink); color: var(--paper);

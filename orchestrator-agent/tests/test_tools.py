@@ -488,18 +488,99 @@ class TestReadOnlyTools:
 
     def test_get_evidence_passes_role_through(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
-        fake = _FakeQAClient(response={"evidence": []})
+        # Non-empty on purpose: these two cover role pass-through on the
+        # ORDINARY path. Empty evidence now means "work out why" and costs a
+        # second call, which is its own test below.
+        fake = _FakeQAClient(response={"evidence": [{"iri": "ev/1"}]})
         monkeypatch.setattr(tools, "QARetrievalClient", fake)
 
         tools.get_evidence("9001", "2026-08-30", "PW-1", role="urgency")
 
         assert fake.calls == [("evidence", "9001", "2026-08-30", "PW-1", "urgency")]
 
+    def test_empty_evidence_costs_one_lookup_to_find_out_why(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Only on the empty path, so the ordinary case still costs one call.
+
+        Empty evidence and a refused paediatric referral are indistinguishable
+        from the evidence endpoint alone, and answering "no citations" when it
+        is the second reported a data gap this system does not have.
+        """
+        monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
+        fake = _FakeQAClient(response={"placement": "p/1", "evidence": []})
+        monkeypatch.setattr(tools, "QARetrievalClient", fake)
+
+        tools.get_evidence("9001", "2026-08-30", "PW-1")
+
+        assert [call[0] for call in fake.calls] == ["evidence", "context"]
+
     def test_get_evidence_omits_role_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(tools, "load_settings", _orchestrator_settings)
-        fake = _FakeQAClient(response={"evidence": []})
+        # Non-empty on purpose: these two cover role pass-through on the
+        # ORDINARY path. Empty evidence now means "work out why" and costs a
+        # second call, which is its own test below.
+        fake = _FakeQAClient(response={"evidence": [{"iri": "ev/1"}]})
         monkeypatch.setattr(tools, "QARetrievalClient", fake)
 
         tools.get_evidence("9001", "2026-08-30", "PW-1")
 
         assert fake.calls == [("evidence", "9001", "2026-08-30", "PW-1", None)]
+
+
+# --- ADR-007 at the tool boundary ---------------------------------------
+#
+# The Q&A tools read retrieval directly, so they never passed through the
+# scoring-time refusal. Asked about a paediatric referral they returned the
+# whole context payload, vitals included, and the assistant scored a child on
+# an adult scale in prose. Four phrasings out of five did it.
+
+
+def test_paediatric_match_is_exact_not_a_prefix() -> None:
+    """0600 differs from 0601 by one character and is NOT paediatric.
+
+    A prefix or "starts with 060" test would refuse the largest ordinary
+    specialty on this list, which is a far more visible failure than the leak.
+    """
+    from orchestrator_agent.tools import _refused_paediatric
+
+    assert _refused_paediatric({"referral": {"specialty_hipe": "0601"}}) is True
+    assert _refused_paediatric({"referral": {"specialty_hipe": "0600"}}) is False
+    assert _refused_paediatric({"referral": {"specialty_hipe": "060"}}) is False
+    assert _refused_paediatric({"referral": {"specialty_hipe": None}}) is False
+    assert _refused_paediatric({"referral": {}}) is False
+    assert _refused_paediatric({}) is False
+
+
+def test_the_refusal_names_the_reason_and_the_paediatric_alternative() -> None:
+    from orchestrator_agent.tools import PAEDIATRIC_REFUSAL
+
+    assert "ADR-007" in PAEDIATRIC_REFUSAL
+    assert "not validated in children" in PAEDIATRIC_REFUSAL
+    assert "PEWS" in PAEDIATRIC_REFUSAL
+    # the sentence that stops a deliberate exclusion being reported as a gap
+    assert "NOT missing evidence" in PAEDIATRIC_REFUSAL
+
+
+def test_the_refusal_carries_no_readings_of_its_own() -> None:
+    """It is prose returned INSTEAD of vitals, so it must not quote any."""
+    from orchestrator_agent.tools import PAEDIATRIC_REFUSAL
+
+    import re
+
+    # the only digits allowed are the ADR number and the score's own name
+    stripped = PAEDIATRIC_REFUSAL.replace("ADR-007", "").replace("NEWS2", "")
+    assert not re.search(r"\d", stripped), "a number leaked into the refusal text"
+
+
+def test_empty_evidence_is_detected_so_the_reason_can_be_looked_up() -> None:
+    """Retrieval returns {placement, evidence} for a refused referral too, with
+    evidence empty. Reporting that as "no citations" is what told a clinician
+    the evidence was missing for a referral the system had refused on purpose."""
+    from orchestrator_agent.tools import _has_citations
+
+    assert _has_citations({"placement": "p/1", "evidence": []}) is False
+    assert _has_citations({"placement": "p/1", "evidence": [{"x": 1}]}) is True
+    # an unfamiliar shape must read as non-empty, so the payload is left alone
+    assert _has_citations({"something_new": [1, 2]}) is True
+    assert _has_citations({}) is False

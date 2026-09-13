@@ -20,6 +20,7 @@ from urllib.parse import unquote
 import concurrent.futures as cf
 import datetime as _dt
 import time
+from collections import Counter
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -30,6 +31,12 @@ from pydantic import BaseModel, Field
 from .runner import CAPACITY_DIRECTION, execute
 from .sources import query, sources_status, sparql
 from .state import Run, store
+
+# The chat facts name every band rather than printing its code. Imported, not
+# redeclared: a second copy of this mapping that drifted would mislabel bands in
+# the one place nothing downstream can catch it. Deliberately unguarded, so a
+# broken import fails at boot rather than silently falling back to raw codes.
+from coordinator.app.decision import CPC_BAND_LABELS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -740,34 +747,113 @@ def _chat_current_facts(payload: ChatIn) -> list[str]:
     facts.append(f"- decision_id: {decision.get('decision_id', '')}")
     facts.append(f"- run_id: {decision.get('run_id', '')}")
     facts.append(f"- ranked_referrals: {len(rankings)}")
+
+    # Counts the model would otherwise derive by tallying the whole cohort inside
+    # get_cohort, which hands it 300+ rows as one JSON string. That is where the
+    # 35-second answers and "there is 1 breached referral" came from: it is a
+    # language model counting, not a system reporting. Every figure below is
+    # counted here, from the same Decision the ranked list on screen renders.
+    breached = [row for row in rankings if row.get("crt_breached")]
+    facts.append(f"- past_target_total: {len(breached)}")
+    facts.append(f"- past_target_by_band: {_chat_band_counts(breached)}")
+    facts.append(f"- band_counts: {_chat_band_counts(rankings)}")
+
+    # Both are exclusions, and they are not interchangeable: paediatric referrals
+    # were refused a score (ADR-007), skipped ones had no citable evidence.
+    refused = decision.get("refused_paediatric") or []
+    facts.append(f"- refused_paediatric_total: {len(refused)}")
+    # Named, not just counted. "Why is this one not ranked" is a question about a
+    # specific pathway, and without the list the assistant has to go looking,
+    # finds no placement, and reports a deliberate exclusion as missing evidence.
+    if refused:
+        facts.append(f"- refused_paediatric_pathways: {', '.join(sorted(refused)[:25])}")
+    facts.append(f"- skipped_no_evidence_total: {len(decision.get('skipped') or [])}")
+    facts.append(f"- alpha: {_chat_round(decision.get('alpha'))}")
+    facts.append(f"- scarcity: {_chat_round(decision.get('scarcity'))}")
+
+    # A NEWS2 of 0 is a recorded score, not a missing one. Asked how many have no
+    # NEWS2, the honest answer is the missing count, and the two are far apart.
+    news2 = decision.get("news2") or {}
+    recorded = [value for value in news2.values() if value is not None]
+    facts.append(
+        f"- news2: recorded={len(recorded)}, missing={len(news2) - len(recorded)}, "
+        f"scoring_zero={sum(1 for value in recorded if value == 0)}"
+    )
+
     if rankings:
-        facts.append(f"- first_ranked_referral: {_chat_ranking_summary(rankings[0], position=1)}")
+        head = rankings[0]
+        facts.append(
+            "- first_ranked_referral: "
+            f"{_chat_ranking_summary(head, position=1, news2=news2.get(head.get('pathway_number')))}"
+        )
     if payload.pathway_number:
         for index, row in enumerate(rankings, start=1):
             if row.get("pathway_number") == payload.pathway_number:
                 facts.append(
-                    f"- selected_referral_rank: {_chat_ranking_summary(row, position=index)}"
+                    "- selected_referral_rank: "
+                    f"{_chat_ranking_summary(row, position=index, news2=news2.get(payload.pathway_number))}"
                 )
                 break
     return facts
 
 
-def _chat_ranking_summary(row: dict[str, Any], *, position: int) -> str:
+def _chat_round(value: Any) -> Any:
+    """Trims binary float noise before a score reaches the model.
+
+    alpha is 0.8112; stored as a double it prints as 0.8111999999999999, and a
+    model quoting that verbatim reads as false precision against a UI showing
+    four places. Non-numeric values pass through untouched.
+    """
+    return round(value, 4) if isinstance(value, float) else value
+
+
+def _band_label(row: dict[str, Any]) -> str:
+    """One ranked row's band by name, never by its `cpc` code.
+
+    CPC 3 (Semi-Urgent) printed beside CPC 2 (Routine) reads as the less urgent
+    of the two, which is the exact confusion `severity_rank` exists to prevent
+    (coordinator/app/decision.py, CPC_BAND_LABELS). These facts are read by a
+    language model, which has no way to know the codes are not ordinal.
+    """
+    return CPC_BAND_LABELS.get(row.get("cpc"), "uncategorised")
+
+
+def _chat_band_counts(rows: list[dict[str, Any]]) -> str:
+    counts = Counter(_band_label(row) for row in rows)
+    # CPC_BAND_LABELS is declared in severity order (1, 3, 2, 4, None), so
+    # iterating its values keeps Urgent first and Routine after Semi-Urgent.
+    named = dict.fromkeys(CPC_BAND_LABELS.values())
+    return ", ".join(f"{name}={counts[name]}" for name in named if counts[name]) or "none"
+
+
+def _chat_ranking_summary(
+    row: dict[str, Any], *, position: int, news2: int | None = None
+) -> str:
+    """One ranked row, as facts rather than as a JSON dump.
+
+    `news2` is passed in because it is not on the row: the urgency agent's pass
+    carries it separately on the Decision (runner.py). Without it here, a model
+    asked why this referral is placed where it is has the scores but not the
+    reading behind them, and fills the gap with a guess.
+    """
     parts = [
         f"position={position}",
         f"pathway_number={row.get('pathway_number')}",
+        f"band={_band_label(row)}",
     ]
     for key in (
         "specialty_hipe",
-        "cpc",
         "crt_breached",
+        "crt_threshold_days",
         "adjusted_wait_days",
         "urgency_score",
         "capacity_score",
-        "priority_score",
+        "priority",
     ):
         if key in row:
-            parts.append(f"{key}={row.get(key)}")
+            parts.append(f"{key}={_chat_round(row.get(key))}")
+    if news2 is not None:
+        parts.append(f"news2={news2}")
     return ", ".join(parts)
 
 
@@ -804,7 +890,24 @@ def chat(payload: ChatIn) -> dict[str, Any]:
 
     answer = _chat_answer(answer)
     store.put_chat_history(session_id, updated_history)
-    return {"session_id": session_id, "answer": answer}
+    # What the answer was read from, so the panel can show it. A clinician has no
+    # other way to tell an answer grounded in the decision on screen from one the
+    # model composed, and "how do I know it is not inventing this" is the first
+    # question anyone asks of a chat box sitting next to a ranked list.
+    return {"session_id": session_id, "answer": answer, "source": _chat_source(payload)}
+
+
+def _chat_source(payload: ChatIn) -> dict[str, str] | None:
+    """The decision the facts in this turn came from, or None if none is held."""
+    if not payload.hospital_hipe or not payload.as_of_date:
+        return None
+    decision = store.get_decision(payload.hospital_hipe, payload.as_of_date)
+    if decision is None:
+        return None
+    return {
+        "decision_id": str(decision.get("decision_id", "")),
+        "run_id": str(decision.get("run_id", "")),
+    }
 
 
 @app.post("/api/overrides")

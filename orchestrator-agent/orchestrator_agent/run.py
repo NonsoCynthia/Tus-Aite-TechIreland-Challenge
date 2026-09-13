@@ -29,14 +29,14 @@ def _default_pipeline_runner(*, prompt: str, model: str, api_key: str) -> str:
     from agents import InputGuardrailTripwireTriggered, Runner, set_default_openai_key
 
     from .agent import build_agent
-    from .scope_guardrail import GENERIC_OUT_OF_SCOPE_RESPONSE
+    from .scope_guardrail import response_for
 
     set_default_openai_key(api_key)
     agent = build_agent(model=model)
     try:
         result = Runner.run_sync(agent, prompt)
-    except InputGuardrailTripwireTriggered:
-        return GENERIC_OUT_OF_SCOPE_RESPONSE
+    except InputGuardrailTripwireTriggered as exc:
+        return response_for(exc)
     return str(result.final_output)
 
 
@@ -103,7 +103,7 @@ def _default_ask_runner(
     from agents import InputGuardrailTripwireTriggered, Runner, set_default_openai_key
 
     from .agent import build_agent
-    from .scope_guardrail import GENERIC_OUT_OF_SCOPE_RESPONSE
+    from .scope_guardrail import response_for
 
     set_default_openai_key(api_key)
     agent = build_agent(model=model)
@@ -112,8 +112,8 @@ def _default_ask_runner(
     )
     try:
         result = Runner.run_sync(agent, conversation_input)
-    except InputGuardrailTripwireTriggered:
-        return GENERIC_OUT_OF_SCOPE_RESPONSE, history or []
+    except InputGuardrailTripwireTriggered as exc:
+        return response_for(exc), history or []
     return str(result.final_output), result.to_input_list()
 
 
@@ -128,7 +128,7 @@ def _default_read_only_ask_runner(
     from agents import InputGuardrailTripwireTriggered, Runner, set_default_openai_key
 
     from .agent import build_qa_agent
-    from .scope_guardrail import GENERIC_OUT_OF_SCOPE_RESPONSE
+    from .scope_guardrail import response_for
 
     set_default_openai_key(api_key)
     agent = build_qa_agent(model=model)
@@ -137,8 +137,8 @@ def _default_read_only_ask_runner(
     )
     try:
         result = Runner.run_sync(agent, conversation_input)
-    except InputGuardrailTripwireTriggered:
-        return GENERIC_OUT_OF_SCOPE_RESPONSE, history or []
+    except InputGuardrailTripwireTriggered as exc:
+        return response_for(exc), history or []
     return str(result.final_output), result.to_input_list()
 
 

@@ -151,17 +151,26 @@ export const api = {
     return r.json()
   },
 
+  /** `signal` carries the panel's own timeout: a question that routes through
+      generate_rationale can take 20s, and without a deadline a stalled request
+      leaves the panel saying "Thinking" with nothing behind it. `source` names
+      the decision the answer was read from, or is null when none is held. */
   chat: async (body: {
     question: string
     session_id?: string | null
     hospital_hipe?: string | null
     as_of_date?: string | null
     pathway_number?: string | null
-  }): Promise<{ session_id: string; answer: string }> => {
+  }, signal?: AbortSignal): Promise<{
+    session_id: string
+    answer: string
+    source: { decision_id: string; run_id: string } | null
+  }> => {
     const r = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
+      signal,
     })
     if (!r.ok) throw new Error(`/api/chat -> ${r.status} ${r.statusText}`)
     return r.json()

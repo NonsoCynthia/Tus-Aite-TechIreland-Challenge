@@ -3,7 +3,16 @@ import { Bot, Send, UserRound, X } from 'lucide-react'
 import { api } from '../lib/api'
 import './assistant-panel.css'
 
-type Message = { role: 'user' | 'assistant'; text: string }
+type Message = {
+  role: 'user' | 'assistant'
+  text: string
+  source?: { decision_id: string; run_id: string } | null
+}
+
+/** A question routed through generate_rationale takes about 20s, so this is
+    deliberately well clear of that. It exists so a stalled request ends in a
+    sentence the clinician can act on rather than in "Thinking" forever. */
+const TIMEOUT_MS = 90_000
 
 interface Props {
   hospital: string
@@ -31,6 +40,9 @@ export function AssistantPanel({ hospital, date, pathway }: Props) {
     setQuestion('')
     setSending(true)
     setMessages((rows) => [...rows, { role: 'user', text }])
+
+    const abort = new AbortController()
+    const timer = window.setTimeout(() => abort.abort(), TIMEOUT_MS)
     try {
       const reply = await api.chat({
         question: text,
@@ -38,15 +50,25 @@ export function AssistantPanel({ hospital, date, pathway }: Props) {
         hospital_hipe: hospital,
         as_of_date: date,
         pathway_number: pathway,
-      })
+      }, abort.signal)
       setSessionId(reply.session_id)
-      setMessages((rows) => [...rows, { role: 'assistant', text: reply.answer }])
-    } catch {
       setMessages((rows) => [
         ...rows,
-        { role: 'assistant', text: 'The assistant could not be reached.' },
+        { role: 'assistant', text: reply.answer, source: reply.source },
       ])
+    } catch (error) {
+      // A slow answer and an unreachable service are not the same failure, and
+      // saying the assistant could not be reached when it simply took too long
+      // sends someone to check the network for a problem that is not there.
+      const timedOut = error instanceof DOMException && error.name === 'AbortError'
+      setMessages((rows) => [...rows, {
+        role: 'assistant',
+        text: timedOut
+          ? 'That question took too long to answer, so I stopped waiting. Nothing was changed. A narrower question, naming one referral, usually comes back quickly.'
+          : 'The assistant could not be reached.',
+      }])
     } finally {
+      window.clearTimeout(timer)
       setSending(false)
     }
   }
@@ -93,6 +115,12 @@ export function AssistantPanel({ hospital, date, pathway }: Props) {
               <div key={index} className={`assistant-msg is-${message.role}`}>
                 <span>{message.role === 'user' ? 'You' : 'Assistant'}</span>
                 <p>{message.text}</p>
+                {message.source && (
+                  <p className="assistant-src">
+                    Read from decision {message.source.decision_id.slice(0, 12)}, run{' '}
+                    {message.source.run_id}
+                  </p>
+                )}
               </div>
             ))}
             {sending && <p className="assistant-wait">Thinking...</p>}

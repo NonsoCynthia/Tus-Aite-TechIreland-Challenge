@@ -33,7 +33,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from .config import load_settings, repo_root
 from .retrieval_client import RetrievalClient as QARetrievalClient
@@ -268,6 +268,47 @@ def _render_rationale_for_tool(
         return render_rationale(pack, style=style)
 
 
+PAEDIATRIC_REFUSAL = (
+    "This referral is in the paediatric specialty, and this system refuses to "
+    "score paediatric referrals rather than scoring them badly (ADR-007). NEWS2 "
+    "is an adult early warning score and is not validated in children, whose "
+    "normal vital-sign ranges differ: a resting heart rate that scores in an "
+    "adult is unremarkable in a small child. So this referral has no urgency "
+    "score, no NEWS2, and no place in the ranked list.\n\n"
+    "That absence is a deliberate, recorded exclusion, NOT missing evidence, an "
+    "incomplete record, or a referral still awaiting triage. Say so plainly if "
+    "asked why it is not ranked.\n\n"
+    "Its vital signs and clinical observations are withheld here on purpose, "
+    "because quoting them invites exactly the adult-scale reading the refusal "
+    "exists to prevent. Do not state or estimate this referral's NEWS2, urgency, "
+    "vital signs or acuity, and do not compare it with another referral on any "
+    "of those grounds. A clinician needing these readings should use the "
+    "paediatric pathway, which uses PEWS rather than NEWS2."
+)
+"""What the read-only tools return in place of a refused referral's vitals.
+
+ADR-007 refuses paediatric referrals at scoring time, but the Q&A tools read
+retrieval directly and so never passed through that decision: asked for one of
+these referrals, they handed back the whole context payload, vitals included,
+and the assistant duly scored a child on an adult scale in prose. Enforced here
+rather than in the instructions because an instruction is a preference the
+model can be argued out of, and this is the system's clearest safety claim.
+"""
+
+
+def _refused_paediatric(context: dict[str, Any]) -> bool:
+    """Whether a context payload belongs to a refused paediatric referral.
+
+    Exact match, never a prefix: specialty 0600 differs by one character and is
+    NOT paediatric (urgency_agent.scoring). The specialty is the only paediatric
+    signal available, since the context endpoint returns no patient age.
+    """
+    from urgency_agent.scoring import PAEDIATRIC_SPECIALTY
+
+    referral = context.get("referral") or {}
+    return str(referral.get("specialty_hipe") or "") == PAEDIATRIC_SPECIALTY
+
+
 def _qa_client() -> QARetrievalClient:
     settings = load_settings()
     return QARetrievalClient(settings.retrieval_base_url, settings.bearer_token)
@@ -289,13 +330,20 @@ def get_referral_context(hospital_hipe: str, pathway_number: str) -> str:
 
     Returns:
         The raw context as JSON, or a plain-language error if the referral
-        doesn't exist.
+        doesn't exist. For a paediatric referral the clinical half is withheld
+        and PAEDIATRIC_REFUSAL is returned in its place (ADR-007); the
+        administrative record is still returned, since the referral's dates,
+        specialty and triage status are not the thing being refused.
     """
     try:
         with _qa_client() as client:
             data = client.get_referral_context(hospital_hipe, pathway_number)
     except RetrievalClientError as exc:
         return f"could not fetch context for {hospital_hipe}/{pathway_number}: {exc}"
+    if _refused_paediatric(data):
+        return f"{PAEDIATRIC_REFUSAL}\n\nAdministrative record only:\n" + _format_json(
+            {"referral": data.get("referral") or {}}
+        )
     return _format_json(data)
 
 
@@ -393,13 +441,43 @@ def get_evidence(
             multi_list), or omit for all four.
 
     Returns:
-        The resolved evidence as JSON.
+        The resolved evidence as JSON. A refused paediatric referral has no
+        placement and so no citations; rather than report that as an empty
+        result, which reads as a gap in the data, this returns the actual
+        reason (ADR-007).
     """
     try:
         with _qa_client() as client:
             data = client.get_evidence(hospital_hipe, as_of_date, pathway_number, role=role)
+            # Only on the empty path, so the ordinary case still costs one call.
+            # "No citations" and "deliberately excluded" look identical from
+            # here, and answering the first when it is the second told a
+            # clinician the evidence was missing for a referral the system had
+            # in fact refused on purpose.
+            if not _has_citations(data):
+                try:
+                    context = client.get_referral_context(hospital_hipe, pathway_number)
+                except RetrievalClientError:
+                    context = {}
+                if context and _refused_paediatric(context):
+                    return PAEDIATRIC_REFUSAL
     except RetrievalClientError as exc:
         return (
             f"could not fetch evidence for {hospital_hipe}/{as_of_date}/{pathway_number}: {exc}"
         )
     return _format_json(data)
+
+
+def _has_citations(data: object) -> bool:
+    """Whether an evidence payload actually carries anything.
+
+    Shape-tolerant on purpose: this decides only whether to spend one more call
+    working out WHY a result is empty, so an unfamiliar shape should read as
+    non-empty and leave the payload untouched.
+    """
+    if isinstance(data, dict):
+        for key in ("citations", "evidence", "placements"):
+            if key in data:
+                return bool(data[key])
+        return bool(data)
+    return bool(data)
