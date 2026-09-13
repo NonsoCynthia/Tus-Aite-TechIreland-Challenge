@@ -30,3 +30,14 @@
   # pinned here rather than left to whatever Netlify's own default happens
   # to be. Verified clean (no engine warning) on this exact version.
   NODE_VERSION = "22"
+
+# Fill in ORCHESTRATOR_URL below once `orchestrator` (docker-compose.yml) is
+# deployed somewhere reachable (Render/Fly/Railway) -- see this file's own
+# top comment for why the app needs this. Until then this redirect is inert:
+# a placeholder host that resolves to nothing, so /api/* still fails, just
+# with a clearer error than a bare Netlify 404.
+[[redirects]]
+  from = "/api/*"
+  to = "https://ORCHESTRATOR_URL/api/:splat"
+  status = 200
+  force = true
