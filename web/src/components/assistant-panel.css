@@ -1,3 +1,4 @@
+/* --- the launcher ------------------------------------------------------- */
 .assistant-launcher {
   position: fixed; right: var(--d5); bottom: var(--d5); z-index: 55;
   display: inline-flex; align-items: end; gap: var(--d3);
@@ -29,11 +30,15 @@
   transform: rotate(45deg);
 }
 
+/* --- the panel ----------------------------------------------------------
+   HEIGHT, not max-height. With only a max, the panel resized on every turn:
+   it grew as each message landed and the whole thing moved under the cursor.
+   A fixed height means the log scrolls and the frame never does. */
 .assistant-panel {
   position: fixed; right: var(--d5); bottom: var(--d5); z-index: 60;
   width: min(420px, calc(100vw - var(--d5) * 2));
-  max-height: calc(100vh - var(--d5) * 2);
-  display: grid; grid-template-rows: auto minmax(220px, 1fr) auto;
+  height: min(560px, calc(100vh - var(--d5) * 2));
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
   border: 1px solid var(--rule-firm); border-radius: var(--radius);
   background: var(--surface); color: var(--text);
 }
@@ -41,22 +46,26 @@
   display: flex; align-items: flex-start; justify-content: space-between; gap: var(--d3);
   padding: var(--d4); border-bottom: 1px solid var(--rule);
 }
+.assistant-id { display: flex; align-items: start; gap: var(--d2); min-width: 0; }
 .assistant-title {
-  display: flex; align-items: center; gap: var(--d2);
-  font-family: var(--font-brand); font-size: 15px;
+  font-family: var(--font-brand); font-size: var(--t-section); line-height: 1.2;
 }
 .assistant-scope {
-  margin-top: 4px; font-size: var(--t-micro); color: var(--text-3);
+  margin-top: var(--d1); font-size: var(--t-micro); color: var(--text-3);
   overflow-wrap: anywhere;
 }
 .assistant-close {
-  width: 34px; height: 34px; display: grid; place-items: center;
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
   border: 1px solid var(--rule); border-radius: var(--radius);
   background: var(--surface-2); color: var(--text-2); cursor: pointer;
 }
+.assistant-close:hover { border-color: var(--text-3); color: var(--text); }
+
+/* --- the log ------------------------------------------------------------ */
 .assistant-log {
   min-height: 0; overflow: auto; display: grid; align-content: start; gap: var(--d3);
   padding: var(--d4); background: var(--surface-2);
+  scroll-behavior: smooth;
 }
 .assistant-empty {
   display: flex; align-items: center; gap: var(--d3);
@@ -64,16 +73,10 @@
 }
 .assistant-empty p { margin: 0; color: var(--text); }
 .assistant-empty .assistant-person { width: 38px; height: 38px; }
-.assistant-wait {
-  margin: 0; font-size: var(--t-small); color: var(--text-2); line-height: 1.55;
-}
+
 .assistant-msg {
-  display: grid; gap: 5px; max-width: 92%;
+  display: grid; gap: var(--d1); max-width: 92%;
   font-size: var(--t-small); line-height: 1.55;
-}
-.assistant-msg span {
-  font-size: var(--t-micro); color: var(--text-3);
-  text-transform: uppercase; letter-spacing: 0.06em;
 }
 .assistant-msg p {
   margin: 0; padding: var(--d3);
@@ -86,32 +89,65 @@
 .assistant-msg .assistant-src {
   padding: 0; border: 0; background: none;
   font-size: var(--t-micro); color: var(--text-3);
-  font-variant-numeric: tabular-nums;
 }
 .assistant-msg.is-user { justify-self: end; }
+.assistant-msg.is-user .lab { justify-self: end; }
 .assistant-msg.is-user p {
   background: var(--ink); border-color: var(--ink); color: var(--paper);
 }
+
+/* --- waiting ------------------------------------------------------------
+   No spinner: DESIGN_PACK.md:1765 forbids one, and the house pattern for a
+   wait is an inline label (List.tsx's "Reading the cohort"). The dots carry
+   no information, so losing them under reduced motion costs nothing. */
+.assistant-wait {
+  margin: 0; display: flex; align-items: center; gap: var(--d2);
+  color: var(--text-2);
+}
+.assistant-dots { display: inline-flex; gap: 3px; }
+.assistant-dots i {
+  width: 3px; height: 3px; border-radius: 50%;
+  background: var(--text-3);
+  animation: assistantDot 1200ms var(--ease) infinite;
+}
+.assistant-dots i:nth-child(2) { animation-delay: 160ms; }
+.assistant-dots i:nth-child(3) { animation-delay: 320ms; }
+@keyframes assistantDot {
+  0%, 60%, 100% { opacity: 0.25; }
+  30%           { opacity: 1; }
+}
+
+/* --- the composer -------------------------------------------------------
+   One row, growing with its content, rather than a labelled 72-150px box: the
+   "QUESTION" label carried nothing the placeholder does not. */
 .assistant-form {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--d3);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--d2);
   align-items: end; padding: var(--d4); border-top: 1px solid var(--rule);
 }
-.assistant-input { display: grid; gap: 5px; }
-.assistant-input textarea {
-  resize: vertical; min-height: 72px; max-height: 150px;
+.assistant-composer {
+  resize: none; overflow-y: auto; min-height: 38px; max-height: 132px;
   font: inherit; font-size: var(--t-small); line-height: 1.45;
   color: var(--text); background: var(--surface);
   border: 1px solid var(--rule-firm); border-radius: var(--radius);
   padding: var(--d2); outline: none;
 }
-.assistant-input textarea:focus { border-color: var(--text-3); }
+.assistant-composer::placeholder { color: var(--text-3); }
+.assistant-composer:focus { border-color: var(--text-3); }
 .assistant-send {
-  min-height: 38px; display: inline-flex; align-items: center; gap: var(--d2);
-  padding: 0 var(--d3); border: 1px solid var(--ink); border-radius: var(--radius);
+  width: 38px; height: 38px; flex: none; display: grid; place-items: center;
+  border: 1px solid var(--ink); border-radius: var(--radius);
   background: var(--ink); color: var(--paper);
-  font: inherit; font-size: var(--t-small); cursor: pointer;
+  font: inherit; cursor: pointer;
 }
 .assistant-send:disabled { opacity: 0.45; cursor: default; }
+
+/* The global guard in tokens.css crushes animation-duration to 0.01ms, which
+   neither stops a smooth scroll nor gives an infinite animation a resting
+   state. Both need saying here. */
+@media (prefers-reduced-motion: reduce) {
+  .assistant-log { scroll-behavior: auto; }
+  .assistant-dots i { animation: none; opacity: 0.55; }
+}
 
 @media (max-width: 720px) {
   .assistant-launcher {
@@ -121,7 +157,6 @@
   .assistant-panel {
     right: var(--d3); bottom: var(--d3);
     width: calc(100vw - var(--d3) * 2);
-    max-height: calc(100vh - var(--d3) * 2);
+    height: min(560px, calc(100vh - var(--d3) * 2));
   }
-  .assistant-form { grid-template-columns: 1fr; }
 }
