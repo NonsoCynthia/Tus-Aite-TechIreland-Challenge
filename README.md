@@ -7,7 +7,11 @@ The project turns fragmented referral, urgency, and bed-capacity data into a ran
 shortlist that a clinician can inspect, accept, reorder, or override. The system does not admit,
 schedule, diagnose, or make final clinical decisions. It provides auditable decision support.
 
-<video src="demo/Tus-Aite-Demo.mp4" width="100%" autoplay loop muted playsinline controls></video>
+https://github.com/user-attachments/assets/7352872f-519b-463d-8e25-6c5ba1191bc1
+
+
+
+
 
 ## Working with the dataset
 
